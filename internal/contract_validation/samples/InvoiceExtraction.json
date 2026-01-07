@@ -1,0 +1,16 @@
+{
+  "vendor": "Steel Co",
+  "date": "2026-01-05",
+  "invoice_number": "INV-1001",
+  "total_amount": 1500.5,
+  "line_items": [
+    {
+      "description": "Steel Beams",
+      "quantity": 10,
+      "unit_price": 150.05,
+      "total": 1500.5
+    }
+  ],
+  "suggested_wbs_code": "6200-LBR",
+  "confidence": 0.98
+}

@@ -1,0 +1,983 @@
+{
+    "template": {
+        "entry_point_wbs": "5.2",
+        "is_default": true,
+        "name": "Residential Construction Path Model (CPM-res1.0)",
+        "version": "1.2.0"
+    },
+    "phases": [
+        {
+            "code": "6.x",
+            "name": "Procurement",
+            "is_weather_sensitive": false,
+            "sort_order": 1,
+            "tasks": [
+                {
+                    "base_duration_days": 1,
+                    "code": "6.0",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 8,
+                    "lead_time_weeks_min": 4,
+                    "name": "Order Roof Trusses",
+                    "notes": "Verify lead times with truss manufacturer",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.1",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 20,
+                    "lead_time_weeks_min": 8,
+                    "name": "Order Windows \u0026 Exterior Doors",
+                    "notes": "Confirm rough opening sizes before ordering",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.2",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 6,
+                    "name": "Order HVAC Equipment",
+                    "notes": "Coordinate with HVAC sub for equipment list",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.3",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 6,
+                    "name": "Order Plumbing Fixtures",
+                    "notes": "Staged ordering for rough-in vs finish fixtures",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.4",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 6,
+                    "name": "Order Electrical Fixtures \u0026 Panels",
+                    "notes": "Confirm panel capacity and fixture selections",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.5",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 16,
+                    "lead_time_weeks_min": 10,
+                    "name": "Order Cabinetry \u0026 Millwork",
+                    "notes": "Final field measurements needed before release",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.6",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 16,
+                    "lead_time_weeks_min": 8,
+                    "name": "Order Appliances",
+                    "notes": "Verify appliance specs for rough-in planning",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.7",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 6,
+                    "name": "Order Garage Doors",
+                    "notes": "Confirm motor/opener requirements",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.8",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 4,
+                    "name": "Order Exterior Cladding \u0026 Roofing",
+                    "notes": "Coordinate siding and roofing material colors",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "6.9",
+                    "deliverable": "Purchase Order",
+                    "is_long_lead": true,
+                    "lead_time_weeks_max": 12,
+                    "lead_time_weeks_min": 6,
+                    "name": "Order Interior Doors, Trim, Hardware",
+                    "notes": "Final trim list based on actual framing",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Builder"
+                }
+            ]
+        },
+        {
+            "code": "7.x",
+            "name": "Site Prep",
+            "is_weather_sensitive": true,
+            "sort_order": 2,
+            "tasks": [
+                {
+                    "base_duration_days": 2,
+                    "code": "7.0",
+                    "deliverable": "Work Completion",
+                    "name": "Temporary Power \u0026 Water",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "5.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "7.1",
+                    "deliverable": "Work Completion",
+                    "name": "Site Clearing \u0026 Demolition",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "7.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "7.2",
+                    "deliverable": "Work Completion",
+                    "name": "Construction Entrance Install",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "7.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "7.3",
+                    "deliverable": "Work Completion",
+                    "name": "Rough Grading",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "7.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "7.4",
+                    "deliverable": "Work Completion",
+                    "name": "Foundation Staking \u0026 Layout",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "7.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "8.x",
+            "name": "Foundation",
+            "is_weather_sensitive": true,
+            "sort_order": 3,
+            "tasks": [
+                {
+                    "base_duration_days": 3,
+                    "code": "8.0",
+                    "deliverable": "Work Completion",
+                    "name": "Excavation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "7.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "8.1",
+                    "deliverable": "Work Completion",
+                    "name": "Form Footers \u0026 Rebar",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.2",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Footing Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.1"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.3",
+                    "deliverable": "Work Completion",
+                    "name": "Pour Footings",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "8.4",
+                    "deliverable": "Work Completion",
+                    "name": "Foundation Wall Forms/Steel",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.5",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Foundation Wall \u0026 Steel Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.4"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.6",
+                    "deliverable": "Work Completion",
+                    "name": "Pour Foundation Walls",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.5"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "8.7",
+                    "deliverable": "Work Completion",
+                    "name": "Foundation Waterproofing \u0026 Drain Line",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.6"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.8",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Perimeter Drain Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.7"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "8.9",
+                    "deliverable": "Work Completion",
+                    "name": "Under-slab Plumbing \u0026 Electrical",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.8"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "8.10",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Under-slab Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.9"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "8.11",
+                    "deliverable": "Work Completion",
+                    "name": "Pour Basement/Garage Slab \u0026 Backfill",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.10"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "9.x",
+            "name": "Framing",
+            "is_weather_sensitive": true,
+            "sort_order": 4,
+            "tasks": [
+                {
+                    "base_duration_days": 3,
+                    "code": "9.0",
+                    "deliverable": "Work Completion",
+                    "name": "First Floor System \u0026 Decking",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "8.11"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 5,
+                    "code": "9.1",
+                    "deliverable": "Work Completion",
+                    "name": "Wall Framing - First Floor",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "9.2",
+                    "deliverable": "Work Completion",
+                    "name": "Second Floor System / Truss Delivery Prep",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "9.3",
+                    "deliverable": "Work Completion",
+                    "name": "Set Roof Trusses",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.2",
+                        "6.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "9.4",
+                    "deliverable": "Work Completion",
+                    "name": "Roof Sheathing \u0026 Felting",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "9.5",
+                    "deliverable": "Work Completion",
+                    "name": "Exterior Window \u0026 Door Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.4",
+                        "6.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 0,
+                    "code": "9.6",
+                    "deliverable": "Milestone Marker",
+                    "is_milestone": true,
+                    "name": "Dry-In Completion Milestone",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.5"
+                    ],
+                    "responsible_party": "System"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "9.7",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Framing \u0026 Sheathing Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.6"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                }
+            ]
+        },
+        {
+            "code": "10.x",
+            "name": "Rough-Ins",
+            "is_weather_sensitive": false,
+            "sort_order": 5,
+            "tasks": [
+                {
+                    "base_duration_days": 5,
+                    "code": "10.0",
+                    "deliverable": "Work Completion",
+                    "name": "Plumbing Ground \u0026 Stack Rough-In",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.7",
+                        "6.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "10.1",
+                    "deliverable": "Work Completion",
+                    "name": "Mechanical/HVAC Ductwork Rough-In",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.7",
+                        "6.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 5,
+                    "code": "10.2",
+                    "deliverable": "Work Completion",
+                    "name": "Electrical Rough-In (Wires \u0026 Boxes)",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.7",
+                        "6.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "10.3",
+                    "deliverable": "Work Completion",
+                    "name": "Low Voltage \u0026 Security Rough-In",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.7"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "10.4",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Mechanical, Plumbing, Electrical (MPE) Rough Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "10.0",
+                        "10.1",
+                        "10.2"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "10.5",
+                    "deliverable": "Work Completion",
+                    "name": "Exterior Siding Prep \u0026 Trim",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "9.7"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "11.x",
+            "name": "Insulation/Drywall",
+            "is_weather_sensitive": false,
+            "sort_order": 6,
+            "tasks": [
+                {
+                    "base_duration_days": 3,
+                    "code": "11.0",
+                    "deliverable": "Work Completion",
+                    "name": "Insulation \u0026 Air Sealing",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "10.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "11.1",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Insulation \u0026 Air Barrier Inspection",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.0"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "11.2",
+                    "deliverable": "Work Completion",
+                    "name": "Drywall Stocking \u0026 Hanging",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 6,
+                    "code": "11.3",
+                    "deliverable": "Work Completion",
+                    "name": "Drywall Taping, Mudding \u0026 Finishing",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "11.4",
+                    "deliverable": "Work Completion",
+                    "name": "Drywall Sanding \u0026 Inspection Prep",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "11.5",
+                    "deliverable": "Work Completion",
+                    "name": "Prime \u0026 First Coat Interior Paint",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "12.x",
+            "name": "Interior Finishes",
+            "is_weather_sensitive": false,
+            "sort_order": 7,
+            "tasks": [
+                {
+                    "base_duration_days": 7,
+                    "code": "12.0",
+                    "deliverable": "Work Completion",
+                    "name": "Interior Door \u0026 Trim Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "11.5",
+                        "6.9"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "12.1",
+                    "deliverable": "Work Completion",
+                    "name": "Cabinetry \u0026 Millwork Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.0",
+                        "6.5"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "12.2",
+                    "deliverable": "Work Completion",
+                    "name": "Countertop Templates",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 8,
+                    "code": "12.3",
+                    "deliverable": "Work Completion",
+                    "name": "Hardwood Flooring \u0026 Tile Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "12.4",
+                    "deliverable": "Work Completion",
+                    "name": "Countertop Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 5,
+                    "code": "12.5",
+                    "deliverable": "Work Completion",
+                    "name": "Interior Paint Finish Coats",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "12.6",
+                    "deliverable": "Work Completion",
+                    "name": "Plumbing Trim \u0026 Fixture Install",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.5",
+                        "6.3"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "12.7",
+                    "deliverable": "Work Completion",
+                    "name": "Electrical Device \u0026 Fixture Trim",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.5",
+                        "6.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "12.8",
+                    "deliverable": "Work Completion",
+                    "name": "Mechanical Trim \u0026 HVAC Start-Up",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.5",
+                        "6.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "12.9",
+                    "deliverable": "Work Completion",
+                    "name": "Hardwood Sanding \u0026 Finishing",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.8"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "12.10",
+                    "deliverable": "Work Completion",
+                    "name": "Carpet Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.9"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "12.11",
+                    "deliverable": "Work Completion",
+                    "name": "Appliance Installation \u0026 Integration",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.10",
+                        "6.6"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "12.12",
+                    "deliverable": "Work Completion",
+                    "name": "Final Professional Interior Clean",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.11"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "13.x",
+            "name": "Exterior",
+            "is_weather_sensitive": true,
+            "sort_order": 8,
+            "tasks": [
+                {
+                    "base_duration_days": 7,
+                    "code": "13.0",
+                    "deliverable": "Work Completion",
+                    "name": "Siding \u0026 Cladding Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "10.5",
+                        "6.8",
+                        "6.7"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "13.1",
+                    "deliverable": "Work Completion",
+                    "name": "Gutters \u0026 Downspouts",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "13.2",
+                    "deliverable": "Work Completion",
+                    "name": "Driveway \u0026 Walkway Paving",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 4,
+                    "code": "13.3",
+                    "deliverable": "Work Completion",
+                    "name": "Exterior Painting \u0026 Staining",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 5,
+                    "code": "13.4",
+                    "deliverable": "Work Completion",
+                    "name": "Landscaping \u0026 Irrigation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "13.5",
+                    "deliverable": "Work Completion",
+                    "name": "Fencing Installation",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "13.6",
+                    "deliverable": "Work Completion",
+                    "name": "Exterior Closeout \u0026 Debris Removal",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "13.5"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "14.x",
+            "name": "Commissioning \u0026 Closeout",
+            "is_weather_sensitive": false,
+            "sort_order": 9,
+            "tasks": [
+                {
+                    "base_duration_days": 1,
+                    "code": "14.0",
+                    "deliverable": "Work Completion",
+                    "name": "Pre-Final Punch Walkthrough",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "12.12",
+                        "13.6"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 3,
+                    "code": "14.1",
+                    "deliverable": "Inspection Pass/Fail Report",
+                    "is_inspection": true,
+                    "name": "Final Building, Plumbing, Mechanical, Electrical Inspections",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.0"
+                    ],
+                    "responsible_party": "Third-Party Inspector"
+                },
+                {
+                    "base_duration_days": 5,
+                    "code": "14.2",
+                    "deliverable": "Work Completion",
+                    "name": "Punch List Completion \u0026 Repairs",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.1"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "14.3",
+                    "deliverable": "Work Completion",
+                    "name": "Owner Orientation \u0026 Training",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.2"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "14.4",
+                    "deliverable": "Milestone Marker",
+                    "is_milestone": true,
+                    "name": "Owner Move-In / Occupancy",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.3"
+                    ],
+                    "responsible_party": "System"
+                },
+                {
+                    "base_duration_days": 1,
+                    "code": "14.5",
+                    "deliverable": "Milestone Marker",
+                    "is_milestone": true,
+                    "name": "Certificate of Occupancy Obtained",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.1"
+                    ],
+                    "responsible_party": "System"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "14.6",
+                    "deliverable": "Work Completion",
+                    "name": "Project Closeout \u0026 Manual Delivery",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.5"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        },
+        {
+            "code": "15.x",
+            "name": "Warranty",
+            "is_weather_sensitive": false,
+            "sort_order": 10,
+            "tasks": [
+                {
+                    "base_duration_days": 1,
+                    "code": "15.0",
+                    "deliverable": "Work Completion",
+                    "name": "30-Day Post-Occupancy Callback",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "14.4"
+                    ],
+                    "responsible_party": "Trade Partner"
+                },
+                {
+                    "base_duration_days": 2,
+                    "code": "15.1",
+                    "deliverable": "Work Completion",
+                    "name": "11-Month Warranty Review Walkthrough",
+                    "notes": "",
+                    "predecessor_codes": [
+                        "15.0"
+                    ],
+                    "responsible_party": "Trade Partner"
+                }
+            ]
+        }
+    ]
+}

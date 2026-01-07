@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/GanttData",
+  "definitions": {
+    "GanttData": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string"
+        },
+        "calculated_at": {
+          "type": "string"
+        },
+        "projected_end_date": {
+          "type": "string"
+        },
+        "critical_path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GanttTask"
+          }
+        }
+      },
+      "required": [
+        "project_id",
+        "calculated_at",
+        "projected_end_date",
+        "critical_path",
+        "tasks"
+      ],
+      "additionalProperties": false,
+      "description": "GanttData represents the project schedule for the Gantt view. See API_AND_TYPES_SPEC.md Section 3.2"
+    },
+    "GanttTask": {
+      "type": "object",
+      "properties": {
+        "wbs_code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/TaskStatus"
+        },
+        "early_start": {
+          "type": "string"
+        },
+        "early_finish": {
+          "type": "string"
+        },
+        "duration_days": {
+          "type": "number"
+        },
+        "is_critical": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "wbs_code",
+        "name",
+        "status",
+        "early_start",
+        "early_finish",
+        "duration_days",
+        "is_critical"
+      ],
+      "additionalProperties": false,
+      "description": "GanttTask represents an individual task in the Gantt data."
+    },
+    "TaskStatus": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "Ready",
+        "In_Progress",
+        "Completed",
+        "Blocked",
+        "Delayed"
+      ],
+      "description": "TaskStatus defines the lifecycle of a ProjectTask. See API_AND_TYPES_SPEC.md Section 1.1"
+    }
+  }
+}

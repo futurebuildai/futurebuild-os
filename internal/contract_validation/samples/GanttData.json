@@ -1,0 +1,20 @@
+{
+  "project_id": "550e8400-e29b-41d4-a716-446655440000",
+  "calculated_at": "2026-01-06T12:00:00Z",
+  "projected_end_date": "2026-06-01",
+  "critical_path": [
+    "1.1",
+    "1.2"
+  ],
+  "tasks": [
+    {
+      "wbs_code": "1.1",
+      "name": "Foundation",
+      "status": "In_Progress",
+      "early_start": "2026-01-10",
+      "early_finish": "2026-01-20",
+      "duration_days": 10,
+      "is_critical": true
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/Contact",
+  "definitions": {
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "company",
+        "phone",
+        "email",
+        "role"
+      ],
+      "additionalProperties": false,
+      "description": "Contact represents a shared contact model. See API_AND_TYPES_SPEC.md Section 4.1"
+    },
+    "UserRole": {
+      "type": "string",
+      "enum": [
+        "Admin",
+        "Builder",
+        "Client",
+        "Subcontractor"
+      ],
+      "description": "UserRole defines the permissions and identity of a PortalUser or User. See API_AND_TYPES_SPEC.md Section 1.2"
+    }
+  }
+}

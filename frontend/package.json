@@ -1,0 +1,23 @@
+{
+    "name": "futurebuild-frontend",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "generate:schemas": "node scripts/generate-schemas.js",
+        "test:contract": "npm run generate:schemas && node scripts/validate-contract.js"
+    },
+    "dependencies": {
+        "@lit-labs/preact-signals": "^1.0.0",
+        "lit": "^3.1.2"
+    },
+    "devDependencies": {
+        "ajv": "^8.17.1",
+        "ts-json-schema-generator": "^2.4.0",
+        "typescript": "^5.2.2",
+        "vite": "^5.2.0"
+    }
+}

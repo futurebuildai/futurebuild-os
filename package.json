@@ -1,0 +1,14 @@
+{
+  "name": "futurebuild-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FutureBuild - AI-Powered Construction Scheduling Platform",
+  "scripts": {
+    "dev": "concurrently \"go run ./cmd/api\" \"npm --prefix frontend run dev\"",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm --prefix frontend run test && go test ./..."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

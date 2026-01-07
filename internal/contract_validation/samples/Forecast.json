@@ -1,0 +1,8 @@
+{
+  "date": "2026-01-01",
+  "high_temp_c": 25.5,
+  "low_temp_c": 15,
+  "precipitation_mm": 2.5,
+  "precipitation_probability": 0.8,
+  "conditions": "Rainy"
+}
