@@ -2,11 +2,12 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,33 +16,57 @@ import (
 	"github.com/colton/futurebuild/pkg/ai"
 )
 
+// MockVertexClient simulates Vertex AI interactions
+type MockVertexClient struct {
+	ShouldFail bool
+}
+
+func (m *MockVertexClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...genai.Part) (string, error) {
+	if m.ShouldFail {
+		return "", fmt.Errorf("mock ai failure")
+	}
+	// Return a valid JSON response simulating Gemini
+	return `{"is_verified": true, "confidence": 0.95, "reasoning": "Mock verification passed"}`, nil
+}
+
+func (m *MockVertexClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+	return []float32{0.1, 0.2, 0.3}, nil
+}
+
+func (m *MockVertexClient) Close() error {
+	return nil
+}
+
 func TestVisionService_VerifyTask(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping integration test in CI environment")
-	}
-
+	// 1. Setup Client (Real or Mock)
+	var client ai.Client
 	cfg := config.LoadConfig()
-	if cfg.VertexProjectID == "" {
-		t.Skip("Skipping Vision test: VERTEX_PROJECT_ID not set")
-	}
 
+	if cfg.VertexProjectID != "" {
+		// Try to use Real Client
+		ctx := context.Background()
+		models := map[ai.ModelType]string{
+			ai.ModelTypeFlash:     cfg.VertexModelFlashID,
+			ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
+		}
+		var err error
+		client, err = ai.NewVertexClient(ctx, cfg.VertexProjectID, cfg.VertexLocation, models)
+		if err != nil {
+			t.Logf("Failed to create real Vertex client: %v. Falling back to Mock.", err)
+			client = &MockVertexClient{}
+		} else {
+			t.Log("Using Real Vertex AI Client")
+		}
+	} else {
+		t.Log("VERTEX_PROJECT_ID not set. Using Mock Vertex AI Client.")
+		client = &MockVertexClient{}
+	}
+	defer client.Close()
+
+	visionService := service.NewVisionService(client)
 	ctx := context.Background()
-	models := map[ai.ModelType]string{
-		ai.ModelTypeFlash:     cfg.VertexModelFlashID,
-		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
-	}
-
-	vertexClient, err := ai.NewVertexClient(ctx, cfg.VertexProjectID, cfg.VertexLocation, models)
-	if err != nil {
-		t.Skipf("Skipping Vision test: failed to create Vertex client: %v", err)
-		return
-	}
-	defer vertexClient.Close()
-
-	visionService := service.NewVisionService(vertexClient)
 
 	// Create a mock server to serve an image
-	// We'll use a 1x1 transparent PNG as a dummy image
 	dummyPNG := []byte{
 		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
 		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -56,24 +81,26 @@ func TestVisionService_VerifyTask(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	t.Run("Verify Task Completion", func(t *testing.T) {
-		// Since we are using a dummy tiny image, AI might say no or yes depending on the description.
-		// For the purpose of the integration test, we want to ensure the plumbing works:
-		// Download -> AI Call -> JSON Parse.
-
-		isVerified, confidence, err := visionService.VerifyTask(ctx, ts.URL, "A single transparent pixel representing the start of a digital foundation.")
-
+	t.Run("Verify_Task_Completion", func(t *testing.T) {
+		isVerified, confidence, err := visionService.VerifyTask(ctx, ts.URL, "A test description")
 		require.NoError(t, err)
 		t.Logf("Vision Result - Verified: %v, Confidence: %f", isVerified, confidence)
 
-		// We don't strictly assert isVerified because it's LLM based on a dummy image,
-		// but confidence should be returned (even if 0).
-		assert.GreaterOrEqual(t, confidence, 0.0)
-		assert.LessOrEqual(t, confidence, 1.0)
+		// Assertions (relaxed for Real AI, strict for Mock)
+		if _, ok := client.(*MockVertexClient); ok {
+			assert.True(t, isVerified)
+			assert.Equal(t, 0.95, confidence)
+		} else {
+			assert.GreaterOrEqual(t, confidence, 0.0)
+			assert.LessOrEqual(t, confidence, 1.0)
+		}
 	})
 
-	t.Run("Invalid Image URL", func(t *testing.T) {
-		_, _, err := visionService.VerifyTask(ctx, "http://invalid-url-that-does-not-exist.com/img.png", "A test description")
+	t.Run("Invalid_Image_URL", func(t *testing.T) {
+		// Use a local port that is guaranteed to be closed to force connection error
+		// Port 0 is not valid, but http client might just fail to dial
+		// "http://127.0.0.1:0" is a good cross-platform way to trigger dial error
+		_, _, err := visionService.VerifyTask(ctx, "http://127.0.0.1:0/img.png", "A test description")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to download image")
 	})
