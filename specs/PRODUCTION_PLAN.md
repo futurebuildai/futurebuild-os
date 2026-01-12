@@ -92,6 +92,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 38 | **Implement DirectoryService lookup logic** (Project Phase -> Contact) | Step 13, 19 | 1.5 |
 | 39 | Add confidence scoring and human review flags | Step 37 | 1 |
 | 40 | Build site photo verification flow | Step 35 | 2 |
+| 40b | **Upgrade Vertex AI SDK**: Refactor `pkg/ai` to usage `google.golang.org/genai` to support Gemini 2.5 Flash image payloads. | Step 40 | 1 |
 | 41 | Create document re-processing and audit trail system | Step 36 | 1 |
 | 42 | **Mock Ingestion Pipeline**: Create a test fixture that injects "perfect" JSON (simulating Gemini) into the system to verify that the INVOICES and PROJECT_TASKS tables update correctly, isolating DB logic from AI latency. | Step 37, 12 | 1 |
 
@@ -102,6 +103,9 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
 | 43 | **Build Chat Orchestrator with PROCESS_INVOICE intent mapping** | Step 36, 37 | 3 |
+| 43.5 | **Implement Conversational Agent API endpoint** (`POST /api/v1/agent/message`) | Step 36 | 2 |
+| 43.6 | **Build Intent Classification logic** using Vertex AI Gemini | Step 43.5 | 2 |
+| 43.7 | **Implement Action Mapping** (User message → Service calls) | Step 43.6 | 1.5 |
 | 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | 2 |
 | 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 |
 | 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |
@@ -117,7 +121,8 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 |------|------|--------------|-----------|
 | 50 | **Initialize Vite project with Lit + TS**; Configure `@types` aliases | Step 18 | 1 |
 | 51 | **Implement Base Component extensions** and Signals-based Store | Step 50 | 2 |
-| 52 | Build Layouts (Sidebar, Header, Unified Chat Container) | Step 51 | 2 |
+| 52 | **Build Chat Interface Container with Message List and Ephemeral Cards** | Step 51 | 2 |
+| 52.5 | **Implement WebSocket/SSE real-time messaging** for agent responses | Step 52 | 2 |
 | 53 | **Build Specialized Artifact components** (Invoice, Budget, Gantt, Rolodex) | Step 18, 44 | 3 |
 | 54 | **Implement Drag-and-Drop zone** for invoice ingestion | Step 35, 51 | 1.5 |
 | 55 | Finalize responsive mobile navigation and state hydration | Step 52 | 2 |

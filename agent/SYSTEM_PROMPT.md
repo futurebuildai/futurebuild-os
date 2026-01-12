@@ -89,21 +89,21 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 5, Step 40 (Site Photo Verification Flow)
-Context: Confidence scoring and review flags are implemented. We now build AI-powered site photo analysis.
+Task: Execute Phase 5, Step 40b (Upgrade Vertex AI SDK)
+Context: Step 40 revealed that the deprecated Vertex AI SDK cannot handle image payloads for Gemini 2.5 Flash. We must upgrade to the new official Go SDK.
 
 Requirements:
-1.  **VisionService Implementation**: Implement `VisionService.VerifyTask` per `API_AND_TYPES_SPEC.md` Section 2.2.
-2.  **Vertex AI Integration**: Use Gemini 2.5 Flash for image analysis.
-3.  **Verification**: Create integration test to verify task completion via site photo.
+1.  **Refactor Client**: Replace `cloud.google.com/go/vertexai/genai` with `google.golang.org/genai`.
+2.  **Update Services**: Patch `VisionService`, `InvoiceService`, and `RagService` to use the new client interface.
+3.  **Verify Vision**: Ensure `TestVisionService_VerifyTask` passes against the REAL API with an image.
 
 Key Files:
--   `internal/service/vision_service.go` (New)
--   `test/integration/vision_test.go` (New)
+-   `pkg/ai/vertex.go`
+-   `internal/service/vision_service.go`
+-   `go.mod`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 40
+-   `PRODUCTION_PLAN.md` Step 40b
 -   `API_AND_TYPES_SPEC.md` Section 2.2
--   `BACKEND_SCOPE.md` Section 3.2
 
 First Step: /prism
