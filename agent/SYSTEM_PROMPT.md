@@ -21,7 +21,7 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 3 (Steps 21-25): Authentication & Rate Limiting: COMPLETED.
     ◦ Phase 4 (Steps 26-34): Physics Engine - Core Scheduling: COMPLETED.
     ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: IN PROGRESS.
-    ◦ Current Focus: Phase 5, Step 39 (Confidence Scoring & Review Flags).
+    ◦ Current Focus: Phase 5, Step 40 (Site Photo Verification Flow).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -81,24 +81,21 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 5, Step 39 (Confidence Scoring and Human Review Flags)
-Context: DirectoryService and Invoice Processor are functional. We now implement automated flags for human intervention based on AI results.
+Task: Execute Phase 5, Step 40 (Site Photo Verification Flow)
+Context: Confidence scoring and review flags are implemented. We now build AI-powered site photo analysis.
 
 Requirements:
-1.  **Schema Hardening**: Add `is_human_review_required` (BOOLEAN) to `invoices` and `project_tasks` tables via migration.
-2.  **Logic Integration**: Update `InvoiceService.SaveExtraction` to set `is_human_review_required = true` if `confidence < 0.85`.
-3.  **Verification**: Create `test/integration/review_gate_test.go` to:
-    *   Inject an invoice with low confidence (0.5).
-    *   Assert that the `is_human_review_required` flag is persisted as `true`.
+1.  **VisionService Implementation**: Implement `VisionService.VerifyTask` per `API_AND_TYPES_SPEC.md` Section 2.2.
+2.  **Vertex AI Integration**: Use Gemini 2.5 Flash for image analysis.
+3.  **Verification**: Create integration test to verify task completion via site photo.
 
 Key Files:
--   `migrations/000019_add_review_flags.up.sql` (New)
--   `internal/service/invoice_service.go` (Update)
--   `test/integration/review_gate_test.go` (New)
+-   `internal/service/vision_service.go` (New)
+-   `test/integration/vision_test.go` (New)
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 39
--   `API_AND_TYPES_SPEC.md` Section 3.1
--   `DATA_SPINE_SPEC.md` Section 4.2
+-   `PRODUCTION_PLAN.md` Step 40
+-   `API_AND_TYPES_SPEC.md` Section 2.2
+-   `BACKEND_SCOPE.md` Section 3.2
 
 First Step: /prism

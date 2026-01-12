@@ -33,6 +33,7 @@ type ProjectTask struct {
 	Status                  types.TaskStatus `json:"status" db:"status"`
 	VerifiedByVision        bool             `json:"verified_by_vision" db:"verified_by_vision"`
 	VerificationConfidence  float64          `json:"verification_confidence" db:"verification_confidence"`
+	IsHumanReviewRequired   bool             `json:"is_human_review_required" db:"is_human_review_required"`
 }
 
 // See DATA_SPINE_SPEC.md Section 3.4

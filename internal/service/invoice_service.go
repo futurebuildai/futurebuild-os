@@ -15,6 +15,10 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 )
 
+// ConfidenceThresholdForReview defines the minimum AI confidence
+// required to bypass human review. See PRODUCTION_PLAN.md Step 39.
+const ConfidenceThresholdForReview = 0.85
+
 // InvoiceService handles invoice-specific analysis and persistence.
 // See PRODUCTION_PLAN.md Step 37
 type InvoiceService struct {
@@ -116,9 +120,17 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		})
 	}
 
+	// Logic Integration: Flag for human review if confidence is low
+	// See PRODUCTION_PLAN.md Step 39
+	isHumanReviewRequired := extraction.Confidence < ConfidenceThresholdForReview
+
 	query := `
-		INSERT INTO invoices (id, project_id, vendor_name, amount, line_items, detected_wbs_code, status, confidence, invoice_date, invoice_number)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO invoices (
+			id, project_id, vendor_name, amount, line_items, 
+			detected_wbs_code, status, confidence, invoice_date, 
+			invoice_number, is_human_review_required
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	_, err := s.db.Exec(ctx, query,
 		invoiceID,
@@ -131,6 +143,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		extraction.Confidence,
 		extraction.Date,
 		extraction.InvoiceNumber,
+		isHumanReviewRequired,
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to save invoice: %w", err)

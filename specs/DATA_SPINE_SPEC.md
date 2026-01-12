@@ -103,6 +103,7 @@ The specific instances of tasks for a project.
 | status | ENUM | pending, ready, in_progress, inspection_pending, completed, blocked, delayed |
 | verified_by_vision | BOOLEAN | Result of Gemini Flash validation |
 | verification_confidence | FLOAT | Confidence score (0.0 - 1.0) |
+| is_human_review_required | BOOLEAN | Flag for human review when AI confidence is low |
 
 
 ### 3.4 TASK_DEPENDENCIES
@@ -151,6 +152,7 @@ Parsed artifacts from the Action Engine.
 | line_items | JSONB | Matches `InvoiceExtraction` schema |
 | detected_wbs_code | VARCHAR | Predicted WBS mapping |
 | status | ENUM | Pending, Approved, Exported |
+| is_human_review_required | BOOLEAN | Flag for human review when AI confidence is low |
 
 ---
 
