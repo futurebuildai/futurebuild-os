@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/server"
+	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -18,22 +18,26 @@ func main() {
 		log.Println("No .env file found, relying on environment variables")
 	}
 
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
+	cfg := config.LoadConfig()
+	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL environment variable is required")
 	}
 
-	portStr := os.Getenv("APP_PORT")
-	if portStr == "" {
-		portStr = "8080" // Default port
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		log.Fatalf("Invalid APP_PORT: %v", err)
-	}
-
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+
+	// Initialize Vertex AI Client
+	modelIDs := map[ai.ModelType]string{
+		ai.ModelTypeFlash:     cfg.VertexModelFlashID,
+		ai.ModelTypePro:       cfg.VertexModelProID,
+		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
+	}
+	aiClient, err := ai.NewVertexClient(ctx, cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
+	if err != nil {
+		log.Fatalf("Failed to initialize Vertex AI client: %v", err)
+	}
+	defer aiClient.Close()
+
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
@@ -46,7 +50,7 @@ func main() {
 
 	fmt.Println("Database connection established")
 
-	srv := server.NewServer(pool, port)
+	srv := server.NewServer(pool, cfg, aiClient)
 	if err := srv.Start(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}

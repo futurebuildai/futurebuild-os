@@ -2,10 +2,17 @@
 **Governing Strategy:** See `PRODUCTION_PLAN.md` for detailed Phase definitions and Validation Criteria.
 
 #### Current Focus
-*   **Latest Spec Implemented:** Phase 2, Step 20 (Contract Validation Test) ✅
-*   **Health Status:** Green ✅
-*   **Current Goal:** Phase 3, Step 21 (Magic Link Email Authentication)
+*   [x] **Latest Spec Implemented:** Phase 5, Step 38 (DirectoryService Lookup Logic) ✅
+*   [x] **Health Status:** Green ✅ (Integration Tests Passing)
+*   [x] **Current Goal:** Phase 5, Step 39 (Confidence Scoring & Review Flags)
 
+#### Development Queue
+##### Phase 5: Context Engine - AI Integration [Status: ⏳ In Progress]
+*   [x] **Vertex AI & Object Storage Setup:** Implemented S3 & Vertex Clients (Ref: `PRODUCTION_PLAN.md` Step 35) ✅
+*   [x] **Vertex Client Refactor:** Multi-model & Multimodal support (Step 35.5) ✅
+*   [x] **RAG Pipeline:** Implement document chunking and pgvector (Ref: `PRODUCTION_PLAN.md` Step 36) ✅
+*   [x] **Invoice Processor:** PDF -> InvoiceExtraction JSON (Ref: `PRODUCTION_PLAN.md` Step 37) ✅
+*   [x] **DirectoryService:** Map phases to contacts (Ref: `PRODUCTION_PLAN.md` Step 38) ✅
 
 #### Development Queue
 ##### Phase 0: Foundation & CI/CD [Status: ✅ Completed]
@@ -30,7 +37,23 @@
 *   [x] **Type System:** Create pkg/types (Ref: `PRODUCTION_PLAN.md` Step 17) <!-- id: 17 -->
 *   [x] **Frontend Types:** Create frontend/src/types (Ref: `PRODUCTION_PLAN.md` Step 18)
 *   [x] **Service Interfaces:** Define Go Service Interfaces (Ref: `PRODUCTION_PLAN.md` Step 19)
-*   [ ] **Contract Validation:** Write Go-to-TS parity test suite (Ref: `PRODUCTION_PLAN.md` Step 20)
+*   [x] **Contract Validation:** Write Go-to-TS parity test suite (Ref: `PRODUCTION_PLAN.md` Step 20)
+*   [x] **Magic Link Auth:** Implement stateful passwordless login (Ref: `PRODUCTION_PLAN.md` Step 21)
+*   [x] **JWT Generation:** Issue signed tokens with multi-tenant claims (Ref: `PRODUCTION_PLAN.md` Step 22)
+*   [x] **RBAC Middleware:** Role-based access control and Context Safety (Ref: `PRODUCTION_PLAN.md` Step 23)
+*   [x] **Portal Access Tokens:** Enable external `CONTACTS` via Magic Link (Ref: `PRODUCTION_PLAN.md` Step 24)
+*   [x] **Rate Limiting:** Protect auth endpoints with IP-based throttling (Ref: `PRODUCTION_PLAN.md` Step 25)
+
+##### Phase 4: Physics Engine - Core Scheduling [Status: ✅ Completed]
+*   [x] **DHSM Calculator:** Implement multiplier logic (Ref: `PRODUCTION_PLAN.md` Step 26)
+*   [x] **Dependency Graph:** Build gonum/graph DAG (Ref: `PRODUCTION_PLAN.md` Step 27)
+*   [x] **CPM Forward Pass:** Calculate ES, EF (Ref: `PRODUCTION_PLAN.md` Step 28)
+*   [x] **CPM Backward Pass:** Calculate LS, LF, float, critical path (Ref: `PRODUCTION_PLAN.md` Step 29)
+*   [x] **Event Duration Locking:** Fixed durations for Inspections bypass SAF (Ref: `PRODUCTION_PLAN.md` Step 30)
+*   [x] **SWIM Weather Overlay:** Pre-dry-in duration adjustments (Ref: `PRODUCTION_PLAN.md` Step 31)
+*   [x] **Schedule Recalculation Trigger:** Auto-recalc on task changes (Ref: `PRODUCTION_PLAN.md` Step 32) ✅
+*   [x] **Golden Master Physics Test:** Validated DHSM & CPM against 50+ scenarios (Ref: `PRODUCTION_PLAN.md` Step 33) ✅
+*   [x] **Cycle Detection Test:** Verified CPM solver rejects circular dependencies (Ref: `PRODUCTION_PLAN.md` Step 34) ✅
 
 
 #### Future Ideas / Backlog

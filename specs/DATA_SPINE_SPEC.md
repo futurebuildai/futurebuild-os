@@ -51,7 +51,7 @@ The Global Address Book ("The Rolodex"). Stores trade partners, clients, and ven
 | company | VARCHAR | Company Name |
 | phone | VARCHAR | Primary SMS target |
 | email | VARCHAR | |
-| global_role | ENUM | Client, Subcontractor (per [API_AND_TYPES_SPEC.md](file:///home/colton/Replit%20Specs/API_AND_TYPES_SPEC.md)) |
+| role | ENUM | Client, Subcontractor (per [API_AND_TYPES_SPEC.md](file:///home/colton/Replit%20Specs/API_AND_TYPES_SPEC.md)) |
 | contact_preference | ENUM | SMS, Email, Both |
 
 ---
@@ -91,14 +91,19 @@ The specific instances of tasks for a project.
 | project_id | UUID (FK) | |
 | wbs_code | VARCHAR | The WBS identifier (e.g., "9.3") |
 | name | VARCHAR | Task name |
+| is_inspection | BOOLEAN | True if task is an inspection checkpoint |
 | early_start | DATE | Calculated ES from CPM |
 | early_finish | DATE | Calculated EF from CPM |
+| late_start | DATE | Calculated LS from CPM |
+| late_finish | DATE | Calculated LF from CPM |
 | calculated_duration | FLOAT | DHSM output before weather/SAF |
 | weather_adjusted_duration | FLOAT | Output after SWIM & SAF adjustments |
 | manual_override_days | FLOAT | User-applied manual adjustment (Nullable) |
-| status | ENUM | Pending, Ready, In_Progress, Completed, Blocked, Delayed (per [API_AND_TYPES_SPEC.md](file:///home/colton/Replit%20Specs/API_AND_TYPES_SPEC.md)) |
+| total_float_days | FLOAT | Calculated Total Float from CPM |
+| status | ENUM | pending, ready, in_progress, inspection_pending, completed, blocked, delayed |
 | verified_by_vision | BOOLEAN | Result of Gemini Flash validation |
 | verification_confidence | FLOAT | Confidence score (0.0 - 1.0) |
+
 
 ### 3.4 TASK_DEPENDENCIES
 The Directed Acyclic Graph (DAG) edges.
@@ -108,7 +113,7 @@ The Directed Acyclic Graph (DAG) edges.
 | project_id | UUID (FK) | |
 | predecessor_id | UUID (FK) | Reference to PROJECT_TASKS |
 | successor_id | UUID (FK) | Reference to PROJECT_TASKS |
-| dependency_type | ENUM | FS (Finish-to-Start), SS, FF |
+| dependency_type | ENUM | FS (Finish-to-Start), SS (Start-to-Start), FF (Finish-to-Finish), SF (Start-to-Finish) |
 | lag_days | INT | |
 
 ### 3.5 PROJECT_ASSIGNMENTS

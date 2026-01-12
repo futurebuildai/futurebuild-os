@@ -1,0 +1,502 @@
+// Package physics implements the deterministic scheduling algorithms.
+// See BACKEND_SCOPE.md Section 3.4 (Layer 3: Physics Engine)
+package physics
+
+import (
+	"fmt"
+	"math"
+	"time"
+
+	"github.com/google/uuid"
+	"gonum.org/v1/gonum/graph/simple"
+	"gonum.org/v1/gonum/graph/topo"
+
+	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/pkg/types"
+)
+
+// DependencyGraph encapsulates the topology and edge metadata for CPM.
+// See BACKEND_SCOPE.md Section 6.3
+type DependencyGraph struct {
+	Graph *simple.DirectedGraph
+
+	// UUID ↔ int64 mapping for gonum compatibility
+	NodeMap map[uuid.UUID]int64
+	TaskMap map[int64]uuid.UUID
+
+	// Task data lookup (duration, WBS code, etc.)
+	Tasks map[uuid.UUID]models.ProjectTask
+
+	// Edge metadata: Deps[from][to] → TaskDependency
+	// Stores lag_days, dependency_type per DATA_SPINE_SPEC Section 3.4
+	Deps map[int64]map[int64]models.TaskDependency
+}
+
+// TaskSchedule holds the calculated CPM results for a single task.
+// See BACKEND_SCOPE.md Section 6.3
+type TaskSchedule struct {
+	TaskID      uuid.UUID `json:"task_id"`
+	WBSCode     string    `json:"wbs_code"`
+	EarlyStart  time.Time `json:"early_start"`
+	EarlyFinish time.Time `json:"early_finish"`
+	LateStart   time.Time `json:"late_start"`
+	LateFinish  time.Time `json:"late_finish"`
+	TotalFloat  float64   `json:"total_float"`
+	IsCritical  bool      `json:"is_critical"`
+}
+
+// CPMResult represents the output of CPM scheduling.
+// See BACKEND_SCOPE.md Section 6.3
+type CPMResult struct {
+	Tasks        []TaskSchedule `json:"tasks"`
+	CriticalPath []string       `json:"critical_path"` // WBS codes
+	ProjectEnd   time.Time      `json:"project_end"`
+}
+
+// BuildDependencyGraph constructs a DAG from ProjectTask and TaskDependency models.
+// See BACKEND_SCOPE.md Section 6.3
+func BuildDependencyGraph(tasks []models.ProjectTask, deps []models.TaskDependency) *DependencyGraph {
+	g := &DependencyGraph{
+		Graph:   simple.NewDirectedGraph(),
+		NodeMap: make(map[uuid.UUID]int64),
+		TaskMap: make(map[int64]uuid.UUID),
+		Tasks:   make(map[uuid.UUID]models.ProjectTask),
+		Deps:    make(map[int64]map[int64]models.TaskDependency),
+	}
+
+	// Add nodes for each task
+	var nodeID int64 = 1
+	for _, task := range tasks {
+		node := simple.Node(nodeID)
+		g.Graph.AddNode(node)
+		g.NodeMap[task.ID] = nodeID
+		g.TaskMap[nodeID] = task.ID
+		g.Tasks[task.ID] = task
+		nodeID++
+	}
+
+	// Add edges for each dependency
+	for _, dep := range deps {
+		fromID, fromExists := g.NodeMap[dep.PredecessorID]
+		toID, toExists := g.NodeMap[dep.SuccessorID]
+
+		if !fromExists || !toExists {
+			// Skip invalid dependencies (predecessor or successor not in task set)
+			continue
+		}
+
+		// Add edge to graph
+		edge := simple.Edge{F: simple.Node(fromID), T: simple.Node(toID)}
+		g.Graph.SetEdge(edge)
+
+		// Store edge metadata for O(1) lookup during CPM passes
+		if g.Deps[fromID] == nil {
+			g.Deps[fromID] = make(map[int64]models.TaskDependency)
+		}
+		g.Deps[fromID][toID] = dep
+	}
+
+	return g
+}
+
+// TopologicalSort returns task IDs in processing order for CPM forward/backward passes.
+// Returns error if the graph contains a cycle.
+// See BACKEND_SCOPE.md Section 6.3
+func TopologicalSort(g *DependencyGraph) ([]uuid.UUID, error) {
+	sorted, err := topo.Sort(g.Graph)
+	if err != nil {
+		return nil, fmt.Errorf("topological sort failed: %w", err)
+	}
+
+	// Convert node IDs back to UUIDs
+	result := make([]uuid.UUID, len(sorted))
+	for i, node := range sorted {
+		result[i] = g.TaskMap[node.ID()]
+	}
+
+	return result, nil
+}
+
+// DetectCycle checks if the dependency graph contains circular dependencies.
+// Returns a descriptive error with WBS codes of cyclic tasks per PRODUCTION_PLAN Step 34.
+func DetectCycle(g *DependencyGraph) error {
+	_, err := topo.Sort(g.Graph)
+	if err == nil {
+		return nil // No cycle
+	}
+
+	// Extract cycle information from topo.Unorderable error
+	unorderable, ok := err.(topo.Unorderable)
+	if !ok {
+		return fmt.Errorf("cycle detected: %w", err)
+	}
+
+	// Collect WBS codes of cyclic tasks
+	var cyclicTasks []string
+	for _, component := range unorderable {
+		for _, node := range component {
+			taskID := g.TaskMap[node.ID()]
+			if task, exists := g.Tasks[taskID]; exists {
+				cyclicTasks = append(cyclicTasks, task.WBSCode)
+			}
+		}
+	}
+
+	return fmt.Errorf("cycle detected involving tasks: %v", cyclicTasks)
+}
+
+// GetDependency retrieves edge metadata for a specific predecessor→successor relationship.
+// Returns the TaskDependency and true if found, or empty struct and false if not.
+func (g *DependencyGraph) GetDependency(predecessorID, successorID uuid.UUID) (models.TaskDependency, bool) {
+	fromID, fromExists := g.NodeMap[predecessorID]
+	toID, toExists := g.NodeMap[successorID]
+
+	if !fromExists || !toExists {
+		return models.TaskDependency{}, false
+	}
+
+	if g.Deps[fromID] == nil {
+		return models.TaskDependency{}, false
+	}
+
+	dep, exists := g.Deps[fromID][toID]
+	return dep, exists
+}
+
+// GetPredecessors returns all predecessor task IDs for the given task.
+// See BACKEND_SCOPE.md Section 6.3
+func (g *DependencyGraph) GetPredecessors(taskID uuid.UUID) []uuid.UUID {
+	nodeID, exists := g.NodeMap[taskID]
+	if !exists {
+		return nil
+	}
+
+	var predecessors []uuid.UUID
+	nodes := g.Graph.To(nodeID)
+	for nodes.Next() {
+		predNodeID := nodes.Node().ID()
+		if predTaskID, ok := g.TaskMap[predNodeID]; ok {
+			predecessors = append(predecessors, predTaskID)
+		}
+	}
+	return predecessors
+}
+
+// getTaskDuration resolves the effective duration for a task.
+// Precedence: ManualOverrideDays > WeatherAdjustedDuration > CalculatedDuration
+// See CPM_RES_MODEL_SPEC.md Section 11.2.5
+func getTaskDuration(task models.ProjectTask) float64 {
+	if task.ManualOverrideDays != nil && *task.ManualOverrideDays > 0 {
+		return *task.ManualOverrideDays
+	}
+	if task.WeatherAdjustedDuration > 0 {
+		return task.WeatherAdjustedDuration
+	}
+	if task.CalculatedDuration > 0 {
+		return task.CalculatedDuration
+	}
+	// Default to 1 day if no duration is set
+	return 1.0
+}
+
+// addDays adds fractional days to a date.
+// For simplicity, we treat each day as 24 hours.
+func addDays(date time.Time, days float64) time.Time {
+	hours := days * 24
+	return date.Add(time.Duration(hours * float64(time.Hour)))
+}
+
+// ForwardPass calculates Early Start (ES) and Early Finish (EF) for all tasks.
+// Processes tasks in topological order, handling FS, SS, FF, SF dependencies.
+// See BACKEND_SCOPE.md Section 6.3 and CPM_RES_MODEL_SPEC.md Section 11.4
+func ForwardPass(g *DependencyGraph, projectStart time.Time) (map[uuid.UUID]TaskSchedule, error) {
+	sorted, err := TopologicalSort(g)
+	if err != nil {
+		return nil, fmt.Errorf("forward pass failed: %w", err)
+	}
+
+	schedule := make(map[uuid.UUID]TaskSchedule)
+
+	for _, taskID := range sorted {
+		task, exists := g.Tasks[taskID]
+		if !exists {
+			continue
+		}
+
+		duration := getTaskDuration(task)
+		predecessors := g.GetPredecessors(taskID)
+
+		var earlyStart time.Time
+		var earlyFinish time.Time
+
+		if len(predecessors) == 0 {
+			// Root task: starts at project start date
+			earlyStart = projectStart
+			earlyFinish = addDays(earlyStart, duration)
+		} else {
+			// Calculate ES based on all predecessor constraints
+			// Start with zero time, then find the maximum constraint date
+			var maxConstraintDate time.Time
+			firstPredecessor := true
+
+			for _, predID := range predecessors {
+				predSchedule, predExists := schedule[predID]
+				if !predExists {
+					// Predecessor not yet scheduled (shouldn't happen with topo sort)
+					continue
+				}
+
+				dep, depExists := g.GetDependency(predID, taskID)
+				if !depExists {
+					// Default to FS with 0 lag if edge metadata missing
+					dep = models.TaskDependency{
+						DependencyType: types.DependencyTypeFS,
+						LagDays:        0,
+					}
+				}
+
+				constraintDate := calculateConstraintDate(
+					predSchedule,
+					duration,
+					dep.DependencyType,
+					dep.LagDays,
+				)
+
+				if firstPredecessor || constraintDate.After(maxConstraintDate) {
+					maxConstraintDate = constraintDate
+					firstPredecessor = false
+				}
+			}
+
+			earlyStart = maxConstraintDate
+			earlyFinish = addDays(earlyStart, duration)
+		}
+
+		schedule[taskID] = TaskSchedule{
+			TaskID:      taskID,
+			WBSCode:     task.WBSCode,
+			EarlyStart:  earlyStart,
+			EarlyFinish: earlyFinish,
+			// LateStart, LateFinish, TotalFloat, IsCritical set by backward pass
+		}
+	}
+
+	return schedule, nil
+}
+
+// calculateConstraintDate determines the earliest start date for a successor
+// based on the predecessor's schedule and the dependency type.
+// See DATA_SPINE_SPEC.md Section 3.4 for dependency types.
+func calculateConstraintDate(
+	predSchedule TaskSchedule,
+	successorDuration float64,
+	depType types.DependencyType,
+	lagDays int,
+) time.Time {
+	lag := float64(lagDays)
+
+	switch depType {
+	case types.DependencyTypeFS:
+		// Finish-to-Start: Successor starts after predecessor finishes
+		// ES(successor) = EF(predecessor) + lag
+		return addDays(predSchedule.EarlyFinish, lag)
+
+	case types.DependencyTypeSS:
+		// Start-to-Start: Successor starts after predecessor starts
+		// ES(successor) = ES(predecessor) + lag
+		return addDays(predSchedule.EarlyStart, lag)
+
+	case types.DependencyTypeFF:
+		// Finish-to-Finish: Successor finishes after predecessor finishes
+		// EF(successor) = EF(predecessor) + lag
+		// ES(successor) = EF(successor) - duration = EF(predecessor) + lag - duration
+		return addDays(predSchedule.EarlyFinish, lag-successorDuration)
+
+	case types.DependencyTypeSF:
+		// Start-to-Finish: Successor finishes after predecessor starts
+		// EF(successor) = ES(predecessor) + lag
+		// ES(successor) = EF(successor) - duration = ES(predecessor) + lag - duration
+		return addDays(predSchedule.EarlyStart, lag-successorDuration)
+
+	default:
+		// Default to FS behavior
+		return addDays(predSchedule.EarlyFinish, lag)
+	}
+}
+
+// GetSuccessors returns all successor task IDs for the given task.
+// See BACKEND_SCOPE.md Section 6.3
+func (g *DependencyGraph) GetSuccessors(taskID uuid.UUID) []uuid.UUID {
+	nodeID, exists := g.NodeMap[taskID]
+	if !exists {
+		return nil
+	}
+
+	var successors []uuid.UUID
+	nodes := g.Graph.From(nodeID)
+	for nodes.Next() {
+		succNodeID := nodes.Node().ID()
+		if succTaskID, ok := g.TaskMap[succNodeID]; ok {
+			successors = append(successors, succTaskID)
+		}
+	}
+	return successors
+}
+
+// BackwardPass calculates Late Start (LS), Late Finish (LF), Total Float,
+// and identifies the critical path for all tasks.
+// Must be called after ForwardPass has populated ES/EF in the schedule.
+// See BACKEND_SCOPE.md Section 6.3
+func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule) ([]string, error) {
+	if len(schedule) == 0 {
+		return nil, nil
+	}
+
+	// Find project end date (max EF across all tasks)
+	var projectEnd time.Time
+	first := true
+	for _, sched := range schedule {
+		if first || sched.EarlyFinish.After(projectEnd) {
+			projectEnd = sched.EarlyFinish
+			first = false
+		}
+	}
+
+	// Get reverse topological order
+	sorted, err := TopologicalSort(g)
+	if err != nil {
+		return nil, fmt.Errorf("backward pass failed: %w", err)
+	}
+
+	// Reverse the order for backward pass
+	reversed := make([]uuid.UUID, len(sorted))
+	for i, id := range sorted {
+		reversed[len(sorted)-1-i] = id
+	}
+
+	// Process tasks in reverse topological order
+	for _, taskID := range reversed {
+		task, exists := g.Tasks[taskID]
+		if !exists {
+			continue
+		}
+
+		sched, schedExists := schedule[taskID]
+		if !schedExists {
+			continue
+		}
+
+		duration := getTaskDuration(task)
+		successors := g.GetSuccessors(taskID)
+
+		var lateFinish time.Time
+
+		if len(successors) == 0 {
+			// Terminal task: LF = project end date
+			lateFinish = projectEnd
+		} else {
+			// Calculate LF based on minimum constraint from all successors
+			firstSuccessor := true
+
+			for _, succID := range successors {
+				succSchedule, succExists := schedule[succID]
+				if !succExists {
+					continue
+				}
+
+				dep, depExists := g.GetDependency(taskID, succID)
+				if !depExists {
+					// Default to FS with 0 lag if edge metadata missing
+					dep = models.TaskDependency{
+						DependencyType: types.DependencyTypeFS,
+						LagDays:        0,
+					}
+				}
+
+				// Pass predecessor duration for SS/SF constraint calculation
+				constraintDate := calculateBackwardConstraintDate(
+					succSchedule,
+					duration, // Predecessor duration for SS/SF
+					dep.DependencyType,
+					dep.LagDays,
+				)
+
+				if firstSuccessor || constraintDate.Before(lateFinish) {
+					lateFinish = constraintDate
+					firstSuccessor = false
+				}
+			}
+		}
+
+		lateStart := addDays(lateFinish, -duration)
+
+		// Calculate total float: LS - ES (or equivalently LF - EF)
+		// Float is measured in days
+		floatDays := lateStart.Sub(sched.EarlyStart).Hours() / 24
+
+		// Update schedule with backward pass results
+		sched.LateStart = lateStart
+		sched.LateFinish = lateFinish
+		sched.TotalFloat = floatDays
+		// Use tolerance-based comparison per PRODUCTION_PLAN Step 33 (0.01 precision)
+		sched.IsCritical = math.Abs(floatDays) < 0.001
+
+		schedule[taskID] = sched
+	}
+
+	// Build critical path (WBS codes of tasks with zero float)
+	// Return in topological order (not reversed)
+	var criticalPath []string
+	for _, taskID := range sorted {
+		if sched, exists := schedule[taskID]; exists && sched.IsCritical {
+			criticalPath = append(criticalPath, sched.WBSCode)
+		}
+	}
+
+	return criticalPath, nil
+}
+
+// calculateBackwardConstraintDate determines the latest finish date for a predecessor
+// based on the successor's schedule and the dependency type.
+// For SS and SF types, predecessorDuration is used to convert the LS constraint to LF.
+// See DATA_SPINE_SPEC.md Section 3.4 for dependency types.
+func calculateBackwardConstraintDate(
+	succSchedule TaskSchedule,
+	predecessorDuration float64,
+	depType types.DependencyType,
+	lagDays int,
+) time.Time {
+	lag := float64(lagDays)
+
+	switch depType {
+	case types.DependencyTypeFS:
+		// Finish-to-Start: Predecessor finishes before successor starts
+		// LF(predecessor) = LS(successor) - lag
+		return addDays(succSchedule.LateStart, -lag)
+
+	case types.DependencyTypeSS:
+		// Start-to-Start: Predecessor starts before successor starts
+		// Constraint: LS(pred) <= LS(succ) - lag
+		// Since caller computes LS = LF - duration, we need:
+		// LF - duration = LS(succ) - lag
+		// LF = LS(succ) - lag + duration
+		return addDays(succSchedule.LateStart, -lag+predecessorDuration)
+
+	case types.DependencyTypeFF:
+		// Finish-to-Finish: Predecessor finishes before successor finishes
+		// LF(predecessor) = LF(successor) - lag
+		return addDays(succSchedule.LateFinish, -lag)
+
+	case types.DependencyTypeSF:
+		// Start-to-Finish: Predecessor starts before successor finishes
+		// Constraint: LS(pred) <= LF(succ) - lag
+		// Since caller computes LS = LF - duration, we need:
+		// LF - duration = LF(succ) - lag
+		// LF = LF(succ) - lag + duration
+		return addDays(succSchedule.LateFinish, -lag+predecessorDuration)
+
+	default:
+		// Default to FS behavior
+		return addDays(succSchedule.LateStart, -lag)
+	}
+}

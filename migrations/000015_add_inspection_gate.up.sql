@@ -1,0 +1,1 @@
+ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS is_inspection_gate BOOLEAN NOT NULL DEFAULT FALSE;

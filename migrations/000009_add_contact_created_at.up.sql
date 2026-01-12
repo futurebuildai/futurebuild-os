@@ -1,0 +1,2 @@
+-- 000009_add_contact_created_at.up.sql
+ALTER TABLE contacts ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;

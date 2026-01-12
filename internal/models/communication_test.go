@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -17,9 +18,9 @@ func TestCommunicationLogMarshaling(t *testing.T) {
 		ID:        uuid.New(),
 		ProjectID: projectID,
 		ContactID: &contactID,
-		Direction: CommunicationDirectionOutbound,
+		Direction: types.CommunicationDirectionOutbound,
 		Content:   "Testing interaction history",
-		Channel:   CommunicationChannelSMS,
+		Channel:   types.CommunicationChannelSMS,
 		Timestamp: now,
 	}
 
@@ -53,9 +54,9 @@ func TestNotificationMarshaling(t *testing.T) {
 	note := Notification{
 		ID:       uuid.New(),
 		UserID:   userID,
-		Type:     NotificationTypeScheduleSlip,
+		Type:     types.NotificationTypeScheduleSlip,
 		Priority: 1,
-		Status:   NotificationStatusUnread,
+		Status:   types.NotificationStatusUnread,
 	}
 
 	data, err := json.Marshal(note)

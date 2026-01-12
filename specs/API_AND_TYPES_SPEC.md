@@ -14,6 +14,7 @@ Defines the lifecycle of a `ProjectTask`.
 - `Pending`
 - `Ready`
 - `In_Progress`
+- `Inspection_Pending`
 - `Completed`
 - `Blocked`
 - `Delayed`
@@ -75,9 +76,28 @@ type NotificationService interface {
 
 ### 2.4 DirectoryService
 Contact and assignment lookups.
+
+**Interface Contract (Layer 4 Agents):**
 ```go
 type DirectoryService interface {
     GetContactForPhase(phaseID string) (Contact, error)
+}
+```
+> [!NOTE]
+> Layer 4 agents resolve `projectID` and `orgID` from the current execution context before calling the service layer.
+
+**Service Layer Signature (Internal):**
+```go
+func (s *DirectoryService) GetContactForPhase(ctx context.Context, projectID, orgID uuid.UUID, phaseCode string) (*types.Contact, error)
+```
+
+### 2.5 VertexClient
+AI Infrastructure client.
+```go
+type Client interface {
+    GenerateContent(ctx context.Context, modelType ModelType, parts ...genai.Part) (string, error)
+    GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+    Close() error
 }
 ```
 
@@ -110,7 +130,28 @@ type DirectoryService interface {
 }
 ```
 
-### 3.2 Project Schedule
+### 3.2 Authentication (Magic Link)
+`POST /api/v1/auth/login`
+
+**Input (AuthRequest):**
+```json
+{
+  "email": "String"
+}
+```
+
+**Output (AuthResponse):**
+```json
+{
+  "message": "String"
+}
+```
+
+`GET /api/v1/auth/verify?token={token}`
+
+**Output:** `User` JSON (See `DATA_SPINE_SPEC.md` Section 2.2)
+
+### 3.3 Project Schedule
 `GET /api/v1/projects/{id}/schedule`
 
 **Output (Gantt Data):**
@@ -141,11 +182,23 @@ type DirectoryService interface {
 ### 4.1 Contact
 ```go
 type Contact struct {
-    ID      string   `json:"id"`
-    Name    string   `json:"name"`
-    Company string   `json:"company"`
-    Phone   string   `json:"phone"`
-    Email   string   `json:"email"`
-    Role    UserRole `json:"role"`
+    ID                string            `json:"id"`
+    Name              string            `json:"name"`
+    Company           string            `json:"company"`
+    Phone             string            `json:"phone"`
+    Email             string            `json:"email"`
+    Role              UserRole          `json:"role"`
+    ContactPreference ContactPreference `json:"contact_preference,omitempty"` // See DATA_SPINE_SPEC.md Section 2.3
+}
+```
+
+### 4.2 Shared Auth Types
+```go
+type AuthRequest struct {
+    Email string `json:"email"`
+}
+
+type AuthResponse struct {
+    Message string `json:"message"`
 }
 ```

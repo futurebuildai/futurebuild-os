@@ -1,0 +1,185 @@
+[
+    {
+        "scenario_name": "Scenario 1: Identity (Standard Home)",
+        "project_gsf": 2250,
+        "project_start_date": "2024-06-03T08:00:00Z",
+        "context": {
+            "supply_chain_volatility": 1.0,
+            "rough_inspection_latency": 0.0,
+            "final_inspection_latency": 0.0
+        },
+        "multipliers": [],
+        "tasks": [
+            {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "wbs_code": "8.0",
+                "description": "Foundation Dig",
+                "base_duration_days": 5.0,
+                "is_inspection": false,
+                "predecessors": []
+            }
+        ],
+        "expected_results": {
+            "8.0": {
+                "calculated_duration": 5.0,
+                "early_start": "2024-06-03T08:00:00Z",
+                "early_finish": "2024-06-08T08:00:00Z",
+                "late_start": "2024-06-03T08:00:00Z",
+                "late_finish": "2024-06-08T08:00:00Z",
+                "total_float": 0.0,
+                "is_critical": true
+            }
+        }
+    },
+    {
+        "scenario_name": "Scenario 2: SAF Scaling (Large Home)",
+        "project_gsf": 4500,
+        "project_start_date": "2024-06-03T08:00:00Z",
+        "context": {
+            "supply_chain_volatility": 1.0
+        },
+        "multipliers": [],
+        "tasks": [
+            {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "wbs_code": "8.0",
+                "base_duration_days": 5.0,
+                "is_inspection": false,
+                "predecessors": []
+            }
+        ],
+        "expected_results": {
+            "8.0": {
+                "calculated_duration": 8.5,
+                "early_start": "2024-06-03T08:00:00Z",
+                "early_finish": "2024-06-11T20:00:00Z",
+                "late_start": "2024-06-03T08:00:00Z",
+                "late_finish": "2024-06-11T20:00:00Z",
+                "total_float": 0.0,
+                "is_critical": true
+            }
+        }
+    },
+    {
+        "scenario_name": "Scenario 3: Inspection Locking",
+        "project_gsf": 9000,
+        "project_start_date": "2024-06-03T08:00:00Z",
+        "context": {
+            "supply_chain_volatility": 1.0
+        },
+        "multipliers": [],
+        "tasks": [
+            {
+                "id": "00000000-0000-0000-0000-000000000003",
+                "wbs_code": "8.2",
+                "base_duration_days": 1.0,
+                "is_inspection": true,
+                "predecessors": []
+            }
+        ],
+        "expected_results": {
+            "8.2": {
+                "calculated_duration": 1.0,
+                "early_start": "2024-06-03T08:00:00Z",
+                "early_finish": "2024-06-04T08:00:00Z",
+                "late_start": "2024-06-03T08:00:00Z",
+                "late_finish": "2024-06-04T08:00:00Z",
+                "total_float": 0.0,
+                "is_critical": true
+            }
+        }
+    },
+    {
+        "scenario_name": "Scenario 4: Complex DAG & Float",
+        "project_gsf": 2250,
+        "project_start_date": "2024-06-03T08:00:00Z",
+        "context": {},
+        "multipliers": [],
+        "tasks": [
+            {
+                "id": "00000000-0000-0000-0000-0000000000A1",
+                "wbs_code": "A",
+                "base_duration_days": 5.0,
+                "is_inspection": false,
+                "predecessors": []
+            },
+            {
+                "id": "00000000-0000-0000-0000-0000000000B1",
+                "wbs_code": "B",
+                "base_duration_days": 3.0,
+                "is_inspection": false,
+                "predecessors": [
+                    {
+                        "predecessor_id": "00000000-0000-0000-0000-0000000000A1",
+                        "type": "FS",
+                        "lag": 2
+                    }
+                ]
+            },
+            {
+                "id": "00000000-0000-0000-0000-0000000000C1",
+                "wbs_code": "C",
+                "base_duration_days": 2.0,
+                "is_inspection": false,
+                "predecessors": [
+                    {
+                        "predecessor_id": "00000000-0000-0000-0000-0000000000B1",
+                        "type": "FS",
+                        "lag": 0
+                    }
+                ]
+            },
+            {
+                "id": "00000000-0000-0000-0000-0000000000D1",
+                "wbs_code": "D",
+                "base_duration_days": 15.0,
+                "is_inspection": false,
+                "predecessors": [
+                    {
+                        "predecessor_id": "00000000-0000-0000-0000-0000000000A1",
+                        "type": "FS",
+                        "lag": 0
+                    }
+                ]
+            }
+        ],
+        "expected_results": {
+            "A": {
+                "calculated_duration": 5.0,
+                "early_start": "2024-06-03T08:00:00Z",
+                "early_finish": "2024-06-08T08:00:00Z",
+                "late_start": "2024-06-03T08:00:00Z",
+                "late_finish": "2024-06-08T08:00:00Z",
+                "total_float": 0.0,
+                "is_critical": true
+            },
+            "B": {
+                "calculated_duration": 3.0,
+                "early_start": "2024-06-10T08:00:00Z",
+                "early_finish": "2024-06-13T08:00:00Z",
+                "late_start": "2024-06-18T08:00:00Z",
+                "late_finish": "2024-06-21T08:00:00Z",
+                "total_float": 8.0,
+                "is_critical": false
+            },
+            "C": {
+                "calculated_duration": 2.0,
+                "early_start": "2024-06-13T08:00:00Z",
+                "early_finish": "2024-06-15T08:00:00Z",
+                "late_start": "2024-06-21T08:00:00Z",
+                "late_finish": "2024-06-23T08:00:00Z",
+                "total_float": 8.0,
+                "is_critical": false
+            },
+            "D": {
+                "calculated_duration": 15.0,
+                "early_start": "2024-06-08T08:00:00Z",
+                "early_finish": "2024-06-23T08:00:00Z",
+                "late_start": "2024-06-08T08:00:00Z",
+                "late_finish": "2024-06-23T08:00:00Z",
+                "total_float": 0.0,
+                "is_critical": true
+            }
+        }
+    }
+]

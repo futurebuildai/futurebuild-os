@@ -231,11 +231,11 @@ users (
 )
 
 auth_tokens (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users,
-    token_hash VARCHAR(255),
-    expires_at TIMESTAMP,
-    used_at TIMESTAMP
+    token_hash VARCHAR(64) PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    used BOOLEAN DEFAULT FALSE
 )
 
 portal_users (
@@ -610,6 +610,14 @@ org_training_events (
 
 ### 5.1 Service Interfaces (Required)
 The Go application MUST implement the following internal service interfaces as defined in [API_AND_TYPES_SPEC.md](file:///home/colton/Replit%20Specs/API_AND_TYPES_SPEC.md):
+- **VertexClient**:
+    ```go
+    type Client interface {
+        GenerateContent(ctx context.Context, modelType ModelType, parts ...genai.Part) (string, error)
+        GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+        Close() error
+    }
+    ```
 - **WeatherService**: Logic for SWIM model adjustments.
 - **VisionService**: Image-based verification for the Validation Protocol.
 - **NotificationService**: SMS and system notification delivery.

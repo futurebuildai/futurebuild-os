@@ -21,6 +21,7 @@ npm-debug.log*
 .env.test.local
 .env.production.local
 *.pem
+service-account.json
 
 # IDEs
 .vscode/

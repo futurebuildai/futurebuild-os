@@ -14,24 +14,25 @@ type Forecast struct {
 // Contact represents a shared contact model.
 // See API_AND_TYPES_SPEC.md Section 4.1
 type Contact struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Company string   `json:"company"`
-	Phone   string   `json:"phone"`
-	Email   string   `json:"email"`
-	Role    UserRole `json:"role"`
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	Company           string            `json:"company"`
+	Phone             string            `json:"phone"`
+	Email             string            `json:"email"`
+	Role              UserRole          `json:"role"`
+	ContactPreference ContactPreference `json:"contact_preference,omitempty"` // See DATA_SPINE_SPEC.md Section 2.3
 }
 
 // InvoiceExtraction represents the output of document analysis.
 // See API_AND_TYPES_SPEC.md Section 3.1
 type InvoiceExtraction struct {
-	Vendor           string                `json:"vendor"`
-	Date             string                `json:"date"`
-	InvoiceNumber    string                `json:"invoice_number"`
-	TotalAmount      float64               `json:"total_amount"`
+	Vendor           string                  `json:"vendor"`
+	Date             string                  `json:"date"`
+	InvoiceNumber    string                  `json:"invoice_number"`
+	TotalAmount      float64                 `json:"total_amount"`
 	LineItems        []InvoiceExtractionItem `json:"line_items"`
-	SuggestedWBSCode string                `json:"suggested_wbs_code"`
-	Confidence       float64               `json:"confidence"`
+	SuggestedWBSCode string                  `json:"suggested_wbs_code"`
+	Confidence       float64                 `json:"confidence"`
 }
 
 // InvoiceExtractionItem represents a single line item in an invoice.
@@ -61,4 +62,25 @@ type GanttTask struct {
 	EarlyFinish  string     `json:"early_finish"`
 	DurationDays float64    `json:"duration_days"`
 	IsCritical   bool       `json:"is_critical"`
+}
+
+// AuthRequest is the payload for requesting a magic link.
+type AuthRequest struct {
+	Email string `json:"email"`
+}
+
+// AuthResponse is the generic response for auth requests.
+type AuthResponse struct {
+	Message string `json:"message"`
+}
+
+// User represents an internal user.
+// See DATA_SPINE_SPEC.md Section 2.2
+type User struct {
+	ID        string   `json:"id"`
+	OrgID     string   `json:"org_id"`
+	Email     string   `json:"email"`
+	Name      string   `json:"name"`
+	Role      UserRole `json:"role"`
+	CreatedAt string   `json:"created_at"`
 }

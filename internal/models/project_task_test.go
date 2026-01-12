@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -23,9 +24,9 @@ func TestProjectTaskMarshaling(t *testing.T) {
 		CalculatedDuration:      5.0,
 		WeatherAdjustedDuration: 6.5,
 		ManualOverrideDays:      &override,
-		Status:                  TaskStatusPending,
+		Status:                  types.TaskStatusPending,
 		VerifiedByVision:        true,
-		VerificationConfidence: 0.95,
+		VerificationConfidence:  0.95,
 	}
 
 	data, err := json.Marshal(task)

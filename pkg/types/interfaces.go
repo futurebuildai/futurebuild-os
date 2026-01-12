@@ -17,6 +17,7 @@ type VisionService interface {
 // See API_AND_TYPES_SPEC.md Section 2.3
 type NotificationService interface {
 	SendSMS(contactID string, message string) error
+	SendEmail(to string, subject string, body string) error
 }
 
 // DirectoryService defines contact and assignment lookups.

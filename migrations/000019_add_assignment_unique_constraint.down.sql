@@ -1,0 +1,1 @@
+ALTER TABLE project_assignments DROP CONSTRAINT IF EXISTS unique_project_phase_assignment;

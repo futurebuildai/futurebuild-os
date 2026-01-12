@@ -17,6 +17,12 @@ test:
 	@echo "--- Running Frontend Tests ---"
 	@if [ -d "frontend" ]; then npm --prefix frontend test || echo "No frontend tests defined"; fi
 
+# Auth Test: Verify JWT logic and claims
+test-auth:
+	@echo "--- Verifying JWT Authentication ---"
+	go test -v ./internal/service/auth_service_test.go ./internal/service/auth_service.go ./internal/service/notification_service.go
+	go test -v ./internal/api/handlers/auth_handler_test.go ./internal/api/handlers/auth_handler.go
+
 # Contract Test: Verify Go and TS type parity
 contract-test:
 	@echo "--- Generating Contract Samples ---"

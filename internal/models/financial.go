@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -58,11 +59,14 @@ func (l *LineItems) Scan(value interface{}) error {
 // Invoice represents a parsed financial artifact from the Action Engine.
 // See DATA_SPINE_SPEC.md Section 4.2
 type Invoice struct {
-	ID               uuid.UUID     `json:"id" db:"id"`
-	ProjectID        uuid.UUID     `json:"project_id" db:"project_id"`
-	VendorName       string        `json:"vendor_name" db:"vendor_name"`
-	Amount           float64       `json:"amount" db:"amount"`
-	LineItems        LineItems     `json:"line_items" db:"line_items"`
-	DetectedWBSCode  string        `json:"detected_wbs_code" db:"detected_wbs_code"`
-	Status           InvoiceStatus `json:"status" db:"status"`
+	ID              uuid.UUID     `json:"id" db:"id"`
+	ProjectID       uuid.UUID     `json:"project_id" db:"project_id"`
+	VendorName      string        `json:"vendor_name" db:"vendor_name"`
+	Amount          float64       `json:"amount" db:"amount"`
+	LineItems       LineItems     `json:"line_items" db:"line_items"`
+	DetectedWBSCode string        `json:"detected_wbs_code" db:"detected_wbs_code"`
+	Status          InvoiceStatus `json:"status" db:"status"`
+	InvoiceDate     *time.Time    `json:"invoice_date" db:"invoice_date"`
+	InvoiceNumber   *string       `json:"invoice_number" db:"invoice_number"`
+	Confidence      float64       `json:"confidence" db:"confidence"`
 }

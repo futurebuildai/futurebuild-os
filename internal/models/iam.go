@@ -6,6 +6,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// Identity represents a polymorphic authenticated entity (User or Contact).
+type Identity interface {
+	GetID() uuid.UUID
+	GetOrgID() uuid.UUID
+	GetEmail() string
+	GetName() string
+	GetRole() UserRole
+	GetCreatedAt() time.Time
+	IsInternal() bool
+}
+
 // Organization represents the multi-tenant container.
 // See DATA_SPINE_SPEC.md Section 2.1
 type Organization struct {
@@ -38,13 +49,14 @@ type User struct {
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
 
-// See DATA_SPINE_SPEC.md Section 2.3
-type ContactRole string
+func (u *User) GetID() uuid.UUID    { return u.ID }
+func (u *User) GetOrgID() uuid.UUID { return u.OrgID }
+func (u *User) GetEmail() string    { return u.Email }
+func (u *User) GetName() string     { return u.Name }
+func (u *User) GetRole() UserRole   { return u.Role }
+func (u *User) GetCreatedAt() time.Time { return u.CreatedAt }
+func (u *User) IsInternal() bool    { return true }
 
-const (
-	ContactRoleClient        ContactRole = "Client"
-	ContactRoleSubcontractor ContactRole = "Subcontractor"
-)
 
 type ContactPreference string
 
@@ -63,6 +75,29 @@ type Contact struct {
 	Company           *string           `json:"company,omitempty" db:"company"`
 	Phone             *string           `json:"phone,omitempty" db:"phone"`
 	Email             *string           `json:"email,omitempty" db:"email"`
-	GlobalRole        ContactRole       `json:"global_role" db:"global_role" validate:"required"`
+	Role              UserRole          `json:"role" db:"role" validate:"required"`
 	ContactPreference ContactPreference `json:"contact_preference" db:"contact_preference"`
+	CreatedAt         time.Time         `json:"created_at" db:"created_at"`
+}
+
+func (c *Contact) GetID() uuid.UUID    { return c.ID }
+func (c *Contact) GetOrgID() uuid.UUID { return c.OrgID }
+func (c *Contact) GetEmail() string    {
+	if c.Email == nil {
+		return ""
+	}
+	return *c.Email
+}
+func (c *Contact) GetName() string   { return c.Name }
+func (c *Contact) GetRole() UserRole { return c.Role }
+func (c *Contact) GetCreatedAt() time.Time { return c.CreatedAt }
+func (c *Contact) IsInternal() bool  { return false }
+// AuthToken represents a stateful magic link token.
+// See Technical Specification: Magic Link Authentication (Stateful)
+type AuthToken struct {
+	TokenHash string    `db:"token_hash"`
+	UserID    uuid.UUID `db:"user_id"`
+	ExpiresAt time.Time `db:"expires_at"`
+	CreatedAt time.Time `db:"created_at"`
+	Used      bool      `db:"used"`
 }
