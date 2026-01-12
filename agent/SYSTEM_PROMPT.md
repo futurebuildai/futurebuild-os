@@ -21,7 +21,7 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 3 (Steps 21-25): Authentication & Rate Limiting: COMPLETED.
     ◦ Phase 4 (Steps 26-34): Physics Engine - Core Scheduling: COMPLETED.
     ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: IN PROGRESS.
-    ◦ Current Focus: Phase 5, Step 40 (Site Photo Verification Flow).
+    ◦ Current Focus: Phase 5, Step 41 (Document Re-processing & Audit Trail).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -89,21 +89,23 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 5, Step 40b (Upgrade Vertex AI SDK)
-Context: Step 40 revealed that the deprecated Vertex AI SDK cannot handle image payloads for Gemini 2.5 Flash. We must upgrade to the new official Go SDK.
+Task: Execute Phase 5, Step 41 (Document Re-processing & Audit Trail)
+Context: Documents may be updated or re-uploaded. We need a system to trigger re-analysis and version extraction results. Includes `reprocessed` flag and `document_versions` table or logic.
 
 Requirements:
-1.  **Refactor Client**: Replace `cloud.google.com/go/vertexai/genai` with `google.golang.org/genai`.
-2.  **Update Services**: Patch `VisionService`, `InvoiceService`, and `RagService` to use the new client interface.
-3.  **Verify Vision**: Ensure `TestVisionService_VerifyTask` passes against the REAL API with an image.
+1.  **Schema Update**: Add `document_versions` table or `version` column to `invoices`? (Check Data Spine). Actually, `DATA_SPINE_SPEC` implies handling updates.
+2.  **Logic**: Implement `ReprocessDocument(docID)` in `InvoiceService` and `DocumentService`.
+3.  **Audit Trail**: Ensure `updated_at` and `processing_status` are tracked.
+4.  **Endpoint**: `POST /api/v1/documents/{id}/reprocess`.
+5.  **Verify**: Upload new version -> Confirm Invoice Extraction updates.
 
 Key Files:
--   `pkg/ai/vertex.go`
--   `internal/service/vision_service.go`
--   `go.mod`
+-   `internal/service/invoice_service.go`
+-   `internal/service/document_service.go`
+-   `specs/API_AND_TYPES_SPEC.md`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 40b
--   `API_AND_TYPES_SPEC.md` Section 2.2
+-   `PRODUCTION_PLAN.md` Step 41
+-   `DATA_SPINE_SPEC.md` Section 4.2
 
 First Step: /prism
