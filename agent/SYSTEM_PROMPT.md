@@ -4,7 +4,7 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Backend: Go 1.22+, Chi Router, PostgreSQL, Asynq (Redis), Google Vertex AI
 .
     ◦ Frontend: Lit 3.0, TypeScript 5.0+ (Strict), Vite, CSS Custom Properties
-.
+    ◦ Protocol: Hybrid A2UI (See `specs/Google_A2UI_DOCS.md` and `specs/FRONTEND_SCOPE.md`)
     ◦ Constraint: NO React, NO ORMs (use raw SQL/pgx), NO Python logic (Go only)
 .
 2. Database Authority: specs/DATA_SPINE_SPEC.md

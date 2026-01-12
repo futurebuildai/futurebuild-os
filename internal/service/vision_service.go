@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"google.golang.org/genai"
 )
 
 // VisionService implements AI-powered site photo analysis.
@@ -56,11 +56,16 @@ func (s *VisionService) VerifyTask(ctx context.Context, imageURL string, taskDes
 	}
 
 	// 2. Prepare AI Parts
-	prompt := fmt.Sprintf(visionPromptTemplate, taskDescription)
-	imgPart := genai.ImageData(strings.TrimPrefix(mimeType, "image/"), imageBytes)
+	promptPart := &genai.Part{Text: fmt.Sprintf(visionPromptTemplate, taskDescription)}
+	imgPart := &genai.Part{
+		InlineData: &genai.Blob{
+			MIMEType: mimeType,
+			Data:     imageBytes,
+		},
+	}
 
-	// 3. Call Vertex AI (Gemini 2.5 Flash mandated per BACKEND_SCOPE Section 3.2)
-	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, genai.Text(prompt), imgPart)
+	// 3. Call Vertex AI
+	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, promptPart, imgPart)
 	if err != nil {
 		return false, 0, fmt.Errorf("ai vision analysis failed: %w", err)
 	}

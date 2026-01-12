@@ -2,7 +2,7 @@
 **Governing Strategy:** See `PRODUCTION_PLAN.md` for detailed Phase definitions and Validation Criteria.
 
 #### Current Focus
-*   [x] **Latest Spec Implemented:** Phase 5, Step 40 (Site Photo Verification Flow) ✅
+*   [x] **Latest Spec Implemented:** Phase 5, Step 40b (Upgrade Vertex AI SDK) ✅
 *   [x] **Health Status:** Green ✅ (Logic Verified, Auth Pending)
 *   [x] **Current Goal:** Phase 5, Step 41 (Document Re-processing & Audit Trail)
 
@@ -15,6 +15,7 @@
 *   [x] **DirectoryService:** Map phases to contacts (Ref: `PRODUCTION_PLAN.md` Step 38) ✅
 *   [x] **Review Flags:** Confidence scoring & human gates (Ref: `PRODUCTION_PLAN.md` Step 39) ✅
 *   [x] **Site Photo Verification:** AI-powered task verification (Ref: `PRODUCTION_PLAN.md` Step 40) ✅
+*   [x] **Vertex SDK Upgrade:** Migrated to google.golang.org/genai (Ref: `PRODUCTION_PLAN.md` Step 40b) ✅
 
 #### Development Queue
 ##### Phase 0: Foundation & CI/CD [Status: ✅ Completed]

@@ -108,13 +108,12 @@ To ensure end-to-end data integrity, the frontend MUST maintain a `types/` direc
 └─────────────┴───────────────────────────────────────────────────┘
 ```
 
-### 3.2 Responsive Behavior
+### 3.4 Responsive Behavior
 
 | Breakpoint | Layout |
 |------------|--------|
-| Desktop (≥1200px) | Sidebar + Dashboard + Chat side-by-side |
-| Tablet (768-1199px) | Collapsible sidebar, stacked dashboard/chat |
-| Mobile (<768px) | Bottom nav, full-screen views, swipe between dashboard/chat |
+| **Desktop (≥1200px)** | Centered chat channel (max-width 900px) with optional "Artifact Sidebar" for persistent pinning. |
+| **Tablet/Mobile** | Full-width chat stream. Artifacts are inline cards. |
 
 ### 3.3 Component Tree
 
@@ -122,59 +121,23 @@ To ensure end-to-end data integrity, the frontend MUST maintain a `types/` direc
 <fb-app>
 ├── <fb-header>
 │   ├── <fb-logo>
-│   ├── <fb-project-selector>
 │   ├── <fb-notification-bell>
 │   └── <fb-user-menu>
 │
-├── <fb-sidebar>
-│   ├── <fb-nav-item icon="dashboard">
-│   ├── <fb-nav-item icon="schedule">
-│   ├── <fb-nav-item icon="tasks">
-│   ├── <fb-nav-item icon="documents">
-│   ├── <fb-nav-item icon="budget">
-│   ├── <fb-nav-item icon="team">
-│   └── <fb-nav-item icon="settings">
-│
-├── <fb-main>
-│   ├── <fb-dashboard-view>
-│   │   ├── <fb-status-card type="progress">
-│   │   ├── <fb-status-card type="budget">
-│   │   ├── <fb-status-card type="weather">
-│   │   ├── <fb-status-card type="inspections">
-│   │   ├── <fb-upcoming-tasks>
-│   │   └── <fb-recent-activity>
-│   │
-│   ├── <fb-schedule-view>
-│   │   └── <fb-gantt-chart>
-│   │
-│   ├── <fb-tasks-view>
-│   │   ├── <fb-task-filters>
-│   │   └── <fb-task-list>
-│   │       └── <fb-task-card>
-│   │
-│   ├── <fb-documents-view>
-│   │   ├── <fb-document-upload>
-│   │   └── <fb-document-list>
-│   │
-│   ├── <fb-budget-view>
-│   │   ├── <fb-budget-chart>
-│   │   └── <fb-cost-table>
-│   │
-│   └── <fb-team-view>
-│       └── <fb-team-member-card>
-│
-├── <fb-chat-panel>
-│   ├── <fb-chat-header>
+├── <fb-chat-interface>
 │   ├── <fb-message-list>
 │   │   ├── <fb-message type="user">
 │   │   ├── <fb-message type="assistant">
-│   │   └── <fb-artifact>
+│   │   └── <fb-ephemeral-card>
 │   │       ├── <fb-artifact-gantt>
 │   │       ├── <fb-artifact-table>
 │   │       ├── <fb-artifact-chart>
-│   │       └── <fb-artifact-card>
-│   ├── <fb-chat-input>
-│   └── <fb-voice-button>
+│   │       └── <fb-artifact-invoice>
+│   │
+│   └── <fb-input-bar>
+│       ├── <fb-text-input>
+│       ├── <fb-voice-button> (STT)
+│       └── <fb-upload-button>
 │
 ├── <fb-notification-center>
 │   └── <fb-notification-item>
@@ -219,8 +182,9 @@ export class FBElement extends LitElement {
 ```typescript
 import { FBApp } from './app/FBApp';
 import { FBHeader } from './layout/FBHeader';
-import { FBSidebar } from './layout/FBSidebar';
-import { FBChat } from './chat/FBChat';
+import { FBChatInterface } from './chat/FBChatInterface';
+import { FBMessageList } from './chat/FBMessageList';
+import { FBInputBar } from './chat/FBInputBar';
 import { FBArtifactInvoice } from './artifacts/FBArtifactInvoice';
 import { FBArtifactBudget } from './artifacts/FBArtifactBudget';
 import { FBContactCard } from './contacts/FBContactCard';
@@ -228,8 +192,9 @@ import { FBContactCard } from './contacts/FBContactCard';
 const components = {
   'fb-app': FBApp,
   'fb-header': FBHeader,
-  'fb-sidebar': FBSidebar,
-  'fb-chat': FBChat,
+  'fb-chat-interface': FBChatInterface,
+  'fb-message-list': FBMessageList,
+  'fb-input-bar': FBInputBar,
   'fb-artifact-invoice': FBArtifactInvoice,
   'fb-artifact-budget': FBArtifactBudget,
   'fb-contact-card': FBContactCard,
@@ -246,9 +211,20 @@ export function registerComponents() {
 
 ### 4.3 New & Refactored Components
 
+#### <fb-chat-interface> (Central Hub)
+The primary container for the entire application state.
+- **Responsibility:** Manages the message stream, WebSocket connection, and artifact rendering.
+- **Children:** `<fb-message-list>`, `<fb-input-bar>`.
+
+#### <fb-input-bar> (Command Center)
+- **Inputs:** Text area with auto-expand.
+- **Voice:** `<fb-voice-button>` triggers STT (Speech-to-Text) recording.
+- **Uploads:** Drag-and-drop zone for invoices/docs.
+
 #### <fb-artifact-invoice> (Invoice Processor)
-Split-screen interface for validating AI-extracted invoice data.
-- **Left Panel:** Document Viewer (PDF or Image) with zoom/rotate.
+Inline ephemeral card for validating AI-extracted invoice data.
+- **Display:** Embedded within the chat stream or expanded to fullscreen modal.
+- **Left Panel:** Document Viewer (PDF or Image).
 - **Right Panel:** Editable form mirroring the `Invoice` type.
 - **Fields:** Vendor (Autocomplete from Rolodex), Date, Amount, WBS Code, Line Items.
 - **Action:** "Approve" button to commit data to the Data Spine.
@@ -269,6 +245,33 @@ UI for managing project-specific team assignments.
 The primary conversational container, now utilizing Lit's reactive repeaters for the message list.
 - **Reactivity:** Uses `SignalWatch` to update when the global message store changes.
 - **Artifact Rendering:** Dynamically maps agent tool outputs to components.
+
+### 4.4 Dynamic UI Renderer (A2UI Support)
+
+To support "Micro-Flows" (ad-hoc agent-generated UIs), the `<fb-dynamic-renderer>` component recursively renders a JSON tree into native Lit components.
+
+**Atomic Component Catalog (The "Legos"):**
+The Agent is authorized to use ONLY these components in a `Dynamic_UI` response:
+
+| Component | Props | Description |
+|-----------|-------|-------------|
+| `<fb-box>` | `direction` (row/col), `gap`, `padding` | Flexbox container. |
+| `<fb-text>` | `variant` (h1/h2/body/caption), `color` | Typography block. |
+| `<fb-button>` | `variant` (primary/secondary), `action_id` | Triggers a backend event. |
+| `<fb-input>` | `type` (text/number/date), `label`, `value` | Data entry field. |
+| `<fb-select>` | `options` (Array), `label`, `action_id` | Dropdown or Radio list. |
+| `<fb-icon>` | `name` (Material Symbol ID) | Visual icon. |
+
+**Recursive Render Logic:**
+```typescript
+renderComponent(node: DynamicComponent) {
+  switch (node.type) {
+    case 'box': return html`<fb-box .props=${node.props}>${node.children.map(renderComponent)}</fb-box>`;
+    case 'text': return html`<fb-text .props=${node.props}></fb-text>`;
+    // ... maps generic JSON to specific Lit Components
+  }
+}
+```
 
 ---
 

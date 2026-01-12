@@ -124,6 +124,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 52 | **Build Chat Interface Container with Message List and Ephemeral Cards** | Step 51 | 2 |
 | 52.5 | **Implement WebSocket/SSE real-time messaging** for agent responses | Step 52 | 2 |
 | 53 | **Build Specialized Artifact components** (Invoice, Budget, Gantt, Rolodex) | Step 18, 44 | 3 |
+| 53.5 | **Implement Dynamic Agent UI Renderer** (Recursively render `<fb-dynamic-renderer>` from JSON) | Step 53 | 2 |
 | 54 | **Implement Drag-and-Drop zone** for invoice ingestion | Step 35, 51 | 1.5 |
 | 55 | Finalize responsive mobile navigation and state hydration | Step 52 | 2 |
 | 56 | **Artifact Fixture Testing**: Implement a Storybook-style harness to render <fb-artifact-invoice>, <fb-artifact-budget>, and <fb-artifact-gantt> in isolation with various data states (Loading, Error, Empty, Full) to verify visual stability. | Step 53 | 1 |

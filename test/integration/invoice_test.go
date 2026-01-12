@@ -34,13 +34,19 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 	defer db.Close()
 
 	// 2. Setup Vertex Client
+	var client ai.Client
 	modelIDs := map[ai.ModelType]string{
 		ai.ModelTypeFlash:     cfg.VertexModelFlashID,
 		ai.ModelTypePro:       cfg.VertexModelProID,
 		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
 	}
-	client, err := ai.NewVertexClient(context.Background(), cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
-	require.NoError(t, err)
+	if cfg.VertexProjectID != "" {
+		client, err = ai.NewVertexClient(context.Background(), cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
+		require.NoError(t, err)
+	} else {
+		t.Log("Vertex generated ID missing, using Mock client")
+		client = &MockVertexClient{}
+	}
 	defer client.Close()
 
 	// 3. Setup Service

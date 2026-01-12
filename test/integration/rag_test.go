@@ -49,8 +49,14 @@ func TestRag_IngestAndSearch(t *testing.T) {
 		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
 	}
 
-	client, err := ai.NewVertexClient(context.Background(), cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
-	require.NoError(t, err)
+	var client ai.Client
+	if cfg.VertexProjectID != "" {
+		client, err = ai.NewVertexClient(context.Background(), cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
+		require.NoError(t, err)
+	} else {
+		t.Log("Vertex generated ID missing, using Mock client")
+		client = &MockVertexClient{}
+	}
 	defer client.Close()
 
 	// 3. Setup Service

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genai"
 
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -78,7 +78,7 @@ func TestInfra_S3_Vertex(t *testing.T) {
 		defer client.Close()
 
 		// Simple prompt
-		resp, err := client.GenerateContent(ctx, ai.ModelTypeFlash, genai.Text("Say 'Hello Integration Test'"))
+		resp, err := client.GenerateContent(ctx, ai.ModelTypeFlash, &genai.Part{Text: "Say 'Hello Integration Test'"})
 		if err != nil {
 			// If quota exceeded or auth fails, we might fail here.
 			// skipping as this depends on external cloud configuration

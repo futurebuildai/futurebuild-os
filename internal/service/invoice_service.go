@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
+	"google.golang.org/genai"
 )
 
 // ConfidenceThresholdForReview defines the minimum AI confidence
@@ -83,8 +83,9 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 	}
 
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
-	prompt := fmt.Sprintf(invoicePromptTemplate, extractedText)
-	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, genai.Text(prompt))
+	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
+	promptPart := &genai.Part{Text: fmt.Sprintf(invoicePromptTemplate, extractedText)}
+	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, promptPart)
 	if err != nil {
 		return uuid.Nil, nil, fmt.Errorf("ai analysis failed: %w", err)
 	}

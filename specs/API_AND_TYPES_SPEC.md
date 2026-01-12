@@ -31,6 +31,7 @@ Defines the visual components displayed in the Chat Orchestrator.
 - `Invoice`
 - `Budget_View`
 - `Gantt_View`
+- `Dynamic_UI`
 
 ---
 
@@ -202,4 +203,33 @@ type AuthRequest struct {
 type AuthResponse struct {
     Message string `json:"message"`
 }
+
+### 4.3 Dynamic UI (A2UI Protocol)
+These structures allow the Agent to construct "Micro-Flows" using atomic components.
+
+```go
+type DynamicComponentType string
+
+const (
+    ComponentBox    DynamicComponentType = "box"    // Flex container
+    ComponentText   DynamicComponentType = "text"   // Typography
+    ComponentButton DynamicComponentType = "button" // Action
+    ComponentInput  DynamicComponentType = "input"  // Data entry
+    ComponentSelect DynamicComponentType = "select" // Dropdown/Radio
+    ComponentIcon   DynamicComponentType = "icon"   // Material Symbol
+)
+
+type DynamicComponent struct {
+    Type     DynamicComponentType   `json:"type"`
+    Props    map[string]interface{} `json:"props"`              // e.g. {"label": "Submit", "variant": "primary"}
+    Children []DynamicComponent     `json:"children,omitempty"` // Recursive nesting
+    ActionID string                 `json:"action_id,omitempty"` // For buttons/inputs
+}
+
+type DynamicUIArtifact struct {
+    Title      string           `json:"title"`
+    Root       DynamicComponent `json:"root"`
+    SubmitURL  string           `json:"submit_url,omitempty"` // Endpoint to POST data to
+}
+```
 ```
