@@ -17,11 +17,11 @@ The UI is built around a **Chat + Dashboard** paradigm where users interact prim
 
 | Principle | Implementation |
 |-----------|----------------|
-| Simple | Chat-first interaction, no learning curve |
-| Powerful | Rich artifacts generated from conversation |
-| Unified | Same interface for all user roles |
-| Responsive | Works seamlessly on desktop, tablet, phone |
-| Fast | Lit + Vite, optimized reactivity |
+| **Chat-First** | Primary interaction is conversational; no complex nav menus. |
+| **Agent-as-Sieve** | Agent proactively surfaces priorities; User doesn't "hunt" for data. |
+| **Unified** | Same interface for all user roles (Builder, Sub, Client). |
+| **Responsive** | Mobile-first Web App design; touch-optimized. |
+| **Fast** | Lit + Vite, optimized reactivity. |
 | Type-Safe | Strict TypeScript 5.0+, shared backend types |
 
 ### Technology Stack

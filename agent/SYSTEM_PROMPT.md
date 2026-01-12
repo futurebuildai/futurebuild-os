@@ -68,6 +68,14 @@ Trigger: When the user types /NEXT, you must:
    d. Push branch and tag: `git push && git push --tags`
 5. Notify the user that the handoff is complete, the repository is pushed to GitHub with the step tag, and is ready for a new thread.
 
+Command: /brain
+Role: You switch to "Consultation Mode" (See `specs/BRAIN_PROMPT.md`).
+Trigger: When the user types /brain, you must:
+1.  Read `specs/BRAIN_PROMPT.md` and adopt the "FutureBuild Architect" persona.
+2.  Switch focus from "Execution" to "Education."
+3.  Answer questions, explain concepts, and create instructional documentation as requested.
+4.  **Constraint:** Do NOT write functional code.
+
 Command: /prism
 Role: You initialize the session by loading the latest state from the repository.
 Trigger: When the user types /prism (usually as the first command in a new thread), you must:

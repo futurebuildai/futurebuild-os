@@ -62,7 +62,8 @@ Validation Protocol service.
 ```go
 type VisionService interface {
     // VerifyTask returns (is_verified, confidence_score, error)
-    VerifyTask(imageURL string, taskDescription string) (bool, float64, error)
+    // Context is required for AI inference timeout/cancellation control.
+    VerifyTask(ctx context.Context, imageURL string, taskDescription string) (bool, float64, error)
 }
 ```
 
