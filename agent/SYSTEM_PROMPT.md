@@ -89,25 +89,25 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 5, Step 42 (Mock Ingestion Pipeline)
-Context: Create a deterministic test fixture ("perfect" JSON) to simulate AI output. verifiable DB logic (UPSERT, Review Flags) without AI latency or nondeterminism.
-
+Task: Execute Phase 6, Step 43 (Chat Orchestrator)
+Context: Build the foundational "Brain" of the system. The Chat Orchestrator receives user input, determines intent, and executes tools.
 Requirements:
-1.  **Fixtures**: Create `test/fixtures/perfect_invoice.json` matching `types.InvoiceExtraction`.
-2.  **Test Suite**: Create `test/integration/pipeline_test.go`.
-3.  **Logic Verification**:
-    -   Load JSON fixture.
-    -   Call `InvoiceService.SaveExtraction` directly.
-    -   Assert strict equality between JSON and DB records (`invoices`, `line_items`).
-4.  **Goal**: "Green Bar" regression test for the database layer.
+1.  **Package**: Create `internal/chat`.
+2.  **Service**: Implement `ChatService` with `HandleMessage`.
+3.  **Intent Mapping**: Create `intents.go`. Implement detection for `PROCESS_INVOICE` (keyword/regex is fine for V1, or Gemini dispatch if simple).
+4.  **Integration**:
+    *   If intent == `PROCESS_INVOICE`, it should expect a file upload or reference `InvoiceService`.
+    *   Since we are just building the *Orchestrator* logic, we might mock the actual execution or wire it to the `InvoiceService` we just tested.
+5.  **API**: expose `POST /api/v1/chat`.
 
 Key Files:
--   `test/fixtures/perfect_invoice.json`
--   `test/integration/pipeline_test.go`
--   `internal/service/invoice_service.go`
+-   `internal/chat/orchestrator.go`
+-   `internal/chat/intents.go`
+-   `internal/api/handler/chat_handler.go`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 42
--   `DATA_SPINE_SPEC.md` Section 4.2
+-   `PRODUCTION_PLAN.md` Step 43
+-   `BACKEND_SCOPE.md` Section 3.5 (Action Engine)
+-   `API_AND_TYPES_SPEC.md` Section 4.3 (Dynamic UI)
 
 First Step: /prism , do not execute implementation plan without my approval

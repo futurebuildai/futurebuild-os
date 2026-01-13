@@ -1,26 +1,28 @@
-# Handoff: Phase 5 Step 42
+# Handoff: Phase 6 Step 43
 
-**Previous Step:** 41 (Document Re-processing & Audit Trail) - **COMPLETED**
-**Current Step:** 42 (Mock Ingestion Pipeline)
+**Previous Step:** 42 (Mock Ingestion Pipeline) - **COMPLETED**
+**Current Step:** 43 (Chat Orchestrator & Intent Mapping)
 
 ## Status
-- **Step 41 Complete**: Implemented document re-processing with audit trail.
-  - Added `source_document_id` to `invoices` table.
-  - Added `updated_at`, `reprocessed_count` to `documents` table.
-  - Implemented `ReprocessDocument` handler with chained Re-extraction -> UPSERT.
-  - Verified with new integration test `test/integration/reprocess_test.go`.
-- **Ready for Step 42**: Need to create a test fixture for "perfect" JSON injection to verify DB logic in isolation from AI.
+- **Step 42 Complete**: Created `test/fixtures/perfect_invoice.json` and `test/integration/pipeline_test.go`. Verified `InvoiceService.SaveExtraction` logic in isolation.
+- **Ready for Step 43**: The database layer is regression-tested. We can now build the "Brain" (Chat Orchestrator) that will drive these services.
 
-## Context for Step 42
-The goal is to create a deterministic test fixture that simulates the AI's output. This allows us to test the `InvoiceService.SaveExtraction` logic (mapping, UPSERT, Review Flags) without relying on the actual Vertex AI calls or mocks that might drift. This "Mock Ingestion Pipeline" will serve as a regression suite for the database layer.
+## Context for Step 43
+The Goal is to build the `ChatService` and `Orchestrator`. This is the entry point for all user interaction in the "Chat-First" architecture.
+The Orchestrator must:
+1. Accept a user message.
+2. classify intent (initially we can use regex or simple keywords, backing into Gemini later).
+3. Route to the correct service (e.g., `PROCESS_INVOICE` -> `InvoiceService`).
+4. Return a structured response (See `API_AND_TYPES_SPEC.md` for `DynamicUIArtifact`).
 
 ## Key Files
-- `test/fixtures/perfect_invoice.json` (To be created)
-- `test/integration/pipeline_test.go` (To be created)
-- `internal/service/invoice_service.go` (Target of testing)
+- `internal/chat/orchestrator.go` (NEW)
+- `internal/chat/service.go` (NEW)
+- `internal/chat/intents.go` (NEW)
+- `pkg/types/chat.go` (Shared types if needed, or use `pkg/types`)
 
 ## Next Actions
-1.  Create `test/fixtures` directory.
-2.  Add `perfect_invoice.json` matching `types.InvoiceExtraction`.
-3.  Create `test/integration/pipeline_test.go` that loads this JSON and calls `invoiceService.SaveExtraction`.
-4.  Assert database state matches the JSON exactly.
+1. Define `ChatService` struct.
+2. Implement `HandleMessage(ctx, user, message)`.
+3. Create `Intent` enum (`ProcessInvoice`, `GeneralQuery`, etc.).
+4. accessible via `POST /api/v1/chat`.

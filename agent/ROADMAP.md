@@ -2,23 +2,16 @@
 ### Execution Roadmap
 **Governing Strategy:** See `PRODUCTION_PLAN.md` for detailed Phase definitions and Validation Criteria.
 
+*   [x] **Mock Ingestion:** Create deterministic test fixtures (Ref: `PRODUCTION_PLAN.md` Step 42) ✅
+
 #### Current Focus
-*   [x] **Latest Spec Implemented:** Phase 5, Step 41 (Document Re-processing & Audit Trail) ✅
-*   [x] **Health Status:** Green ✅ (Logic Verified, Auth Pending)
-*   [ ] **Current Goal:** Phase 5, Step 42 (Mock Ingestion Pipeline)
+*   [x] **Latest Spec Implemented:** Phase 5, Step 42 (Mock Ingestion Pipeline) ✅
+*   [x] **Health Status:** Green ✅ (Regression Suite Passed)
+*   [ ] **Current Goal:** Phase 6, Step 43 (Chat Orchestrator & Intent Mapping)
 
 #### Development Queue
-##### Phase 5: Context Engine - AI Integration [Status: ⏳ In Progress]
-*   [x] **Vertex AI & Object Storage Setup:** Implemented S3 & Vertex Clients (Ref: `PRODUCTION_PLAN.md` Step 35) ✅
-*   [x] **Vertex Client Refactor:** Multi-model & Multimodal support (Step 35.5) ✅
-*   [x] **RAG Pipeline:** Implement document chunking and pgvector (Ref: `PRODUCTION_PLAN.md` Step 36) ✅
-*   [x] **Invoice Processor:** PDF -> InvoiceExtraction JSON (Ref: `PRODUCTION_PLAN.md` Step 37) ✅
-*   [x] **DirectoryService:** Map phases to contacts (Ref: `PRODUCTION_PLAN.md` Step 38) ✅
-*   [x] **Review Flags:** Confidence scoring & human gates (Ref: `PRODUCTION_PLAN.md` Step 39) ✅
-*   [x] **Site Photo Verification:** AI-powered task verification (Ref: `PRODUCTION_PLAN.md` Step 40) ✅
-*   [x] **Vertex SDK Upgrade:** Migrated to google.golang.org/genai (Ref: `PRODUCTION_PLAN.md` Step 40b) ✅
-*   [x] **Audit Trail:** Document re-processing & Invoice UPSERT (Ref: `PRODUCTION_PLAN.md` Step 41) ✅
-*   [ ] **Mock Ingestion:** Create deterministic test fixtures (Ref: `PRODUCTION_PLAN.md` Step 42)
+##### Phase 6: Action Engine - Chat & Agents [Status: ⏳ In Progress]
+*   [ ] **Chat Orchestrator:** Build main message router (Ref: `PRODUCTION_PLAN.md` Step 43)
 
 #### Development Queue
 ##### Phase 0: Foundation & CI/CD [Status: ✅ Completed]

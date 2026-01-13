@@ -151,7 +151,10 @@ Parsed artifacts from the Action Engine.
 | amount | DECIMAL | Total invoice value |
 | line_items | JSONB | Matches `InvoiceExtraction` schema |
 | detected_wbs_code | VARCHAR | Predicted WBS mapping |
+| invoice_date | DATE | Extracted invoice date |
+| invoice_number | VARCHAR | Extracted invoice number |
 | status | ENUM | Pending, Approved, Exported |
+| confidence | FLOAT | AI Confidence Score (0.0 - 1.0) |
 | is_human_review_required | BOOLEAN | Flag for human review when AI confidence is low |
 | source_document_id | UUID (FK) | Reference to source DOCUMENT (Nullable, SET NULL) |
 
