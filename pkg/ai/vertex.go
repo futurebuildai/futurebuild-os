@@ -1,13 +1,9 @@
 package ai
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 
-	"golang.org/x/oauth2/google"
 	"google.golang.org/genai"
 )
 
@@ -106,57 +102,20 @@ func (vc *VertexClient) GenerateEmbedding(ctx context.Context, text string) ([]f
 		return nil, fmt.Errorf("embedding model not configured in modelIDs map")
 	}
 
-	// We stick to the REST implementation for Embeddings for now
-	// to ensure stability unless we actally refactor this to SDK too.
-	// The SDK likely supports vc.client.Models.EmbedContent but params might differ.
-	// Keeping the working REST implementation as per "Refactor Client" focused on image payloads.
-
-	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict",
-		vc.location, vc.projectID, vc.location, modelID)
-
-	payload := map[string]interface{}{
-		"instances": []map[string]interface{}{
-			{"content": text},
-		},
+	// Use SDK for Embedding
+	content := &genai.Content{
+		Parts: []*genai.Part{{Text: text}},
+		Role:  "user",
 	}
-	body, _ := json.Marshal(payload)
 
-	client, err := google.DefaultClient(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	resp, err := vc.client.Models.EmbedContent(ctx, modelID, []*genai.Content{content}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create http client: %w", err)
+		return nil, fmt.Errorf("embedding error: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("embedding request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("embedding API returned status %d", resp.StatusCode)
+	if len(resp.Embeddings) == 0 || len(resp.Embeddings[0].Values) == 0 {
+		return nil, fmt.Errorf("no embeddings returned")
 	}
 
-	var result struct {
-		Predictions []struct {
-			Embeddings struct {
-				Values []float32 `json:"values"`
-			} `json:"embeddings"`
-		} `json:"predictions"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(result.Predictions) == 0 {
-		return nil, fmt.Errorf("no predictions returned")
-	}
-
-	return result.Predictions[0].Embeddings.Values, nil
+	return resp.Embeddings[0].Values, nil
 }
