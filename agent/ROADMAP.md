@@ -12,7 +12,8 @@
 #### Development Queue
 ##### Phase 6: Action Engine - Chat & Agents [Status: ⏳ In Progress]
 *   [x] **Chat Types:** Define Intent, ChatRequest, ChatResponse types (Ref: `PRODUCTION_PLAN.md` Step 43.1) ✅
-*   [ ] **Intent Classification:** Implement KeywordClassifier (Ref: `PRODUCTION_PLAN.md` Step 43.2)
+*   [x] **Intent Classification:** Implement KeywordClassifier (Ref: `PRODUCTION_PLAN.md` Step 43.2) ✅
+*   [ ] **Orchestration Service:** Build traffic controller (Ref: `PRODUCTION_PLAN.md` Step 43.3)
 
 
 ##### Phase 5: Context Engine - AI Integration [Status: ✅ Completed]

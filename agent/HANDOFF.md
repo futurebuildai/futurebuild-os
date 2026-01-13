@@ -1,28 +1,23 @@
 # Handoff: Phase 6 Step 43.2
-
-**Previous Step:** 43.1 (Chat Domain Modeling) - **COMPLETED**
-**Current Step:** 43.2 (Intent Classification)
-
-## Status
-- **Step 43.1 Complete**: Created `internal/chat/types.go` with `Intent`, `ChatRequest`, and `ChatResponse` types. CTO Audit APPROVED.
-- **Ready for Step 43.2**: Type contracts are established. Next is implementing the KeywordClassifier.
-
-## Context for Step 43.2
-The Goal is to build the `KeywordClassifier` (V1 MVP). This is a simple router that maps user message content to `Intent` values.
-
-Requirements:
-1. Create `internal/chat/intents.go`.
-2. Implement `ClassifyIntent(message string) Intent` function.
-3. Use keyword matching for V1 (e.g., "invoice" → `IntentProcessInvoice`).
-4. Write unit tests to verify classification logic.
-
-## Key Files
-- `internal/chat/intents.go` (NEW)
-- `internal/chat/intents_test.go` (NEW)
-- `internal/chat/types.go` (Reference for Intent type)
-
-## Next Actions
-1. Define `ClassifyIntent` function signature.
-2. Implement keyword-based matching logic.
-3. Return `IntentUnknown` for unclassified messages.
-4. Write table-driven tests.
+ 
+ **Previous Step:** 43.2 (Intent Classification) - **COMPLETED**
+ **Current Step:** 43.3 (Orchestration Service)
+ 
+ ## Status
+ - **Step 43.2 Complete**: Implemented `KeywordClassifier` in `internal/chat/intents.go` with deterministic ordered-slice logic.
+ - **Verified**: Unit tests passing, including priority conflict resolution (Delay > Schedule).
+ - **Ready for Step 43.3**: Implementing the `Orchestration Service` to route classified intents.
+ 
+ ## Context for Step 43.3
+ The Goal is to build the central traffic controller that takes a `ChatRequest`, classifies it (using our new tool), and executes the appropriate logic.
+ 
+ Requirements:
+ 1. Create `internal/chat/orchestrator.go`.
+ 2. Implement `ProcessRequest` method.
+ 3. Use `ClassifyIntent` to get the intent.
+ 4. Switch on Intent to execute logic (mock/placeholder logic for now is fine, or simple responses).
+ 
+ ## Key Files
+ - `internal/chat/orchestrator.go` (NEW)
+ - `internal/chat/intents.go` (Classifier)
+ - `internal/chat/types.go` (Data Contracts)

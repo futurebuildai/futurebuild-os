@@ -91,24 +91,29 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Subtask 43.2 (Intent Classification)
-Context: Parent Task is Step 43 (Chat Orchestrator). Step 43.1 (Domain Modeling) is COMPLETE. We now focus on the Keyword-based Intent Router.
+Task: Execute Phase 6, Subtask 43.3 (Orchestration Service)
+Context: Parent Task is Step 43 (Chat Orchestrator). Steps 43.1 (Domain Modeling) and 43.2 (Intent Classification) are COMPLETE. We now focus on the Orchestration Service.
 Requirements:
-1.  **Create File**: `internal/chat/intents.go`
-2.  **Implement Function**: `ClassifyIntent(message string) Intent`
-    -   Use keyword matching (e.g., "invoice", "upload invoice" → `IntentProcessInvoice`)
-    -   Default to `IntentUnknown` for unmatched messages.
-3.  **Write Tests**: `internal/chat/intents_test.go`
-    -   Table-driven tests for keyword matching.
-    -   Edge cases: empty string, mixed case, multiple keywords.
-4.  **Constraint**: Simple keyword matching only (no AI/NLP for V1).
+1.  **Create File**: `internal/chat/orchestrator.go`
+2.  **Implement Struct**: `Orchestrator` with necessary dependencies (DB pool, etc.)
+3.  **Implement Method**: `ProcessRequest(ctx context.Context, userID uuid.UUID, req ChatRequest) (*ChatResponse, error)`
+    -   Use `ClassifyIntent` to classify the message.
+    -   Log the message to the `chat_messages` table.
+    -   Switch on Intent to execute placeholder logic (e.g., return a canned response for V1).
+4.  **Write Tests**: `internal/chat/orchestrator_test.go`
+    -   Unit tests verifying intent routing.
+    -   Verify that messages are persisted.
+5.  **Constraint**: Focus on wiring and data flow. Complex agent logic comes in later steps.
 
 Key Files:
--   `internal/chat/intents.go`
--   `internal/chat/intents_test.go`
+-   `internal/chat/orchestrator.go`
+-   `internal/chat/orchestrator_test.go`
+-   `internal/chat/intents.go` (Classifier)
+-   `internal/chat/types.go` (Data Contracts)
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43.2
+-   `PRODUCTION_PLAN.md` Step 43.3
 -   `BACKEND_SCOPE.md` Section 3.5 (Action Engine)
+-   `DATA_SPINE_SPEC.md` Section 5.4 (chat_messages)
 
 First Step: /prism , do not execute implementation plan without my approval
