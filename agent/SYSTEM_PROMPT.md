@@ -89,23 +89,25 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 5, Step 41 (Document Re-processing & Audit Trail)
-Context: Documents may be updated or re-uploaded. We need a system to trigger re-analysis and version extraction results. Includes `reprocessed` flag and `document_versions` table or logic.
+Task: Execute Phase 5, Step 42 (Mock Ingestion Pipeline)
+Context: Create a deterministic test fixture ("perfect" JSON) to simulate AI output. verifiable DB logic (UPSERT, Review Flags) without AI latency or nondeterminism.
 
 Requirements:
-1.  **Schema Update**: Add `document_versions` table or `version` column to `invoices`? (Check Data Spine). Actually, `DATA_SPINE_SPEC` implies handling updates.
-2.  **Logic**: Implement `ReprocessDocument(docID)` in `InvoiceService` and `DocumentService`.
-3.  **Audit Trail**: Ensure `updated_at` and `processing_status` are tracked.
-4.  **Endpoint**: `POST /api/v1/documents/{id}/reprocess`.
-5.  **Verify**: Upload new version -> Confirm Invoice Extraction updates.
+1.  **Fixtures**: Create `test/fixtures/perfect_invoice.json` matching `types.InvoiceExtraction`.
+2.  **Test Suite**: Create `test/integration/pipeline_test.go`.
+3.  **Logic Verification**:
+    -   Load JSON fixture.
+    -   Call `InvoiceService.SaveExtraction` directly.
+    -   Assert strict equality between JSON and DB records (`invoices`, `line_items`).
+4.  **Goal**: "Green Bar" regression test for the database layer.
 
 Key Files:
+-   `test/fixtures/perfect_invoice.json`
+-   `test/integration/pipeline_test.go`
 -   `internal/service/invoice_service.go`
--   `internal/service/document_service.go`
--   `specs/API_AND_TYPES_SPEC.md`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 41
+-   `PRODUCTION_PLAN.md` Step 42
 -   `DATA_SPINE_SPEC.md` Section 4.2
 
 First Step: /prism , do not execute implementation plan without my approval
