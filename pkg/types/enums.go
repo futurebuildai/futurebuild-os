@@ -139,3 +139,26 @@ const (
 	ChatRoleSystem ChatRole = "system"
 	ChatRoleTool   ChatRole = "tool"
 )
+
+// Intent is a string type alias for strict intent classification.
+// Moved from internal/chat/types.go to align with Rosetta Stone architecture.
+// See API_AND_TYPES_SPEC.md Section 4.3 (Dynamic UI)
+type Intent string
+
+const (
+	// IntentProcessInvoice triggers the invoice extraction and verification flow.
+	// See BACKEND_SCOPE.md Section 3.5 (Action Engine)
+	IntentProcessInvoice Intent = "PROCESS_INVOICE"
+
+	// IntentUpdateTaskStatus triggers a status update for a specific task.
+	IntentUpdateTaskStatus Intent = "UPDATE_TASK_STATUS"
+
+	// IntentGetSchedule retrieves the project schedule or a subset of tasks.
+	IntentGetSchedule Intent = "GET_SCHEDULE"
+
+	// IntentExplainDelay analyzes the critical path to explain schedule delays.
+	IntentExplainDelay Intent = "EXPLAIN_DELAY"
+
+	// IntentUnknown is the fallback when no intent is classified.
+	IntentUnknown Intent = "UNKNOWN"
+)
