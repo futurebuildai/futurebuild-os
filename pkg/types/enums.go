@@ -162,3 +162,16 @@ const (
 	// IntentUnknown is the fallback when no intent is classified.
 	IntentUnknown Intent = "UNKNOWN"
 )
+
+// DynamicComponentType defines the type of atomic UI element.
+// See API_AND_TYPES_SPEC.md Section 4.5
+type DynamicComponentType string
+
+const (
+	ComponentBox    DynamicComponentType = "box"    // Flex container
+	ComponentText   DynamicComponentType = "text"   // Typography
+	ComponentButton DynamicComponentType = "button" // Action
+	ComponentInput  DynamicComponentType = "input"  // Data entry
+	ComponentSelect DynamicComponentType = "select" // Dropdown/Radio
+	ComponentIcon   DynamicComponentType = "icon"   // Material Symbol
+)

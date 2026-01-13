@@ -84,3 +84,32 @@ type User struct {
 	Role      UserRole `json:"role"`
 	CreatedAt string   `json:"created_at"`
 }
+
+// ChatMessage represents a single message in an agent session.
+// See API_AND_TYPES_SPEC.md Section 4.4
+type ChatMessage struct {
+	ID        string      `json:"id"`         // UUID string
+	ProjectID string      `json:"project_id"` // UUID string
+	UserID    string      `json:"user_id"`    // UUID string
+	Role      ChatRole    `json:"role"`
+	Content   string      `json:"content"`
+	ToolCalls interface{} `json:"tool_calls,omitempty"` // Use specific struct if available, else interface{}
+	CreatedAt string      `json:"created_at"`           // ISO-8601 Timestamp
+}
+
+// DynamicComponent represents a recursive UI element.
+// See API_AND_TYPES_SPEC.md Section 4.5
+type DynamicComponent struct {
+	Type     DynamicComponentType   `json:"type"`
+	Props    map[string]interface{} `json:"props"`
+	Children []DynamicComponent     `json:"children,omitempty"`
+	ActionID string                 `json:"action_id,omitempty"`
+}
+
+// DynamicUIArtifact represents a full UI definition served by the agent.
+// See API_AND_TYPES_SPEC.md Section 4.5
+type DynamicUIArtifact struct {
+	Title     string           `json:"title"`
+	Root      DynamicComponent `json:"root"`
+	SubmitURL string           `json:"submit_url,omitempty"`
+}
