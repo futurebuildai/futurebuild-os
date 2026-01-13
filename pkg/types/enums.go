@@ -116,3 +116,15 @@ const (
 	NotificationStatusRead      NotificationStatus = "Read"
 	NotificationStatusDismissed NotificationStatus = "Dismissed"
 )
+
+// ProcurementStatus defines the lifecycle status of a long-lead item.
+// See BACKEND_SCOPE.md Section 4.2
+type ProcurementStatus string
+
+const (
+	ProcurementStatusNotOrdered ProcurementStatus = "not_ordered"
+	ProcurementStatusOrdered    ProcurementStatus = "ordered"
+	ProcurementStatusInTransit  ProcurementStatus = "in_transit"
+	ProcurementStatusDelivered  ProcurementStatus = "delivered"
+	ProcurementStatusInstalled  ProcurementStatus = "installed"
+)
