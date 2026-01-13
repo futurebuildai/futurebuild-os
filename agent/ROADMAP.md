@@ -5,15 +5,26 @@
 *   [x] **Mock Ingestion:** Create deterministic test fixtures (Ref: `PRODUCTION_PLAN.md` Step 42) ✅
 
 #### Current Focus
-*   [x] **Latest Spec Implemented:** Phase 5, Step 42 (Mock Ingestion Pipeline) ✅
-*   [x] **Health Status:** Green ✅ (Regression Suite Passed)
-*   [ ] **Current Goal:** Phase 6, Step 43 (Chat Orchestrator & Intent Mapping)
+*   [x] **Latest Spec Implemented:** Phase 6, Step 43.1 (Chat Domain Modeling) ✅
+*   [x] **Health Status:** Green ✅ (Types Compiled)
+*   [ ] **Current Goal:** Phase 6, Step 43.2 (Intent Classification)
 
 #### Development Queue
 ##### Phase 6: Action Engine - Chat & Agents [Status: ⏳ In Progress]
-*   [ ] **Chat Orchestrator:** Build main message router (Ref: `PRODUCTION_PLAN.md` Step 43)
+*   [x] **Chat Types:** Define Intent, ChatRequest, ChatResponse types (Ref: `PRODUCTION_PLAN.md` Step 43.1) ✅
+*   [ ] **Intent Classification:** Implement KeywordClassifier (Ref: `PRODUCTION_PLAN.md` Step 43.2)
 
-#### Development Queue
+
+##### Phase 5: Context Engine - AI Integration [Status: ✅ Completed]
+*   [x] **Vertex AI Setup:** Client and PDF upload pipeline (Ref: `PRODUCTION_PLAN.md` Step 35)
+*   [x] **RAG Pipeline:** Implement pgvector embeddings (Ref: `PRODUCTION_PLAN.md` Step 36)
+*   [x] **Invoice Processor:** PDF -> InvoiceExtraction JSON (Ref: `PRODUCTION_PLAN.md` Step 37)
+*   [x] **Directory Service:** Project Phase -> Contact lookup (Ref: `PRODUCTION_PLAN.md` Step 38)
+*   [x] **Review Flags:** Confidence scoring and human review trigger (Ref: `PRODUCTION_PLAN.md` Step 39)
+*   [x] **Site Verification:** Build site photo verification flow (Ref: `PRODUCTION_PLAN.md` Step 40)
+*   [x] **SDK Upgrade:** Upgrade Vertex AI SDK (Ref: `PRODUCTION_PLAN.md` Step 40b)
+*   [x] **Audit Trail:** Document re-processing and audit system (Ref: `PRODUCTION_PLAN.md` Step 41)
+*   [x] **Mock Ingestion:** Mock test fixture for pipeline (Ref: `PRODUCTION_PLAN.md` Step 42)
 ##### Phase 0: Foundation & CI/CD [Status: ✅ Completed]
 *   [x] **Git Setup:** Initialize .gitignore (Ref: `PRODUCTION_PLAN.md` Step 1)
 *   [x] **CI/CD:** Configure GitHub Actions (Ref: `PRODUCTION_PLAN.md` Step 2)

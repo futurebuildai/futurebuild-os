@@ -20,8 +20,9 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 2 (Steps 17-20): Rosetta Stone Type System: COMPLETED.
     ◦ Phase 3 (Steps 21-25): Authentication & Rate Limiting: COMPLETED.
     ◦ Phase 4 (Steps 26-34): Physics Engine - Core Scheduling: COMPLETED.
-    ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: IN PROGRESS.
-    ◦ Current Focus: Phase 5, Step 42 (Mock Ingestion Pipeline).
+    ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: COMPLETED.
+    ◦ Phase 6 (Steps 43-49): Action Engine: STARTING.
+    ◦ Current Focus: Phase 6, Step 43 (Chat Orchestrator).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -89,25 +90,24 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Step 43 (Chat Orchestrator)
-Context: Build the foundational "Brain" of the system. The Chat Orchestrator receives user input, determines intent, and executes tools.
+Task: Execute Phase 6, Subtask 43.2 (Intent Classification)
+Context: Parent Task is Step 43 (Chat Orchestrator). Step 43.1 (Domain Modeling) is COMPLETE. We now focus on the Keyword-based Intent Router.
 Requirements:
-1.  **Package**: Create `internal/chat`.
-2.  **Service**: Implement `ChatService` with `HandleMessage`.
-3.  **Intent Mapping**: Create `intents.go`. Implement detection for `PROCESS_INVOICE` (keyword/regex is fine for V1, or Gemini dispatch if simple).
-4.  **Integration**:
-    *   If intent == `PROCESS_INVOICE`, it should expect a file upload or reference `InvoiceService`.
-    *   Since we are just building the *Orchestrator* logic, we might mock the actual execution or wire it to the `InvoiceService` we just tested.
-5.  **API**: expose `POST /api/v1/chat`.
+1.  **Create File**: `internal/chat/intents.go`
+2.  **Implement Function**: `ClassifyIntent(message string) Intent`
+    -   Use keyword matching (e.g., "invoice", "upload invoice" → `IntentProcessInvoice`)
+    -   Default to `IntentUnknown` for unmatched messages.
+3.  **Write Tests**: `internal/chat/intents_test.go`
+    -   Table-driven tests for keyword matching.
+    -   Edge cases: empty string, mixed case, multiple keywords.
+4.  **Constraint**: Simple keyword matching only (no AI/NLP for V1).
 
 Key Files:
--   `internal/chat/orchestrator.go`
 -   `internal/chat/intents.go`
--   `internal/api/handler/chat_handler.go`
+-   `internal/chat/intents_test.go`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43
+-   `PRODUCTION_PLAN.md` Step 43.2
 -   `BACKEND_SCOPE.md` Section 3.5 (Action Engine)
--   `API_AND_TYPES_SPEC.md` Section 4.3 (Dynamic UI)
 
 First Step: /prism , do not execute implementation plan without my approval

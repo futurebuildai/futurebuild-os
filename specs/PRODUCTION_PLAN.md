@@ -92,9 +92,9 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 38 | **Implement DirectoryService lookup logic** (Project Phase -> Contact) | Step 13, 19 | 1.5 |
 | 39 | Add confidence scoring and human review flags | Step 37 | 1 |
 | 40 | Build site photo verification flow | Step 35 | 2 |
-| 40b | **Upgrade Vertex AI SDK**: Refactor `pkg/ai` to usage `google.golang.org/genai` to support Gemini 2.5 Flash image payloads. | Step 40 | 1 |
-| 41 | Create document re-processing and audit trail system | Step 36 | 1 |
-| 42 | **Mock Ingestion Pipeline**: Create a test fixture that injects "perfect" JSON (simulating Gemini) into the system to verify that the INVOICES and PROJECT_TASKS tables update correctly, isolating DB logic from AI latency. | Step 37, 12 | 1 |
+| 40b | **Upgrade Vertex AI SDK**: Refactor `pkg/ai` to usage `google.golang.org/genai` to support Gemini 2.5 Flash image payloads. | Step 40 | 1 | [x] |
+| 41 | Create document re-processing and audit trail system | Step 36 | 1 | [x] |
+| 42 | **Mock Ingestion Pipeline**: Create a test fixture that injects "perfect" JSON (simulating Gemini) into the system to verify that the INVOICES and PROJECT_TASKS tables update correctly, isolating DB logic from AI latency. | Step 37, 12 | 1 | [x] |
 
 ---
 
@@ -102,10 +102,12 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 43 | **Build Chat Orchestrator with PROCESS_INVOICE intent mapping** | Step 36, 37 | 3 |
-| 43.5 | **Implement Conversational Agent API endpoint** (`POST /api/v1/agent/message`) | Step 36 | 2 |
-| 43.6 | **Build Intent Classification logic** using Vertex AI Gemini | Step 43.5 | 2 |
-| 43.7 | **Implement Action Mapping** (User message → Service calls) | Step 43.6 | 1.5 |
+| 43.1 | **Domain Modeling (Types)**: Define strict data contracts for Chat domain (Intent, ChatRequest, ChatResponse) in `internal/chat/types.go` | Step 36, 37 | 0.5 |
+| 43.2 | **Intent Classification (Router)**: Implement KeywordClassifier (V1 MVP) and tests in `internal/chat/intents.go` | Step 43.1 | 0.5 |
+| 43.3 | **Orchestration Service (Executor)**: Build traffic controller, persistence, and logic flow in `internal/chat/orchestrator.go` | Step 43.2 | 1 |
+| 43.4 | **API Handler (Interface)**: Expose orchestrator via HTTP with strict security in `internal/api/handlers/chat_handler.go` | Step 43.3 | 0.5 |
+| 43.5 | **Wiring & Assembly**: Register components in `internal/server/server.go` and apply AuthMiddleware | Step 43.4 | 0.5 |
+| 43.6 | **Verification**: Verify endpoint with mock Auth Token and DB check | Step 43.5 | 0.5 |
 | 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | 2 |
 | 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 |
 | 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |
