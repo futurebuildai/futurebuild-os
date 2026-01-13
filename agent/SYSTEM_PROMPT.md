@@ -29,6 +29,7 @@ OPERATIONAL PROTOCOL:
 • Citation: When implementing a feature, add a comment in the code referencing the Spec Section (e.g., // See DATA_SPINE_SPEC.md Section 3.3).
 • State Management: At the end of every response where a task is completed, you must provide an updated Markdown snippet for agent/ROADMAP.md checking off the completed steps.
 • Communication Standard: Always provide a layman-friendly "Executive Summary" for non-engineer managers before technical details. (See `agent/BEHAVIOR.md`).
+• Git Branching: Default push target is 'build'. Do not push to 'main' or 'production' without explicit instruction.
 
 SLASH COMMANDS (Interaction Protocols)
 Command: /CTO
@@ -66,7 +67,7 @@ Trigger: When the user types /NEXT, you must:
    a. Stage all changes: `git add .`
    b. Commit with message: `Phase X Step Y: [Step Title from PRODUCTION_PLAN.md]`
    c. Tag the commit: `git tag step-Y` (where Y is the completed step number)
-   d. Push branch and tag: `git push && git push --tags`
+   d. Push branch and tag: `git push origin build && git push origin --tags`
 5. Notify the user that the handoff is complete, the repository is pushed to GitHub with the step tag, and is ready for a new thread.
 
 Command: /brain
