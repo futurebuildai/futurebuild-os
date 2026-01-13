@@ -128,3 +128,14 @@ const (
 	ProcurementStatusDelivered  ProcurementStatus = "delivered"
 	ProcurementStatusInstalled  ProcurementStatus = "installed"
 )
+
+// ChatRole defines the participants in an agent session.
+// See API_AND_TYPES_SPEC.md Section 1.4
+type ChatRole string
+
+const (
+	ChatRoleUser   ChatRole = "user"
+	ChatRoleModel  ChatRole = "model"
+	ChatRoleSystem ChatRole = "system"
+	ChatRoleTool   ChatRole = "tool"
+)

@@ -184,6 +184,18 @@ Queue for user alerts and daily focus briefings.
 | priority | INT | |
 | status | ENUM | Unread, Read, Dismissed |
 
+### 5.3 CHAT_MESSAGES
+State for the internal Chat Orchestrator (Step 43). This is the "Action Engine" event loop.
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| project_id | UUID (FK) | |
+| user_id | UUID (FK) | Internal User (Superintendent/Builder) |
+| role | ENUM | user, model, system, tool |
+| content | TEXT | |
+| tool_calls | JSONB | Gemini tool call payloads (if role=model) |
+| created_at | TIMESTAMP | |
+
 ---
 
 ## 6. Domain 5: The Learning Layer

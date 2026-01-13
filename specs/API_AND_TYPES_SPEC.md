@@ -33,6 +33,13 @@ Defines the visual components displayed in the Chat Orchestrator.
 - `Gantt_View`
 - `Dynamic_UI`
 
+### 1.4 ChatRole
+Defines the participants in an agent session.
+- `user`
+- `model`
+- `system`
+- `tool`
+
 ---
 
 ---
@@ -204,7 +211,20 @@ type AuthResponse struct {
     Message string `json:"message"`
 }
 
-### 4.3 Dynamic UI (A2UI Protocol)
+### 4.4 ChatMessage
+```go
+type ChatMessage struct {
+    ID        uuid.UUID   `json:"id"`
+    ProjectID uuid.UUID   `json:"project_id"`
+    UserID    uuid.UUID   `json:"user_id"`
+    Role      ChatRole    `json:"role"`
+    Content   string      `json:"content"`
+    ToolCalls interface{} `json:"tool_calls,omitempty"`
+    CreatedAt time.Time   `json:"created_at"`
+}
+```
+
+### 4.5 Dynamic UI (A2UI Protocol)
 These structures allow the Agent to construct "Micro-Flows" using atomic components.
 
 ```go
@@ -231,5 +251,4 @@ type DynamicUIArtifact struct {
     Root       DynamicComponent `json:"root"`
     SubmitURL  string           `json:"submit_url,omitempty"` // Endpoint to POST data to
 }
-```
 ```

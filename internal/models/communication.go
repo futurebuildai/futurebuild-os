@@ -40,3 +40,15 @@ type Notification struct {
 	Priority int                      `json:"priority" db:"priority"`
 	Status   types.NotificationStatus `json:"status" db:"status"`
 }
+
+// ChatMessage represents a single message in an agent session.
+// See DATA_SPINE_SPEC.md Section 5.3
+type ChatMessage struct {
+	ID        uuid.UUID      `json:"id" db:"id"`
+	ProjectID uuid.UUID      `json:"project_id" db:"project_id" validate:"required"`
+	UserID    uuid.UUID      `json:"user_id" db:"user_id" validate:"required"`
+	Role      types.ChatRole `json:"role" db:"role" validate:"required"`
+	Content   string         `json:"content" db:"content" validate:"required"`
+	ToolCalls interface{}    `json:"tool_calls,omitempty" db:"tool_calls"`
+	CreatedAt time.Time      `json:"created_at" db:"created_at"`
+}
