@@ -1,10 +1,11 @@
+```
 ### Execution Roadmap
 **Governing Strategy:** See `PRODUCTION_PLAN.md` for detailed Phase definitions and Validation Criteria.
 
 #### Current Focus
-*   [x] **Latest Spec Implemented:** Phase 5, Step 40b (Upgrade Vertex AI SDK) ✅
+*   [x] **Latest Spec Implemented:** Phase 5, Step 41 (Document Re-processing & Audit Trail) ✅
 *   [x] **Health Status:** Green ✅ (Logic Verified, Auth Pending)
-*   [x] **Current Goal:** Phase 5, Step 41 (Document Re-processing & Audit Trail)
+*   [ ] **Current Goal:** Phase 5, Step 42 (Mock Ingestion Pipeline)
 
 #### Development Queue
 ##### Phase 5: Context Engine - AI Integration [Status: ⏳ In Progress]
@@ -16,6 +17,8 @@
 *   [x] **Review Flags:** Confidence scoring & human gates (Ref: `PRODUCTION_PLAN.md` Step 39) ✅
 *   [x] **Site Photo Verification:** AI-powered task verification (Ref: `PRODUCTION_PLAN.md` Step 40) ✅
 *   [x] **Vertex SDK Upgrade:** Migrated to google.golang.org/genai (Ref: `PRODUCTION_PLAN.md` Step 40b) ✅
+*   [x] **Audit Trail:** Document re-processing & Invoice UPSERT (Ref: `PRODUCTION_PLAN.md` Step 41) ✅
+*   [ ] **Mock Ingestion:** Create deterministic test fixtures (Ref: `PRODUCTION_PLAN.md` Step 42)
 
 #### Development Queue
 ##### Phase 0: Foundation & CI/CD [Status: ✅ Completed]

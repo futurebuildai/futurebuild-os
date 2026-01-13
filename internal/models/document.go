@@ -46,6 +46,8 @@ type Document struct {
 	Metadata         map[string]any   `json:"metadata" db:"metadata"`
 	UploadedBy       uuid.UUID        `json:"uploaded_by" db:"uploaded_by"`
 	UploadedAt       time.Time        `json:"uploaded_at" db:"uploaded_at"`
+	UpdatedAt        time.Time        `json:"updated_at" db:"updated_at"`               // See PRODUCTION_PLAN.md Step 41
+	ReprocessedCount int              `json:"reprocessed_count" db:"reprocessed_count"` // See PRODUCTION_PLAN.md Step 41
 }
 
 // DocumentChunk represents a semantic chunk of a document for RAG

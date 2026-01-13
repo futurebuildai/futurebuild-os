@@ -153,6 +153,7 @@ Parsed artifacts from the Action Engine.
 | detected_wbs_code | VARCHAR | Predicted WBS mapping |
 | status | ENUM | Pending, Approved, Exported |
 | is_human_review_required | BOOLEAN | Flag for human review when AI confidence is low |
+| source_document_id | UUID (FK) | Reference to source DOCUMENT (Nullable, SET NULL) |
 
 ---
 

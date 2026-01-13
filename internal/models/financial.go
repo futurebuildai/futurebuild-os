@@ -70,4 +70,5 @@ type Invoice struct {
 	InvoiceNumber         *string       `json:"invoice_number" db:"invoice_number"`
 	Confidence            float64       `json:"confidence" db:"confidence"`
 	IsHumanReviewRequired bool          `json:"is_human_review_required" db:"is_human_review_required"`
+	SourceDocumentID      *uuid.UUID    `json:"source_document_id,omitempty" db:"source_document_id"` // See PRODUCTION_PLAN.md Step 41
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/rag"
 	"github.com/colton/futurebuild/pkg/ai"
 )
@@ -26,6 +27,19 @@ func NewDocumentService(db *pgxpool.Pool, client ai.Client) *DocumentService {
 		embedder: rag.NewEmbedder(client),
 		chunker:  rag.NewChunker(),
 	}
+}
+
+// GetDocumentStatus retrieves the current processing status and reprocessed count.
+// See PRODUCTION_PLAN.md Step 41
+func (s *DocumentService) GetDocumentStatus(ctx context.Context, docID uuid.UUID) (string, int, error) {
+	var processingStatus string
+	var reprocessedCount int
+	query := `SELECT processing_status, reprocessed_count FROM documents WHERE id = $1`
+	err := s.db.QueryRow(ctx, query, docID).Scan(&processingStatus, &reprocessedCount)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to fetch document status: %w", err)
+	}
+	return processingStatus, reprocessedCount, nil
 }
 
 // IngestDocument processes a document for RAG: Read -> Chunk -> Embed -> Save
@@ -89,10 +103,33 @@ func (s *DocumentService) IngestDocument(ctx context.Context, docID uuid.UUID) e
 	}
 
 	// 5. Update Status
-	_, err = tx.Exec(ctx, "UPDATE documents SET processing_status = 'completed' WHERE id = $1", docID)
+	_, err = tx.Exec(ctx, "UPDATE documents SET processing_status = $1 WHERE id = $2", models.ProcessingStatusCompleted, docID)
 	if err != nil {
 		return fmt.Errorf("failed to update document status: %w", err)
 	}
 
 	return tx.Commit(ctx)
+}
+
+// ReprocessDocument triggers re-analysis of a document.
+// Resets status to pending, increments reprocessed_count, and re-runs ingestion.
+// See PRODUCTION_PLAN.md Step 41
+func (s *DocumentService) ReprocessDocument(ctx context.Context, orgID, docID uuid.UUID) error {
+	// 1. Multi-tenancy check & reset status atomically
+	query := `
+		UPDATE documents d
+		SET processing_status = $3, 
+		    reprocessed_count = COALESCE(reprocessed_count, 0) + 1
+		FROM projects p
+		WHERE d.id = $1 AND d.project_id = p.id AND p.org_id = $2
+		RETURNING d.id
+	`
+	var returnedID uuid.UUID
+	err := s.db.QueryRow(ctx, query, docID, orgID, models.ProcessingStatusPending).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("document not found or unauthorized: %w", err)
+	}
+
+	// 2. Re-run ingestion pipeline (this already deletes old chunks)
+	return s.IngestDocument(ctx, docID)
 }

@@ -106,10 +106,10 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 }
 
 // SaveExtraction persists the analyzed invoice to the DB.
+// Uses UPSERT pattern when sourceDocID is provided for re-processing.
 // See DATA_SPINE_SPEC.md Section 4.2
-func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID, extraction *types.InvoiceExtraction) (uuid.UUID, error) {
-	invoiceID := uuid.New()
-
+// See PRODUCTION_PLAN.md Step 41 for re-processing support
+func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID, extraction *types.InvoiceExtraction, sourceDocID *uuid.UUID) (uuid.UUID, error) {
 	// Map types.InvoiceExtraction to models.LineItems
 	var lineItems models.LineItems
 	for _, item := range extraction.LineItems {
@@ -125,15 +125,57 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 	// See PRODUCTION_PLAN.md Step 39
 	isHumanReviewRequired := extraction.Confidence < ConfidenceThresholdForReview
 
-	query := `
+	// Check for existing invoice if sourceDocID provided (re-processing case)
+	// See PRODUCTION_PLAN.md Step 41
+	if sourceDocID != nil {
+		var existingID uuid.UUID
+		err := s.db.QueryRow(ctx,
+			"SELECT id FROM invoices WHERE source_document_id = $1",
+			*sourceDocID).Scan(&existingID)
+		if err == nil {
+			// UPDATE existing invoice
+			updateQuery := `
+				UPDATE invoices SET
+					vendor_name = $2,
+					amount = $3,
+					line_items = $4,
+					detected_wbs_code = $5,
+					confidence = $6,
+					invoice_date = $7,
+					invoice_number = $8,
+					is_human_review_required = $9
+				WHERE id = $1
+			`
+			_, err = s.db.Exec(ctx, updateQuery,
+				existingID,
+				extraction.Vendor,
+				extraction.TotalAmount,
+				lineItems,
+				extraction.SuggestedWBSCode,
+				extraction.Confidence,
+				extraction.Date,
+				extraction.InvoiceNumber,
+				isHumanReviewRequired,
+			)
+			if err != nil {
+				return uuid.Nil, fmt.Errorf("failed to update invoice: %w", err)
+			}
+			return existingID, nil
+		}
+		// If no existing invoice found, fall through to INSERT
+	}
+
+	// INSERT new invoice
+	invoiceID := uuid.New()
+	insertQuery := `
 		INSERT INTO invoices (
 			id, project_id, vendor_name, amount, line_items, 
 			detected_wbs_code, status, confidence, invoice_date, 
-			invoice_number, is_human_review_required
+			invoice_number, is_human_review_required, source_document_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
-	_, err := s.db.Exec(ctx, query,
+	_, err := s.db.Exec(ctx, insertQuery,
 		invoiceID,
 		projectID,
 		extraction.Vendor,
@@ -145,6 +187,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		extraction.Date,
 		extraction.InvoiceNumber,
 		isHumanReviewRequired,
+		sourceDocID, // Can be nil
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to save invoice: %w", err)

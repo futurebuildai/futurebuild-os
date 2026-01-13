@@ -54,7 +54,7 @@ func TestReviewGate_ConfidenceThreshold(t *testing.T) {
 			InvoiceNumber:    "INV-LOW",
 		}
 
-		invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, ext)
+		invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, ext, nil)
 		require.NoError(t, err)
 
 		var isRequired bool
@@ -73,7 +73,7 @@ func TestReviewGate_ConfidenceThreshold(t *testing.T) {
 			InvoiceNumber:    "INV-HIGH",
 		}
 
-		invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, ext)
+		invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, ext, nil)
 		require.NoError(t, err)
 
 		var isRequired bool

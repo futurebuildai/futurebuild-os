@@ -40,7 +40,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// See PRODUCTION_PLAN.md Step 37
 	invoiceService := service.NewInvoiceService(db, aiClient)
-	documentHandler := handlers.NewDocumentHandler(invoiceService)
+	// See PRODUCTION_PLAN.md Step 41
+	documentService := service.NewDocumentService(db, aiClient)
+	documentHandler := handlers.NewDocumentHandler(invoiceService, documentService)
 
 	notificationService := service.NewConsoleEmailProvider()
 	authService := service.NewAuthService(db, cfg)
@@ -90,6 +92,8 @@ func (s *Server) routes() {
 		})
 		r.Route("/documents", func(r chi.Router) {
 			r.Post("/analyze", s.DocumentHandler.AnalyzeDocument)
+			// See PRODUCTION_PLAN.md Step 41
+			r.Post("/{id}/reprocess", s.DocumentHandler.ReprocessDocument)
 		})
 	})
 }

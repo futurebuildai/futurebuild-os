@@ -1,49 +1,26 @@
-### Agent Handoff Report
-**Date:** 2026-01-12
-**Session:** Step 40b Vertex SDK Upgrade (Complete) ✅
-**Repository:** FutureBuild (Root Go + Frontend Lit/TS)
+# Handoff: Phase 5 Step 42
 
-#### 1. Current State
-*   **Latest Spec Implemented:** Phase 5, Step 40b (Upgrade Vertex AI SDK) ✅
-*   **Health Status:** Green ✅ (CTO Audit PASSED)
-*   **Audit Status:** APPROVED ✅
-*   **Phase Completion:** Phase 5 (Context Engine) - Step 40b Complete
+**Previous Step:** 41 (Document Re-processing & Audit Trail) - **COMPLETED**
+**Current Step:** 42 (Mock Ingestion Pipeline)
 
-##### Completed / Working Features
-| Feature | Related Spec | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **SDK Migration** | `n/a` | ✅ | Migrated to `google.golang.org/genai` |
-| **VisionService** | `API_AND_TYPES_SPEC.md` Section 2.2 | ✅ | Supports Image payloads via `genai.Blob` |
-| **InvoiceService** | `API_AND_TYPES_SPEC.md` Section 3.1 | ✅ | Supports Text payloads |
-| **RAG Embedder** | `PRODUCTION_PLAN.md` Step 36 | ✅ | Supports Embeddings (REST fallback) |
-| **Mocking Strategy** | `n/a` | ✅ | Smart Mock client for Integration Tests |
+## Status
+- **Step 41 Complete**: Implemented document re-processing with audit trail.
+  - Added `source_document_id` to `invoices` table.
+  - Added `updated_at`, `reprocessed_count` to `documents` table.
+  - Implemented `ReprocessDocument` handler with chained Re-extraction -> UPSERT.
+  - Verified with new integration test `test/integration/reprocess_test.go`.
+- **Ready for Step 42**: Need to create a test fixture for "perfect" JSON injection to verify DB logic in isolation from AI.
 
-#### 2. Files Created/Modified (Step 40b)
-| File | Change |
-| :--- | :--- |
-| `go.mod` | [UPDATE] Replaced `vertexai/genai` with `google.golang.org/genai` |
-| `pkg/ai/vertex.go` | [UPDATE] Refactored `VertexClient` implementation |
-| `internal/service/vision_service.go` | [UPDATE] Updated Payload construction |
-| `internal/service/invoice_service.go` | [UPDATE] Updated Payload construction |
-| `test/integration/vision_test.go` | [UPDATE] Enhanced Mock implementation |
-| `agent/HANDOFF.md` | [UPDATE] Status report |
-| `agent/SYSTEM_PROMPT.md` | [UPDATE] Prepared for Step 41 |
+## Context for Step 42
+The goal is to create a deterministic test fixture that simulates the AI's output. This allows us to test the `InvoiceService.SaveExtraction` logic (mapping, UPSERT, Review Flags) without relying on the actual Vertex AI calls or mocks that might drift. This "Mock Ingestion Pipeline" will serve as a regression suite for the database layer.
 
-#### 3. Test Results
-```bash
-$ go test ./...
-ok      github.com/colton/futurebuild/internal/api/handlers     (cached)
-ok      github.com/colton/futurebuild/internal/service          (cached)
-ok      github.com/colton/futurebuild/test/integration          0.059s
-PASS
-```
+## Key Files
+- `test/fixtures/perfect_invoice.json` (To be created)
+- `test/integration/pipeline_test.go` (To be created)
+- `internal/service/invoice_service.go` (Target of testing)
 
-#### CTO Audit Summary
-✅ **Stack:** Validated `google.golang.org/genai` is the correct path forward.
-✅ **Data:** `VerifyAndPersistTask` logic preserved.
-✅ **Logic:** `VisionService` flow verified through inspection and enhanced tests.
-
-#### Next Step
-**Phase 5, Step 41: Creating document re-processing and audit trail system (1 day)**
-*   **Goal**: Implement system to track document changes and enable re-processing via AI.
-*   **REF**: See `PRODUCTION_PLAN.md` Step 41.
+## Next Actions
+1.  Create `test/fixtures` directory.
+2.  Add `perfect_invoice.json` matching `types.InvoiceExtraction`.
+3.  Create `test/integration/pipeline_test.go` that loads this JSON and calls `invoiceService.SaveExtraction`.
+4.  Assert database state matches the JSON exactly.

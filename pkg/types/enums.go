@@ -44,6 +44,7 @@ const (
 	ArtifactTypeInvoice    ArtifactType = "Invoice"
 	ArtifactTypeBudgetView ArtifactType = "Budget_View"
 	ArtifactTypeGanttView  ArtifactType = "Gantt_View"
+	ArtifactTypeDynamicUI  ArtifactType = "Dynamic_UI" // See API_AND_TYPES_SPEC.md Section 1.3
 )
 
 // ContactPreference defines the preferred communication channel for a contact.

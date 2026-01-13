@@ -101,7 +101,7 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 
 	// 6. Save Extraction
 	t.Logf("Saving extraction for project %s...", projectID)
-	invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, extraction)
+	invoiceID, err := invoiceService.SaveExtraction(ctx, projectID, extraction, nil)
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, invoiceID)
 
