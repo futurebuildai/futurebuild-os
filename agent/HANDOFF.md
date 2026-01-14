@@ -1,33 +1,31 @@
-# Handoff: Phase 6 Step 43.5
+# Handoff: Phase 6 Step 43.6
 
-**Previous Step:** 43.4 (API Handler) - **COMPLETED** ✅
-**Current Step:** 43.5 (Wiring & Assembly)
+**Previous Step:** 43.5 (Wiring & Assembly) - **COMPLETED** ✅
+**Current Step:** 43.6 (Verification)
 
 ## Status
-- **Step 43.4 Complete**: `ChatHandler` implemented with strict security (Context-based identity), input validation, logs, and 100% test coverage.
-- **Components Ready**:
-    - `KeywordClassifier` (Step 43.2)
-    - `Orchestrator` (Step 43.3)
-    - `ChatHandler` (Step 43.4)
-- **Ready for Step 43.5**: Wire it all together in `internal/server/server.go`.
+- **Step 43.5 Complete**: Wiring of `Orchestrator` and `ChatHandler` into `server.go` is done. Route `/api/v1/chat` is active and secured.
+- **Ready for Step 43.6**: We need to verify the endpoint works as expected.
 
-## Context for Step 43.5
-We have all the Lego blocks (`Orchestrator`, `Services`, `Handler`). Now we need to snap them onto the baseplate (`Server`).
-
-1.  **Dependency Injection**: The `Orchestrator` needs access to `TaskService`, `ScheduleService`, etc. (Many of these might still be mocks or stubs if not fully implemented in previous phases, but we must wire what we have or defined mocks).
-2.  **Route Registration**: Map `POST /api/v1/chat` to our new handler.
-3.  **Middleware**: Ensure the `AuthMiddleware` is wrapping this route.
+## Context for Step 43.6
+This is the "Smoke Test" for the Chat Engine. We need to prove that:
+1.  We can hit `POST /api/v1/chat`.
+2.  Auth Middleware allows valid tokens and rejects others.
+3.  The Orchestrator processes the message and saves it to the DB.
+4.  We get a valid JSON response.
 
 ## Requirements
-1.  Verify `internal/server/server.go` (or `routes.go`) structure.
-2.   Instantiate `chat.NewOrchestrator(...)` with required dependencies.
-3.  Instantiate `handlers.NewChatHandler(...)`.
-4.  Register Route: `r.Post("/api/v1/chat", chatHandler.HandleChat)`.
+1.  **Create Integration Test**: `tests/integration/chat_test.go` (or similar).
+2.  **Mock Auth**: Generate a valid JWT for the test user.
+3.  **Execute Request**: Send a `POST /api/v1/chat` request.
+4.  **Assert**:
+    -   HTTP 200 OK.
+    -   Response contains `reply` and `intent`.
+    -   DB table `chat_messages` contains the user message and the model reply.
 
 ## Key Files
-- `internal/server/server.go`
-- `cmd/server/main.go`
-- `internal/api/handlers/chat_handler.go`
+-   `test/integration/chat_test.go` (New)
+-   `internal/server/server.go`
 
 ## Spec References
-- `PRODUCTION_PLAN.md` Step 43.5
+-   `PRODUCTION_PLAN.md` Step 43.6

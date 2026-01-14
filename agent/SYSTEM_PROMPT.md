@@ -91,28 +91,29 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Subtask 43.5 (Wiring & Assembly)
-Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.4 are COMPLETE. The Handler, Orchestrator, and Logic are built. Now we wire them up in the server.
+Task: Execute Phase 6, Subtask 43.6 (Verification)
+Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.5 are COMPLETE. The Chat System is fully built and wired. Now we perform the formal "Smoke Test" to verify end-to-end functionality.
 Requirements:
-1.  **Modify File**: `internal/server/server.go` (or `routes.go`)
-2.  **Dependency Injection**:
-    -   Initialize `chat.Orchestrator` in `NewServer` (or equivalent).
-    -   Initialize `handlers.ChatHandler`.
-    -   Inject `TaskService`, `ScheduleService`, `InvoiceService` into Orchestrator.
-3.  **Route Registration**:
-    -   Register `POST /api/v1/chat` -> `chatHandler.HandleChat`
-    -   **Security**: Ensure `authMiddleware.RequireAuth` or `RequireRole` covers this route.
+1.  **Create Test File**: `tests/integration/chat_test.go` (or `chat_integration_test.go`).
+2.  **Test Setup**:
+    -   Spin up a test server instance (or use `httptest`).
+    -   Generate a valid JWT for a test user (`UserRoleBuilder`).
+    -   Ensure Clean Database state (or use a dedicated test Org).
+3.  **Test Execution**:
+    -   Send `POST /api/v1/chat` with valid payload `{"project_id": "...", "message": "Analyze this invoice"}`.
+    -   **Assert**: HTTP 200 OK.
+    -   **Assert**: Response Body contains `reply` and `intent` ("PROCESS_INVOICE").
+    -   **Assert**: DB `chat_messages` table contains the User message and the Model reply.
 4.  **Verification**:
-    -   Ensure the server compiles and starts.
-    -   (Next step 43.6 will formally verify with a specific integration test, but ensure wiring is valid now).
+    -   Run the test: `go test ./tests/integration/...` (or specific file).
 
 Key Files:
+-   `tests/integration/chat_test.go` (New)
+-   `internal/chat/orchestrator.go`
 -   `internal/server/server.go`
--   `cmd/server/main.go`
--   `internal/api/routes.go` (if exists)
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43.5
+-   `PRODUCTION_PLAN.md` Step 43.6
 -   `BACKEND_SCOPE.md` Section 5.2 (Chat Endpoint)
 
 First Step: /prism , do not execute implementation plan without my approval

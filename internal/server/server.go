@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/api/handlers"
+	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
@@ -26,6 +27,7 @@ type Server struct {
 	TaskHandler     *handlers.TaskHandler
 	AuthHandler     *handlers.AuthHandler
 	DocumentHandler *handlers.DocumentHandler
+	ChatHandler     *handlers.ChatHandler // See PRODUCTION_PLAN.md Step 43.5
 	AuthMiddleware  *middleware.AuthMiddleware
 	AuthRateLimiter *middleware.IPRateLimiter
 }
@@ -44,6 +46,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	documentService := service.NewDocumentService(db, aiClient)
 	documentHandler := handlers.NewDocumentHandler(invoiceService, documentService)
 
+	// See PRODUCTION_PLAN.md Step 43.5: Chat Orchestrator wiring
+	// ScheduleService satisfies both TaskService and ScheduleService interfaces.
+	chatOrchestrator := chat.NewOrchestrator(db, scheduleService, scheduleService, invoiceService)
+	chatHandler := handlers.NewChatHandler(chatOrchestrator)
+
 	notificationService := service.NewConsoleEmailProvider()
 	authService := service.NewAuthService(db, cfg)
 	authHandler := handlers.NewAuthHandler(authService, notificationService, "http://localhost:8080")
@@ -59,6 +66,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		TaskHandler:     taskHandler,
 		AuthHandler:     authHandler,
 		DocumentHandler: documentHandler,
+		ChatHandler:     chatHandler, // See PRODUCTION_PLAN.md Step 43.5
 		AuthMiddleware:  authMiddleware,
 		AuthRateLimiter: authRateLimiter,
 	}
@@ -94,6 +102,12 @@ func (s *Server) routes() {
 			r.Post("/analyze", s.DocumentHandler.AnalyzeDocument)
 			// See PRODUCTION_PLAN.md Step 41
 			r.Post("/{id}/reprocess", s.DocumentHandler.ReprocessDocument)
+		})
+
+		// See PRODUCTION_PLAN.md Step 43.5: Chat endpoint with Auth
+		r.Route("/chat", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Post("/", s.ChatHandler.HandleChat)
 		})
 	})
 }
