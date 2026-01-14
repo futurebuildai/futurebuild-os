@@ -8,6 +8,7 @@ import (
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -55,7 +56,24 @@ func NewOrchestrator(
 	invoiceService InvoiceService,
 ) *Orchestrator {
 	return &Orchestrator{
-		db:              &PgxMessageStore{pool: db},
+		db:              NewPgxMessageStore(db), // db satisfies DBExecutor interface (matches method signature even if not explicitly declared in pgx)
+		TaskService:     taskService,
+		ScheduleService: scheduleService,
+		InvoiceService:  invoiceService,
+	}
+}
+
+// NewOrchestratorWithPersister creates a new Orchestrator with a custom MessagePersister.
+// This is primarily used for testing to inject a mock persister.
+// See PRODUCTION_PLAN.md Step 43.4
+func NewOrchestratorWithPersister(
+	persister MessagePersister,
+	taskService TaskService,
+	scheduleService ScheduleService,
+	invoiceService InvoiceService,
+) *Orchestrator {
+	return &Orchestrator{
+		db:              persister,
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
@@ -64,8 +82,9 @@ func NewOrchestrator(
 
 // ProcessRequest is the main entry point for handling a user's chat message.
 // Flow: Persist(User) -> Classify -> Route -> Persist(Model) -> Return
-// See PRODUCTION_PLAN.md Step 43.3
-func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, req ChatRequest) (*ChatResponse, error) {
+// See PRODUCTION_PLAN.md Step 43.3, 43.4
+func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, orgID uuid.UUID, req ChatRequest) (*ChatResponse, error) {
+	// Note: orgID is available for future multi-tenancy filtering but not used in V1 placeholder logic.
 	// 1. Inbound Persistence: Save User Message
 	// See DATA_SPINE_SPEC.md Section 5.3
 	userMsg := models.ChatMessage{
@@ -127,9 +146,20 @@ func (o *Orchestrator) routeIntent(_ context.Context, intent types.Intent) strin
 
 // --- Default MessagePersister Implementation ---
 
-// PgxMessageStore implements MessagePersister using pgxpool.
+// DBExecutor defines a subset of pgxpool.Pool methods needed for execution.
+// This allows us to mock the database connection for 100% coverage.
+type DBExecutor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (commandTag pgconn.CommandTag, err error)
+}
+
+// PgxMessageStore implements MessagePersister using a DBExecutor (pgxpool or mock).
 type PgxMessageStore struct {
-	pool *pgxpool.Pool
+	db DBExecutor
+}
+
+// NewPgxMessageStore creates a new PgxMessageStore.
+func NewPgxMessageStore(db DBExecutor) *PgxMessageStore {
+	return &PgxMessageStore{db: db}
 }
 
 // SaveMessage persists a ChatMessage to the database.
@@ -139,7 +169,8 @@ func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessag
 		INSERT INTO chat_messages (id, project_id, user_id, role, content, tool_calls, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := s.pool.Exec(ctx, query,
+	// note: commandTag return is ignored as we don't need rows affected count
+	_, err := s.db.Exec(ctx, query,
 		msg.ID, msg.ProjectID, msg.UserID, msg.Role, msg.Content, msg.ToolCalls, msg.CreatedAt,
 	)
 	if err != nil {

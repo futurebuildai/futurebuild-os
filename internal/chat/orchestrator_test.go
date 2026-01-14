@@ -72,7 +72,7 @@ func TestProcessRequest_PersistsUserAndModelMessages(t *testing.T) {
 	}
 
 	// Act
-	resp, err := orchestrator.ProcessRequest(context.Background(), userID, req)
+	resp, err := orchestrator.ProcessRequest(context.Background(), userID, uuid.New(), req)
 
 	// Assert
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestProcessRequest_ClassifiesIntentCorrectly(t *testing.T) {
 			}
 
 			// Act
-			resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), req)
+			resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), uuid.New(), req)
 
 			// Assert
 			require.NoError(t, err)
@@ -146,10 +146,47 @@ func TestProcessRequest_ReturnsErrorOnUserMessagePersistFailure(t *testing.T) {
 	}
 
 	// Act
-	resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), req)
+	resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), uuid.New(), req)
 
 	// Assert
 	require.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "failed to persist user message")
+}
+
+// Extending the test file to support the complexity needed for the 2nd call failure
+type FailOnSecondSavePersister struct {
+	CallCount int
+}
+
+func (m *FailOnSecondSavePersister) SaveMessage(_ context.Context, _ models.ChatMessage) error {
+	m.CallCount++
+	if m.CallCount == 2 {
+		return assert.AnError
+	}
+	return nil
+}
+
+func TestProcessRequest_ModelPersistError(t *testing.T) {
+	// Arrange
+	mockDB := &FailOnSecondSavePersister{}
+	orchestrator := &Orchestrator{
+		db:              mockDB,
+		TaskService:     &MockTaskService{},
+		ScheduleService: &MockScheduleService{},
+		InvoiceService:  &MockInvoiceService{},
+	}
+
+	req := ChatRequest{
+		ProjectID: uuid.New(),
+		Message:   "Test",
+	}
+
+	// Act
+	resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), uuid.New(), req)
+
+	// Assert
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to persist model message")
 }

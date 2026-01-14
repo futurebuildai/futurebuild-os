@@ -94,6 +94,12 @@ func GetClaims(ctx context.Context) (*types.Claims, error) {
 	return claims, nil
 }
 
+// WithClaims returns a new context with the given claims attached.
+// This is primarily used for testing to inject mock claims.
+func WithClaims(ctx context.Context, claims *types.Claims) context.Context {
+	return context.WithValue(ctx, claimsContextKey, claims)
+}
+
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

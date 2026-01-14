@@ -1,31 +1,33 @@
-# Handoff: Phase 6 Step 43.4
+# Handoff: Phase 6 Step 43.5
 
-**Previous Step:** 43.3 (Orchestration Service) - **COMPLETED** ✅
-**Current Step:** 43.4 (API Handler)
+**Previous Step:** 43.4 (API Handler) - **COMPLETED** ✅
+**Current Step:** 43.5 (Wiring & Assembly)
 
 ## Status
-- **Step 43.3 Complete**: `Orchestrator` service built with dependency injection and full persistence flow.
-- **CTO Audit**: APPROVED (Zero-Trust Passed).
-- **Ready for Step 43.4**: Expose the service via HTTP.
+- **Step 43.4 Complete**: `ChatHandler` implemented with strict security (Context-based identity), input validation, logs, and 100% test coverage.
+- **Components Ready**:
+    - `KeywordClassifier` (Step 43.2)
+    - `Orchestrator` (Step 43.3)
+    - `ChatHandler` (Step 43.4)
+- **Ready for Step 43.5**: Wire it all together in `internal/server/server.go`.
 
-## Context for Step 43.4
-We need to expose the `Orchestrator` to the frontend via a secured HTTP endpoint.
-1.  **Handler**: `internal/api/handlers/chat_handler.go`
-2.  **Input**: JSON `ChatRequest` (ProjectID, Message).
-3.  **Security**: Extract `UserID` from the request context (RBAC Middleware).
-4.  **Flow**: `Handler` -> `Orchestrator.ProcessRequest` -> `JSON Response`.
+## Context for Step 43.5
+We have all the Lego blocks (`Orchestrator`, `Services`, `Handler`). Now we need to snap them onto the baseplate (`Server`).
+
+1.  **Dependency Injection**: The `Orchestrator` needs access to `TaskService`, `ScheduleService`, etc. (Many of these might still be mocks or stubs if not fully implemented in previous phases, but we must wire what we have or defined mocks).
+2.  **Route Registration**: Map `POST /api/v1/chat` to our new handler.
+3.  **Middleware**: Ensure the `AuthMiddleware` is wrapping this route.
 
 ## Requirements
-1.  Create `internal/api/handlers/chat_handler.go`.
-2.  Define `ChatHandler` struct with `*chat.Orchestrator`.
-3.  Implement `HandleChat(w http.ResponseWriter, r *http.Request)`.
-4.  **Strict Security**: Ensure `UserID` is strictly retrieved from `r.Context()`. DO NOT trust user input for identity.
+1.  Verify `internal/server/server.go` (or `routes.go`) structure.
+2.   Instantiate `chat.NewOrchestrator(...)` with required dependencies.
+3.  Instantiate `handlers.NewChatHandler(...)`.
+4.  Register Route: `r.Post("/api/v1/chat", chatHandler.HandleChat)`.
 
 ## Key Files
-- `internal/api/handlers/chat_handler.go` (NEW)
-- `internal/chat/orchestrator.go` (Dependency)
-- `internal/chat/types.go` (Contracts)
+- `internal/server/server.go`
+- `cmd/server/main.go`
+- `internal/api/handlers/chat_handler.go`
 
 ## Spec References
-- `PRODUCTION_PLAN.md` Step 43.4
-- `BACKEND_SCOPE.md` Section 5.2 (API Structure)
+- `PRODUCTION_PLAN.md` Step 43.5

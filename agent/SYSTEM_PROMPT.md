@@ -91,26 +91,28 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Subtask 43.4 (API Handler)
-Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.3 are COMPLETE. The logic core is built. Now we expose it.
+Task: Execute Phase 6, Subtask 43.5 (Wiring & Assembly)
+Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.4 are COMPLETE. The Handler, Orchestrator, and Logic are built. Now we wire them up in the server.
 Requirements:
-1.  **Create File**: `internal/api/handlers/chat_handler.go`
-2.  **Define Handler**: `ChatHandler` struct injecting `*chat.Orchestrator`.
-3.  **Implement Method**: `HandleChat(w, r)`
-    -   Parse `ChatRequest` from Body.
-    -   Validate Request (Non-empty message).
-    -   **Security**: Extract `UserID` and `OrgID` from `r.Context()`. (RBAC).
-    -   Call `orchestrator.ProcessRequest`.
-    -   Return `ChatResponse` as JSON.
-4.  **Constraint**: Do NOT trust any identity data in the request body. Context only.
+1.  **Modify File**: `internal/server/server.go` (or `routes.go`)
+2.  **Dependency Injection**:
+    -   Initialize `chat.Orchestrator` in `NewServer` (or equivalent).
+    -   Initialize `handlers.ChatHandler`.
+    -   Inject `TaskService`, `ScheduleService`, `InvoiceService` into Orchestrator.
+3.  **Route Registration**:
+    -   Register `POST /api/v1/chat` -> `chatHandler.HandleChat`
+    -   **Security**: Ensure `authMiddleware.RequireAuth` or `RequireRole` covers this route.
+4.  **Verification**:
+    -   Ensure the server compiles and starts.
+    -   (Next step 43.6 will formally verify with a specific integration test, but ensure wiring is valid now).
 
 Key Files:
--   `internal/api/handlers/chat_handler.go`
--   `internal/chat/orchestrator.go`
--   `internal/api/middleware` (Reference for context keys)
+-   `internal/server/server.go`
+-   `cmd/server/main.go`
+-   `internal/api/routes.go` (if exists)
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43.4
+-   `PRODUCTION_PLAN.md` Step 43.5
 -   `BACKEND_SCOPE.md` Section 5.2 (Chat Endpoint)
 
 First Step: /prism , do not execute implementation plan without my approval
