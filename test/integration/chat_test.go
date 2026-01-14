@@ -124,3 +124,139 @@ func TestChat_EndToEnd(t *testing.T) {
 	assert.Equal(t, chatResp.Reply, modelContent)
 	assert.Equal(t, types.ChatRoleModel, modelRole)
 }
+
+// CTO-003 Remediation: Negative Auth Test - No Token
+func TestChat_NoToken_Unauthorized(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup
+	cfg := config.LoadConfig()
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
+	}
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	require.NoError(t, err)
+	defer db.Close()
+
+	s := server.NewServer(db, cfg, &noOpClient{})
+	ts := httptest.NewServer(s.Router)
+	defer ts.Close()
+
+	// Request WITHOUT Authorization header
+	chatReq := chat.ChatRequest{
+		ProjectID: uuid.New(),
+		Message:   "Test message",
+	}
+	body, err := json.Marshal(chatReq)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/chat", bytes.NewBuffer(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	// Deliberately NOT setting Authorization header
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+// CTO-003 Remediation: Negative Auth Test - Invalid Token
+func TestChat_InvalidToken_Unauthorized(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup
+	cfg := config.LoadConfig()
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
+	}
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	require.NoError(t, err)
+	defer db.Close()
+
+	s := server.NewServer(db, cfg, &noOpClient{})
+	ts := httptest.NewServer(s.Router)
+	defer ts.Close()
+
+	// Request with GARBAGE token
+	chatReq := chat.ChatRequest{
+		ProjectID: uuid.New(),
+		Message:   "Test message",
+	}
+	body, err := json.Marshal(chatReq)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/chat", bytes.NewBuffer(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer totally-invalid-token-garbage")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+// CTO-003 Remediation: Negative Auth Test - Expired Token
+func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup
+	cfg := config.LoadConfig()
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
+	}
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	require.NoError(t, err)
+	defer db.Close()
+
+	s := server.NewServer(db, cfg, &noOpClient{})
+	ts := httptest.NewServer(s.Router)
+	defer ts.Close()
+
+	// Generate EXPIRED JWT
+	claims := &types.Claims{
+		UserID: uuid.New().String(),
+		OrgID:  uuid.New().String(),
+		Role:   types.UserRoleBuilder,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-24 * time.Hour)), // EXPIRED
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(cfg.JWTSecret))
+	require.NoError(t, err)
+
+	// Request with expired token
+	chatReq := chat.ChatRequest{
+		ProjectID: uuid.New(),
+		Message:   "Test message",
+	}
+	body, err := json.Marshal(chatReq)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/chat", bytes.NewBuffer(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+signedToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}

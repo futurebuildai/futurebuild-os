@@ -89,16 +89,26 @@ type User struct {
 	CreatedAt string    `json:"created_at"`
 }
 
+// ToolCall represents a single tool invocation from the AI model.
+// See API_AND_TYPES_SPEC.md Section 4.4 (Chat Domain)
+// CTO-002 Remediation: Typed struct instead of interface{}
+type ToolCall struct {
+	ID       string                 `json:"id"`       // Unique ID for the tool call
+	Name     string                 `json:"name"`     // Tool function name
+	Args     map[string]interface{} `json:"args"`     // Arguments passed to the tool
+	Response string                 `json:"response"` // Tool output (filled after execution)
+}
+
 // ChatMessage represents a single message in an agent session.
 // See API_AND_TYPES_SPEC.md Section 4.4
 type ChatMessage struct {
-	ID        uuid.UUID   `json:"id"`         // UUID string
-	ProjectID uuid.UUID   `json:"project_id"` // UUID string
-	UserID    uuid.UUID   `json:"user_id"`    // UUID string
-	Role      ChatRole    `json:"role"`
-	Content   string      `json:"content"`
-	ToolCalls interface{} `json:"tool_calls,omitempty"` // Use specific struct if available, else interface{}
-	CreatedAt string      `json:"created_at"`           // ISO-8601 Timestamp
+	ID        uuid.UUID  `json:"id"`         // UUID string
+	ProjectID uuid.UUID  `json:"project_id"` // UUID string
+	UserID    uuid.UUID  `json:"user_id"`    // UUID string
+	Role      ChatRole   `json:"role"`
+	Content   string     `json:"content"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"` // CTO-002: Typed struct
+	CreatedAt string     `json:"created_at"`           // ISO-8601 Timestamp
 }
 
 // DynamicComponent represents a recursive UI element.
