@@ -30,6 +30,9 @@ func (s *SpyNotificationService) SendEmail(to string, subject string, body strin
 }
 
 func TestAuthFlow_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
