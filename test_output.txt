@@ -1,0 +1,56 @@
+=== RUN   TestAuthFlow_Integration
+    auth_handler_test.go:49: Failed to create test org: failed to connect to `user=fb_user database=futurebuild`: 127.0.0.1:5433 (localhost): dial error: dial tcp 127.0.0.1:5433: connect: connection refused
+--- FAIL: TestAuthFlow_Integration (0.00s)
+=== RUN   TestHandleChat_HappyPath
+2026/01/14 14:59:19 INFO chat: request received user_id=c5b7e204-ff6a-4833-a417-b7b19ab32381 org_id=869cf0b6-64bb-4930-a4f9-59b1c25b6e47 project_id=38373dbf-901c-4fbf-913b-16a43bd27729 message_preview="Show me the schedule"
+2026/01/14 14:59:19 INFO chat: request completed user_id=c5b7e204-ff6a-4833-a417-b7b19ab32381 project_id=38373dbf-901c-4fbf-913b-16a43bd27729 intent=GET_SCHEDULE duration_ms=0
+--- PASS: TestHandleChat_HappyPath (0.00s)
+=== RUN   TestHandleChat_MissingContext
+2026/01/14 14:59:19 ERROR chat: missing claims in context error="claims not found in context"
+--- PASS: TestHandleChat_MissingContext (0.00s)
+=== RUN   TestHandleChat_EmptyMessage
+2026/01/14 14:59:19 WARN chat: empty message received user_id=e38819a4-9e6e-4efa-9e31-52a989f73814 project_id=77abd6fa-c515-40e2-9fe0-5e4ff43190cd
+--- PASS: TestHandleChat_EmptyMessage (0.00s)
+=== RUN   TestHandleChat_InvalidJSON
+2026/01/14 14:59:19 WARN chat: invalid request body error="invalid character 'i' looking for beginning of object key string"
+--- PASS: TestHandleChat_InvalidJSON (0.00s)
+=== RUN   TestHandleChat_InvalidClaims
+2026/01/14 14:59:19 ERROR chat: invalid UserID in claims raw_user_id=invalid-uuid error="invalid UUID length: 12"
+2026/01/14 14:59:19 ERROR chat: invalid OrgID in claims raw_org_id=invalid-uuid error="invalid UUID length: 12"
+--- PASS: TestHandleChat_InvalidClaims (0.00s)
+=== RUN   TestHandleChat_OrchestratorError
+2026/01/14 14:59:19 INFO chat: request received user_id=de77dd6b-593c-49b4-92da-0df1c5c272b4 org_id=bec6769c-c5cc-4201-a378-9c5279c4a94c project_id=20d1d31b-2866-4d18-8b94-bcde383ab57f message_preview=Test
+2026/01/14 14:59:19 ERROR chat: orchestrator error user_id=de77dd6b-593c-49b4-92da-0df1c5c272b4 project_id=20d1d31b-2866-4d18-8b94-bcde383ab57f error="failed to persist user message: assert.AnError general error for testing" duration_ms=0
+--- PASS: TestHandleChat_OrchestratorError (0.00s)
+=== RUN   TestAnalyzeDocument
+=== RUN   TestAnalyzeDocument/Missing_X-Org-ID_Header
+2026/01/14 14:59:19 "POST http://127.0.0.1:33857/api/v1/documents/analyze HTTP/1.1" from 127.0.0.1:39116 - 400 28B in 23.603µs
+=== RUN   TestAnalyzeDocument/Invalid_Body
+2026/01/14 14:59:19 "POST http://127.0.0.1:38097/api/v1/documents/analyze HTTP/1.1" from 127.0.0.1:44172 - 400 24B in 15.558µs
+--- PASS: TestAnalyzeDocument (0.00s)
+    --- PASS: TestAnalyzeDocument/Missing_X-Org-ID_Header (0.00s)
+    --- PASS: TestAnalyzeDocument/Invalid_Body (0.00s)
+=== RUN   TestRateLimiting
+=== RUN   TestRateLimiting/Exhaust_rate_limit_for_single_IP
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55476 - 400 24B in 10.331µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55484 - 400 24B in 16.953µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55486 - 429 50B in 16.99µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55500 - 429 50B in 8.342µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55512 - 429 50B in 22.883µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:40585/api/v1/auth/login HTTP/1.1" from 127.0.0.1:55516 - 429 50B in 17.699µs
+=== RUN   TestRateLimiting/X-Forwarded-For_ignored_from_untrusted_proxy
+2026/01/14 14:59:19 "POST http://127.0.0.1:33093/api/v1/auth/login HTTP/1.1" from 127.0.0.1:49590 - 400 24B in 14.701µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:33093/api/v1/auth/login HTTP/1.1" from 127.0.0.1:49596 - 400 24B in 7.112µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:33093/api/v1/auth/login HTTP/1.1" from 127.0.0.1:49600 - 429 50B in 12.642µs
+=== RUN   TestRateLimiting/X-Forwarded-For_honored_from_trusted_proxy
+2026/01/14 14:59:19 "POST http://127.0.0.1:44797/api/v1/auth/login HTTP/1.1" from 127.0.0.1:50172 - 400 24B in 8.307µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:44797/api/v1/auth/login HTTP/1.1" from 127.0.0.1:50178 - 400 24B in 9.228µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:44797/api/v1/auth/login HTTP/1.1" from 127.0.0.1:50186 - 400 24B in 11.537µs
+2026/01/14 14:59:19 "POST http://127.0.0.1:44797/api/v1/auth/login HTTP/1.1" from 127.0.0.1:50188 - 400 24B in 6.278µs
+--- PASS: TestRateLimiting (0.00s)
+    --- PASS: TestRateLimiting/Exhaust_rate_limit_for_single_IP (0.00s)
+    --- PASS: TestRateLimiting/X-Forwarded-For_ignored_from_untrusted_proxy (0.00s)
+    --- PASS: TestRateLimiting/X-Forwarded-For_honored_from_trusted_proxy (0.00s)
+FAIL
+FAIL	github.com/colton/futurebuild/internal/api/handlers	0.010s
+FAIL

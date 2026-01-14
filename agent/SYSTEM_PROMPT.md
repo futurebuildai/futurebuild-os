@@ -21,8 +21,8 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 3 (Steps 21-25): Authentication & Rate Limiting: COMPLETED.
     ◦ Phase 4 (Steps 26-34): Physics Engine - Core Scheduling: COMPLETED.
     ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: COMPLETED.
-    ◦ Phase 6 (Steps 43-49): Action Engine: STARTING.
-    ◦ Current Focus: Phase 6, Step 43 (Chat Orchestrator).
+    ◦ Phase 6 (Steps 43-49): Action Engine: IN PROGRESS.
+    ◦ Current Focus: Phase 6, Step 44 (Internal Artifact Mapping).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -91,29 +91,21 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Subtask 43.6 (Verification)
-Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.5 are COMPLETE. The Chat System is fully built and wired. Now we perform the formal "Smoke Test" to verify end-to-end functionality.
+Task: Execute Phase 6, Step 44 (Internal Artifact Mapping)
+Context: Chat Orchestrator (Step 43) is COMPLETE and verified. Now we implement the mapping layer that converts agent tool outputs into structured, ephemeral artifacts for the frontend.
 Requirements:
-1.  **Create Test File**: `tests/integration/chat_test.go` (or `chat_integration_test.go`).
-2.  **Test Setup**:
-    -   Spin up a test server instance (or use `httptest`).
-    -   Generate a valid JWT for a test user (`UserRoleBuilder`).
-    -   Ensure Clean Database state (or use a dedicated test Org).
-3.  **Test Execution**:
-    -   Send `POST /api/v1/chat` with valid payload `{"project_id": "...", "message": "Analyze this invoice"}`.
-    -   **Assert**: HTTP 200 OK.
-    -   **Assert**: Response Body contains `reply` and `intent` ("PROCESS_INVOICE").
-    -   **Assert**: DB `chat_messages` table contains the User message and the Model reply.
-4.  **Verification**:
-    -   Run the test: `go test ./tests/integration/...` (or specific file).
+1.  **Define Artifact Models**: Create `internal/chat/artifacts.go` with `Artifact` struct and `ArtifactType` enum (Invoice, Budget, Gantt, Rolodex).
+2.  **Mapping Service**: Implement logic that takes raw results from services (e.g., `InvoiceExtraction`) and wraps them in an `Artifact` container.
+3.  **Update Orchestrator**: Refactor `ChatResponse` in `internal/chat/types.go` to include an optional `Artifact` pointer. Ensure `ProcessRequest` can populate this when applicable.
+4.  **Validation**: Write unit tests verifying that various tool outputs map to the correct `ArtifactType` and data payload.
 
 Key Files:
--   `tests/integration/chat_test.go` (New)
+-   `internal/chat/artifacts.go` (New)
+-   `internal/chat/types.go`
 -   `internal/chat/orchestrator.go`
--   `internal/server/server.go`
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43.6
--   `BACKEND_SCOPE.md` Section 5.2 (Chat Endpoint)
+-   `PRODUCTION_PLAN.md` Step 44
+-   `BACKEND_SCOPE.md` Section 3.5
 
-First Step: /prism , do not execute implementation plan without my approval
+First Step: /prism

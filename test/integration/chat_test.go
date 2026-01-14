@@ -1,0 +1,126 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/colton/futurebuild/internal/chat"
+	"github.com/colton/futurebuild/internal/config"
+	"github.com/colton/futurebuild/internal/server"
+	"github.com/colton/futurebuild/pkg/types"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestChat_EndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// 1. Setup DB Connection
+	cfg := config.LoadConfig()
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
+	}
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// 2. Create Test Fixtures (Org, User, Project)
+	orgID := uuid.New()
+	orgSlug := fmt.Sprintf("chat-test-org-%s", uuid.New().String()[:8])
+	_, err = db.Exec(ctx, "INSERT INTO organizations (id, name, slug) VALUES ($1, 'Chat Test Org', $2)", orgID, orgSlug)
+	require.NoError(t, err)
+	defer func() {
+		_, _ = db.Exec(ctx, "DELETE FROM organizations WHERE id = $1", orgID)
+	}()
+
+	userID := uuid.New()
+	_, err = db.Exec(ctx, "INSERT INTO users (id, org_id, email, name, role) VALUES ($1, $2, $3, 'Test User', 'Builder')",
+		userID, orgID, fmt.Sprintf("test-%s@example.com", userID.String()[:8]))
+	require.NoError(t, err)
+
+	projectID := uuid.New()
+	_, err = db.Exec(ctx, "INSERT INTO projects (id, org_id, name, status) VALUES ($1, $2, 'Chat Test Project', 'Active')", projectID, orgID)
+	require.NoError(t, err)
+
+	// 3. Generate JWT
+	claims := &types.Claims{
+		UserID: userID.String(),
+		OrgID:  orgID.String(),
+		Role:   types.UserRoleBuilder,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(cfg.JWTSecret))
+	require.NoError(t, err)
+
+	// 4. Start Test Server
+	// We use a real Server instance to test the full router and auth middleware.
+	// Since we aren't calling Gemini, a no-op client is fine for the server setup.
+	s := server.NewServer(db, cfg, &noOpClient{})
+	ts := httptest.NewServer(s.Router)
+	defer ts.Close()
+
+	// 5. Execute Request
+	chatReq := chat.ChatRequest{
+		ProjectID: projectID,
+		Message:   "Analyze this invoice",
+	}
+	body, err := json.Marshal(chatReq)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/chat", bytes.NewBuffer(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+signedToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// 6. Assertions: HTTP Status & Body
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var chatResp chat.ChatResponse
+	err = json.NewDecoder(resp.Body).Decode(&chatResp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, chatResp.Reply)
+	assert.Equal(t, types.IntentProcessInvoice, chatResp.Intent)
+
+	// 7. Assertions: Database State
+	// Verify that both the User message and Model reply were saved.
+	var count int
+	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM chat_messages WHERE project_id = $1", projectID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count, "Should have 2 messages (User + Model)")
+
+	// Check User message
+	var userContent string
+	var userRole types.ChatRole
+	err = db.QueryRow(ctx, "SELECT content, role FROM chat_messages WHERE project_id = $1 AND role = 'user' LIMIT 1", projectID).Scan(&userContent, &userRole)
+	require.NoError(t, err)
+	assert.Equal(t, "Analyze this invoice", userContent)
+	assert.Equal(t, types.ChatRoleUser, userRole)
+
+	// Check Model message
+	var modelContent string
+	var modelRole types.ChatRole
+	err = db.QueryRow(ctx, "SELECT content, role FROM chat_messages WHERE project_id = $1 AND role = 'model' LIMIT 1", projectID).Scan(&modelContent, &modelRole)
+	require.NoError(t, err)
+	assert.Equal(t, chatResp.Reply, modelContent)
+	assert.Equal(t, types.ChatRoleModel, modelRole)
+}
