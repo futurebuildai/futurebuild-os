@@ -6,10 +6,14 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 )
 
+// Keyword is a strictly typed string for matching rules.
+// See CTO Audit Step 43.2
+type Keyword string
+
 // keywordRule defines a set of keywords that map to a specific Intent.
 type keywordRule struct {
 	Intent   types.Intent
-	Keywords []string
+	Keywords []Keyword
 }
 
 // ClassifyIntent maps a raw user message to a strict Intent type based on keyword matching.
@@ -29,28 +33,28 @@ func ClassifyIntent(message string) types.Intent {
 		// High Priority: Distinct Nouns / Specific Objects
 		{
 			Intent:   types.IntentProcessInvoice,
-			Keywords: []string{"invoice", "bill", "receipt"},
+			Keywords: []Keyword{"invoice", "bill", "receipt"},
 		},
 		{
 			Intent:   types.IntentExplainDelay,
-			Keywords: []string{"delay", "late", "behind", "slip"},
+			Keywords: []Keyword{"delay", "late", "behind", "slip"},
 		},
 		{
 			Intent:   types.IntentGetSchedule,
-			Keywords: []string{"schedule", "timeline", "gantt", "when"},
+			Keywords: []Keyword{"schedule", "timeline", "gantt", "when"},
 		},
 		// Low Priority: Generic Verbs / Actions
 		// Checked last so "Update Schedule" catches "Schedule" (above) first.
 		{
 			Intent:   types.IntentUpdateTaskStatus,
-			Keywords: []string{"status", "complete", "finish", "done", "update"},
+			Keywords: []Keyword{"status", "complete", "finish", "done", "update"},
 		},
 	}
 
 	// 3. Execute Linear Scan
 	for _, rule := range rules {
 		for _, keyword := range rule.Keywords {
-			if strings.Contains(normalized, keyword) {
+			if strings.Contains(normalized, string(keyword)) {
 				return rule.Intent
 			}
 		}
@@ -59,3 +63,4 @@ func ClassifyIntent(message string) types.Intent {
 	// 4. Default Fallback
 	return types.IntentUnknown
 }
+
