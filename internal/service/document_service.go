@@ -79,7 +79,7 @@ func (s *DocumentService) IngestDocument(ctx context.Context, docID uuid.UUID) e
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// First, delete any existing chunks for this doc to allow re-ingestion
 	_, err = tx.Exec(ctx, "DELETE FROM document_chunks WHERE document_id = $1", docID)

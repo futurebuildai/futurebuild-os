@@ -75,7 +75,7 @@ func (h *DocumentHandler) AnalyzeDocument(w http.ResponseWriter, r *http.Request
 
 	// 5. Return JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(extraction)
+	_ = json.NewEncoder(w).Encode(extraction)
 }
 
 // ReprocessDocumentResponse is the response for document re-processing.
@@ -140,7 +140,7 @@ func (h *DocumentHandler) ReprocessDocument(w http.ResponseWriter, r *http.Reque
 
 	// 5. Return JSON response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ReprocessDocumentResponse{
+	_ = json.NewEncoder(w).Encode(ReprocessDocumentResponse{
 		DocumentID:       docID,
 		Status:           processingStatus,
 		ReprocessedCount: reprocessedCount,

@@ -10,6 +10,7 @@ import (
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/server"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRateLimiting(t *testing.T) {
@@ -48,7 +49,7 @@ func TestRateLimiting(t *testing.T) {
 				assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode, "6th request should be rate limited")
 
 				var body map[string]string
-				json.NewDecoder(resp.Body).Decode(&body)
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 				assert.Equal(t, "Too Many Requests", body["error"])
 				assert.Equal(t, "12s", body["retry_after"])
 				assert.Equal(t, "12", resp.Header.Get("Retry-After"))

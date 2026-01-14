@@ -1,5 +1,9 @@
 package types
 
+import (
+	"github.com/google/uuid"
+)
+
 // Forecast represents weather integration data.
 // See API_AND_TYPES_SPEC.md Section 2.1
 type Forecast struct {
@@ -14,7 +18,7 @@ type Forecast struct {
 // Contact represents a shared contact model.
 // See API_AND_TYPES_SPEC.md Section 4.1
 type Contact struct {
-	ID                string            `json:"id"`
+	ID                uuid.UUID         `json:"id"`
 	Name              string            `json:"name"`
 	Company           string            `json:"company"`
 	Phone             string            `json:"phone"`
@@ -46,7 +50,7 @@ type InvoiceExtractionItem struct {
 // GanttData represents the project schedule for the Gantt view.
 // See API_AND_TYPES_SPEC.md Section 3.2
 type GanttData struct {
-	ProjectID        string      `json:"project_id"`
+	ProjectID        uuid.UUID   `json:"project_id"`
 	CalculatedAt     string      `json:"calculated_at"`
 	ProjectedEndDate string      `json:"projected_end_date"`
 	CriticalPath     []string    `json:"critical_path"`
@@ -77,20 +81,20 @@ type AuthResponse struct {
 // User represents an internal user.
 // See DATA_SPINE_SPEC.md Section 2.2
 type User struct {
-	ID        string   `json:"id"`
-	OrgID     string   `json:"org_id"`
-	Email     string   `json:"email"`
-	Name      string   `json:"name"`
-	Role      UserRole `json:"role"`
-	CreatedAt string   `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	Role      UserRole  `json:"role"`
+	CreatedAt string    `json:"created_at"`
 }
 
 // ChatMessage represents a single message in an agent session.
 // See API_AND_TYPES_SPEC.md Section 4.4
 type ChatMessage struct {
-	ID        string      `json:"id"`         // UUID string
-	ProjectID string      `json:"project_id"` // UUID string
-	UserID    string      `json:"user_id"`    // UUID string
+	ID        uuid.UUID   `json:"id"`         // UUID string
+	ProjectID uuid.UUID   `json:"project_id"` // UUID string
+	UserID    uuid.UUID   `json:"user_id"`    // UUID string
 	Role      ChatRole    `json:"role"`
 	Content   string      `json:"content"`
 	ToolCalls interface{} `json:"tool_calls,omitempty"` // Use specific struct if available, else interface{}

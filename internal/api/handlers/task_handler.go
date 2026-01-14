@@ -89,7 +89,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(UpdateTaskResponse{
+	_ = json.NewEncoder(w).Encode(UpdateTaskResponse{
 		Task:         task,
 		Recalculated: recalculated,
 	})
@@ -180,7 +180,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ProgressResponse{
+	_ = json.NewEncoder(w).Encode(ProgressResponse{
 		Task:          task,
 		StatusChanged: statusChanged,
 		Recalculated:  recalculated,
@@ -288,7 +288,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(InspectionResponse{
+	_ = json.NewEncoder(w).Encode(InspectionResponse{
 		Task:         task,
 		Result:       req.Result,
 		Recalculated: recalculated,

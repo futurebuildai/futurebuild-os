@@ -11,6 +11,7 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper to generate a token with specific modifications
@@ -52,7 +53,8 @@ func TestRequireAuth(t *testing.T) {
 			t.Errorf("Expected OrgID org-456, got %s", claims.OrgID)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err = w.Write([]byte("OK"))
+		require.NoError(t, err)
 	}))
 
 	t.Run("Valid Token + OrgID", func(t *testing.T) {
@@ -79,7 +81,7 @@ func TestRequireAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		var body map[string]string
-		json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "Unauthorized: Missing OrgID", body["error"])
 	})
 
@@ -91,7 +93,7 @@ func TestRequireAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		var body map[string]string
-		json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "Unauthorized", body["error"])
 	})
 
@@ -104,7 +106,7 @@ func TestRequireAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		var body map[string]string
-		json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "Unauthorized", body["error"])
 	})
 
@@ -118,7 +120,7 @@ func TestRequireAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		var body map[string]string
-		json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "Unauthorized", body["error"])
 	})
 }
@@ -130,7 +132,8 @@ func TestRequireRole(t *testing.T) {
 	// Admin-only handler
 	handler := mw.RequireAuth(mw.RequireRole(types.UserRoleAdmin)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Access Granted"))
+		_, err := w.Write([]byte("Access Granted"))
+		require.NoError(t, err)
 	})))
 
 	t.Run("Admin User Accessing Admin Route -> Allow", func(t *testing.T) {
@@ -159,7 +162,7 @@ func TestRequireRole(t *testing.T) {
 
 		assert.Equal(t, http.StatusForbidden, rec.Code)
 		var body map[string]string
-		json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "Forbidden", body["error"])
 	})
 
@@ -167,7 +170,8 @@ func TestRequireRole(t *testing.T) {
 		// Create a separate handler for Builder
 		builderHandler := mw.RequireAuth(mw.RequireRole(types.UserRoleBuilder)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Builder Access"))
+			_, err := w.Write([]byte("Builder Access"))
+			require.NoError(t, err)
 		})))
 
 		token := generateTestToken(cfg.JWTSecret, time.Hour, func(c *types.Claims) {

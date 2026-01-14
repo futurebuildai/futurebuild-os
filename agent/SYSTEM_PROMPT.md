@@ -91,29 +91,26 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 Immediately after the system acknowledges its identity, paste this prompt to execute the step.
 
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Subtask 43.3 (Orchestration Service)
-Context: Parent Task is Step 43 (Chat Orchestrator). Steps 43.1 (Domain Modeling) and 43.2 (Intent Classification) are COMPLETE. We now focus on the Orchestration Service.
+Task: Execute Phase 6, Subtask 43.4 (API Handler)
+Context: Parent Task is Step 43 (Chat Orchestrator). 43.1-43.3 are COMPLETE. The logic core is built. Now we expose it.
 Requirements:
-1.  **Create File**: `internal/chat/orchestrator.go`
-2.  **Implement Struct**: `Orchestrator` with necessary dependencies (DB pool, etc.)
-3.  **Implement Method**: `ProcessRequest(ctx context.Context, userID uuid.UUID, req ChatRequest) (*ChatResponse, error)`
-    -   Use `ClassifyIntent` to classify the message.
-    -   Log the message to the `chat_messages` table.
-    -   Switch on Intent to execute placeholder logic (e.g., return a canned response for V1).
-4.  **Write Tests**: `internal/chat/orchestrator_test.go`
-    -   Unit tests verifying intent routing.
-    -   Verify that messages are persisted.
-5.  **Constraint**: Focus on wiring and data flow. Complex agent logic comes in later steps.
+1.  **Create File**: `internal/api/handlers/chat_handler.go`
+2.  **Define Handler**: `ChatHandler` struct injecting `*chat.Orchestrator`.
+3.  **Implement Method**: `HandleChat(w, r)`
+    -   Parse `ChatRequest` from Body.
+    -   Validate Request (Non-empty message).
+    -   **Security**: Extract `UserID` and `OrgID` from `r.Context()`. (RBAC).
+    -   Call `orchestrator.ProcessRequest`.
+    -   Return `ChatResponse` as JSON.
+4.  **Constraint**: Do NOT trust any identity data in the request body. Context only.
 
 Key Files:
+-   `internal/api/handlers/chat_handler.go`
 -   `internal/chat/orchestrator.go`
--   `internal/chat/orchestrator_test.go`
--   `internal/chat/intents.go` (Classifier)
--   `internal/chat/types.go` (Data Contracts)
+-   `internal/api/middleware` (Reference for context keys)
 
 Spec References:
--   `PRODUCTION_PLAN.md` Step 43.3
--   `BACKEND_SCOPE.md` Section 3.5 (Action Engine)
--   `DATA_SPINE_SPEC.md` Section 5.4 (chat_messages)
+-   `PRODUCTION_PLAN.md` Step 43.4
+-   `BACKEND_SCOPE.md` Section 5.2 (Chat Endpoint)
 
 First Step: /prism , do not execute implementation plan without my approval

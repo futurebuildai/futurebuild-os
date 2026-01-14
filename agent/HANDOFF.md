@@ -1,34 +1,31 @@
-# Handoff: Phase 6 Step 43.3
+# Handoff: Phase 6 Step 43.4
 
-**Previous Step:** 43.2 (Intent Classification) - **COMPLETED** ✅
-**Current Step:** 43.3 (Orchestration Service)
+**Previous Step:** 43.3 (Orchestration Service) - **COMPLETED** ✅
+**Current Step:** 43.4 (API Handler)
 
 ## Status
-- **Step 43.2 Complete**: `ClassifyIntent` in `internal/chat/intents.go` with `Keyword` type and deterministic priority.
-- **CTO Audit**: APPROVED (2x - Post-Refinement)
-- **Ready for Step 43.3**: Orchestration Service.
+- **Step 43.3 Complete**: `Orchestrator` service built with dependency injection and full persistence flow.
+- **CTO Audit**: APPROVED (Zero-Trust Passed).
+- **Ready for Step 43.4**: Expose the service via HTTP.
 
-## Context for Step 43.3
-Build the central traffic controller (`Orchestrator`) that:
-1. Takes a `ChatRequest`.
-2. Classifies it using `ClassifyIntent`.
-3. Persists the message to `chat_messages` (See `DATA_SPINE_SPEC.md` Section 5.3).
-4. Switches on Intent to execute placeholder logic.
-5. Returns a `ChatResponse`.
+## Context for Step 43.4
+We need to expose the `Orchestrator` to the frontend via a secured HTTP endpoint.
+1.  **Handler**: `internal/api/handlers/chat_handler.go`
+2.  **Input**: JSON `ChatRequest` (ProjectID, Message).
+3.  **Security**: Extract `UserID` from the request context (RBAC Middleware).
+4.  **Flow**: `Handler` -> `Orchestrator.ProcessRequest` -> `JSON Response`.
 
 ## Requirements
-1. Create `internal/chat/orchestrator.go`.
-2. Implement `Orchestrator` struct with DB pool dependency.
-3. Implement `ProcessRequest(ctx, userID, req) (*ChatResponse, error)`.
-4. Write tests in `internal/chat/orchestrator_test.go`.
+1.  Create `internal/api/handlers/chat_handler.go`.
+2.  Define `ChatHandler` struct with `*chat.Orchestrator`.
+3.  Implement `HandleChat(w http.ResponseWriter, r *http.Request)`.
+4.  **Strict Security**: Ensure `UserID` is strictly retrieved from `r.Context()`. DO NOT trust user input for identity.
 
 ## Key Files
-- `internal/chat/orchestrator.go` (NEW)
-- `internal/chat/orchestrator_test.go` (NEW)
-- `internal/chat/intents.go` (Classifier)
-- `internal/chat/types.go` (Data Contracts)
+- `internal/api/handlers/chat_handler.go` (NEW)
+- `internal/chat/orchestrator.go` (Dependency)
+- `internal/chat/types.go` (Contracts)
 
 ## Spec References
-- `PRODUCTION_PLAN.md` Step 43.3
-- `DATA_SPINE_SPEC.md` Section 5.3 (CHAT_MESSAGES)
-- `BACKEND_SCOPE.md` Section 3.5 (Action Engine)
+- `PRODUCTION_PLAN.md` Step 43.4
+- `BACKEND_SCOPE.md` Section 5.2 (API Structure)

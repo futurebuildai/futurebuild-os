@@ -92,7 +92,7 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 
 	// 4. Return result
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(VerifyTaskResponse{
+	_ = json.NewEncoder(w).Encode(VerifyTaskResponse{
 		IsVerified: isVerified,
 		Confidence: confidence,
 	})

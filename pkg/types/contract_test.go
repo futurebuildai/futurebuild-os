@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // TestGenerateContractSamples generates JSON samples for core models to be validated against TS schemas.
@@ -25,7 +27,7 @@ func TestGenerateContractSamples(t *testing.T) {
 			Conditions:               "Rainy",
 		},
 		"Contact": Contact{
-			ID:      "550e8400-e29b-41d4-a716-446655440000",
+			ID:      uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"),
 			Name:    "John Doe",
 			Company: "BuildIt Inc",
 			Phone:   "555-0199",
@@ -49,7 +51,7 @@ func TestGenerateContractSamples(t *testing.T) {
 			},
 		},
 		"GanttData": GanttData{
-			ProjectID:        "550e8400-e29b-41d4-a716-446655440000",
+			ProjectID:        uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"),
 			CalculatedAt:     "2026-01-06T12:00:00Z",
 			ProjectedEndDate: "2026-06-01",
 			CriticalPath:     []string{"1.1", "1.2"},

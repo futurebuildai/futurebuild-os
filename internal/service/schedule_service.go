@@ -92,7 +92,7 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var projectEnd time.Time
 	for taskID, sched := range schedule {

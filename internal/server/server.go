@@ -108,9 +108,9 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	err := s.DB.Ping(r.Context())
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("Database unavailable"))
+		_, _ = w.Write([]byte("Database unavailable"))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }

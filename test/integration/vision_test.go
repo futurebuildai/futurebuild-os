@@ -153,7 +153,8 @@ func TestVisionService_VerifyTask(t *testing.T) {
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
-		w.Write(dummyJPEG)
+		_, err := w.Write(dummyJPEG)
+		require.NoError(t, err)
 	}))
 	defer ts.Close()
 

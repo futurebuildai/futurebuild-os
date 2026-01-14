@@ -33,7 +33,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Lookup: Resolve identity across USERS (internal) and CONTACTS (external)
 	identity, err := h.authService.LookupIdentityByEmail(r.Context(), req.Email)
-	
+
 	// Security Note: If the identity does not exist, return 200 OK to prevent email enumeration attacks.
 	if err != nil {
 		h.respondGenericSuccess(w)
@@ -65,8 +65,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	magicLink := h.authService.ConstructLink(h.baseURL, rawToken)
 	subject := "Your FutureBuild Magic Link"
 	body := fmt.Sprintf("Click here to login: %s", magicLink)
-	
-	// For Contacts, we might want to prioritize SMS if it's their preference, 
+
+	// For Contacts, we might want to prioritize SMS if it's their preference,
 	// but for now, we'll stick to email for the magic link delivery consistency.
 	if err := h.notificationService.SendEmail(identity.GetEmail(), subject, body); err != nil {
 		http.Error(w, "failed to send email", http.StatusInternalServerError)
@@ -99,13 +99,13 @@ func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenResp)
+	_ = json.NewEncoder(w).Encode(tokenResp)
 }
 
 func (h *AuthHandler) respondGenericSuccess(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(types.AuthResponse{
+	_ = json.NewEncoder(w).Encode(types.AuthResponse{
 		Message: "If this user exists, a login link has been sent.",
 	})
 }

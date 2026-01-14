@@ -129,7 +129,7 @@ func RateLimit(limiter *IPRateLimiter) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", retryAfterStr)
 				w.WriteHeader(http.StatusTooManyRequests)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error":       "Too Many Requests",
 					"retry_after": retryJSONStr,
 				})

@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"strings"
+
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"strings"
 )
-
 
 type ProjectHandler struct {
 	service *service.ProjectService
@@ -64,12 +64,10 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(p)
+	_ = json.NewEncoder(w).Encode(p)
 }
-
 
 func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	projectIDStr := chi.URLParam(r, "id")
@@ -98,5 +96,5 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	_ = json.NewEncoder(w).Encode(p)
 }

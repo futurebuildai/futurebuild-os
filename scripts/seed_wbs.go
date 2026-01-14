@@ -20,18 +20,18 @@ type WBSTemplate struct {
 }
 
 type WBSTask struct {
-	Code              string   `json:"code"`
-	Name              string   `json:"name"`
-	BaseDurationDays  float64  `json:"base_duration_days"`
-	ResponsibleParty  string   `json:"responsible_party"`
-	Deliverable       string   `json:"deliverable"`
-	Notes             string   `json:"notes"`
-	IsInspection      bool     `json:"is_inspection"`
-	IsMilestone       bool     `json:"is_milestone"`
-	IsLongLead        bool     `json:"is_long_lead"`
-	LeadTimeWeeksMin  int      `json:"lead_time_weeks_min"`
-	LeadTimeWeeksMax  int      `json:"lead_time_weeks_max"`
-	PredecessorCodes  []string `json:"predecessor_codes"`
+	Code             string   `json:"code"`
+	Name             string   `json:"name"`
+	BaseDurationDays float64  `json:"base_duration_days"`
+	ResponsibleParty string   `json:"responsible_party"`
+	Deliverable      string   `json:"deliverable"`
+	Notes            string   `json:"notes"`
+	IsInspection     bool     `json:"is_inspection"`
+	IsMilestone      bool     `json:"is_milestone"`
+	IsLongLead       bool     `json:"is_long_lead"`
+	LeadTimeWeeksMin int      `json:"lead_time_weeks_min"`
+	LeadTimeWeeksMax int      `json:"lead_time_weeks_max"`
+	PredecessorCodes []string `json:"predecessor_codes"`
 }
 
 type WBSPhase struct {
@@ -44,7 +44,7 @@ type WBSPhase struct {
 
 type WBSMasterData struct {
 	Template WBSTemplate `json:"template"`
-	Phases   []WBSPhase   `json:"phases"`
+	Phases   []WBSPhase  `json:"phases"`
 }
 
 func main() {
@@ -76,7 +76,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to begin transaction: %v", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// 1. Insert Template
 	templateID := uuid.New()

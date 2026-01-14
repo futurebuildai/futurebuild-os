@@ -16,6 +16,7 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/require"
 )
 
 type SpyNotificationService struct {
@@ -47,7 +48,7 @@ func TestAuthFlow_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test org: %v", err)
 	}
-	defer pool.Exec(ctx, "DELETE FROM organizations WHERE id = $1", orgID)
+	defer func() { _, _ = pool.Exec(ctx, "DELETE FROM organizations WHERE id = $1", orgID) }()
 
 	userID := uuid.New()
 	email := "test-" + userID.String()[:8] + "@example.com"
@@ -76,7 +77,7 @@ func TestAuthFlow_Integration(t *testing.T) {
 	}
 
 	var loginResp types.AuthResponse
-	json.Unmarshal(rr.Body.Bytes(), &loginResp)
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &loginResp))
 	if loginResp.Message != "If this user exists, a login link has been sent." {
 		t.Errorf("Unexpected login response message: %s", loginResp.Message)
 	}
@@ -101,7 +102,7 @@ func TestAuthFlow_Integration(t *testing.T) {
 	}
 
 	var tokenResp types.TokenResponse
-	json.Unmarshal(rr.Body.Bytes(), &tokenResp)
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &tokenResp))
 	if tokenResp.AccessToken == "" {
 		t.Error("Verified response missing AccessToken")
 	}
