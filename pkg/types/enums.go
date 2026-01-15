@@ -129,6 +129,17 @@ const (
 	ProcurementStatusInstalled  ProcurementStatus = "installed"
 )
 
+// ProcurementAlertStatus defines the risk status of a procurement item.
+// See PRODUCTION_PLAN.md Step 46
+type ProcurementAlertStatus string
+
+const (
+	ProcurementAlertPending  ProcurementAlertStatus = "pending"
+	ProcurementAlertOK       ProcurementAlertStatus = "ok"
+	ProcurementAlertWarning  ProcurementAlertStatus = "warning"
+	ProcurementAlertCritical ProcurementAlertStatus = "critical"
+)
+
 // ChatRole defines the participants in an agent session.
 // See API_AND_TYPES_SPEC.md Section 1.4
 type ChatRole string

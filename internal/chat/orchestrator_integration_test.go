@@ -44,6 +44,11 @@ func (m *AmnesiacPersister) SaveMessage(_ context.Context, _ models.ChatMessage)
 	return nil
 }
 
+// Pool returns nil for integration tests that don't test transactional behavior.
+func (m *AmnesiacPersister) Pool() Transactor {
+	return nil
+}
+
 // --- Test Fixtures ---
 
 func newTestOrchestrator(persister MessagePersister) *Orchestrator {

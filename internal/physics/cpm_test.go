@@ -194,7 +194,7 @@ func TestForwardPass_LinearDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 	require.Len(t, schedule, 3)
@@ -238,7 +238,7 @@ func TestForwardPass_BranchingDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -268,7 +268,7 @@ func TestForwardPass_LagDays(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -297,7 +297,7 @@ func TestForwardPass_SSType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -325,7 +325,7 @@ func TestForwardPass_FFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -356,7 +356,7 @@ func TestForwardPass_SFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -381,7 +381,7 @@ func TestForwardPass_RootTask(t *testing.T) {
 	deps := []models.TaskDependency{} // No dependencies
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -410,7 +410,7 @@ func TestForwardPass_DurationPrecedence(t *testing.T) {
 	deps := []models.TaskDependency{}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 
@@ -425,10 +425,92 @@ func TestForwardPass_EmptyGraph(t *testing.T) {
 	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	g := BuildDependencyGraph(nil, nil)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 	assert.Len(t, schedule, 0, "Empty graph should produce empty schedule")
+}
+
+// TestForwardPass_MaterialConstraint verifies material constraints push task start dates.
+// See PRODUCTION_PLAN.md Step 46 (MRP Feedback Loop)
+func TestForwardPass_MaterialConstraint(t *testing.T) {
+	projectID := uuid.New()
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
+
+	// Create tasks: A (2 days) → B (3 days)
+	// B normally starts at Day 2 (after A finishes)
+	// Material constraint: B's material arrives Day 10
+	// Expected: B should start Day 10, not Day 2
+	taskA := makeTaskWithDuration("MAT.1", 2.0)
+	taskB := makeTaskWithDuration("MAT.2", 3.0)
+
+	tasks := []models.ProjectTask{taskA, taskB}
+	deps := []models.TaskDependency{
+		makeDep(projectID, taskA.ID, taskB.ID, types.DependencyTypeFS, 0),
+	}
+
+	// Material arrives on Day 10 for Task B
+	materialDeliveryDate := time.Date(2026, 1, 22, 0, 0, 0, 0, time.UTC) // Day 10 from project start
+	materialConstraints := map[uuid.UUID]time.Time{
+		taskB.ID: materialDeliveryDate,
+	}
+
+	g := BuildDependencyGraph(tasks, deps)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, materialConstraints)
+
+	require.NoError(t, err)
+	require.Len(t, schedule, 2)
+
+	cal := &StandardCalendar{}
+
+	// Task A: ES = project start, EF = ES + 2 working days
+	schedA := schedule[taskA.ID]
+	assert.Equal(t, projectStart, schedA.EarlyStart, "A should start at project start")
+	assert.Equal(t, cal.AddWorkingDays(projectStart, 2), schedA.EarlyFinish, "A should finish 2 working days later")
+
+	// Task B: ES should be pushed to material delivery date (Day 10), not A.EF (Day 2)
+	// Material constraint is HARD - task cannot start before material arrives
+	schedB := schedule[taskB.ID]
+	assert.Equal(t, materialDeliveryDate, schedB.EarlyStart, "B should start when material arrives (Day 10)")
+	assert.Equal(t, cal.AddWorkingDays(materialDeliveryDate, 3), schedB.EarlyFinish, "B should finish 3 working days after Day 10")
+}
+
+// TestForwardPass_MaterialConstraint_NoEffect verifies material constraint is ignored when predecessor is later.
+func TestForwardPass_MaterialConstraint_NoEffect(t *testing.T) {
+	projectID := uuid.New()
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
+
+	// Create tasks: A (10 days) → B (2 days)
+	// B normally starts at Day 10 (after A finishes)
+	// Material arrives Day 5 - before predecessor finishes
+	// Expected: B should start Day 10, NOT Day 5 (predecessor constraint is tighter)
+	taskA := makeTaskWithDuration("MAT2.1", 10.0)
+	taskB := makeTaskWithDuration("MAT2.2", 2.0)
+
+	tasks := []models.ProjectTask{taskA, taskB}
+	deps := []models.TaskDependency{
+		makeDep(projectID, taskA.ID, taskB.ID, types.DependencyTypeFS, 0),
+	}
+
+	// Material arrives early on Day 5 - should not affect schedule
+	materialDeliveryDate := time.Date(2026, 1, 17, 0, 0, 0, 0, time.UTC) // Working day 5
+	materialConstraints := map[uuid.UUID]time.Time{
+		taskB.ID: materialDeliveryDate,
+	}
+
+	g := BuildDependencyGraph(tasks, deps)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, materialConstraints)
+
+	require.NoError(t, err)
+
+	cal := &StandardCalendar{}
+	schedA := schedule[taskA.ID]
+	schedB := schedule[taskB.ID]
+
+	// B.ES should be A.EF (working day 10), not material date (Day 5)
+	expectedBStart := schedA.EarlyFinish
+	assert.Equal(t, expectedBStart, schedB.EarlyStart, "B should start when A finishes (Day 10), not material arrival (Day 5)")
+	assert.Equal(t, cal.AddWorkingDays(expectedBStart, 2), schedB.EarlyFinish, "B should finish 2 working days after A")
 }
 
 // ============================================================================
@@ -452,10 +534,10 @@ func TestBackwardPass_LinearDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	// All tasks should be critical in a linear chain
@@ -499,10 +581,10 @@ func TestBackwardPass_BranchingDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	// A and B should be critical; C has float
@@ -535,10 +617,10 @@ func TestBackwardPass_LagDays(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -571,10 +653,10 @@ func TestBackwardPass_CriticalPath(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	// Critical path should be A → B → D
@@ -604,10 +686,10 @@ func TestBackwardPass_SSType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -633,10 +715,10 @@ func TestBackwardPass_FFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -662,10 +744,10 @@ func TestBackwardPass_SFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -687,10 +769,10 @@ func TestBackwardPass_TerminalTask(t *testing.T) {
 	deps := []models.TaskDependency{}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -721,10 +803,10 @@ func TestBackwardPass_FloatCalculation(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule, &StandardCalendar{})
+	_, err = BackwardPass(g, schedule, &StandardCalendar{}, nil)
 	require.NoError(t, err)
 
 	// C should have float equal to the difference between B's duration and C's duration
@@ -745,7 +827,7 @@ func TestBackwardPass_EmptySchedule(t *testing.T) {
 	g := BuildDependencyGraph(nil, nil)
 	schedule := make(map[uuid.UUID]TaskSchedule)
 
-	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 	assert.Nil(t, criticalPath, "Empty schedule should produce nil critical path")
@@ -765,7 +847,7 @@ func TestCalendar_SkipsWeekends(t *testing.T) {
 	deps := []models.TaskDependency{}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
 
 	require.NoError(t, err)
 	require.Len(t, schedule, 1)
@@ -843,7 +925,7 @@ func TestFloatPrecision_LongChain(t *testing.T) {
 
 	// Build graph and run forward pass with 7-day calendar (no weekend logic)
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{}, nil)
 
 	require.NoError(t, err)
 	require.Len(t, schedule, numTasks)
@@ -899,7 +981,7 @@ func TestFloatPrecision_AccumulatedFractional(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{})
+	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{}, nil)
 
 	require.NoError(t, err)
 

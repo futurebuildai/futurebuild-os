@@ -64,21 +64,26 @@ func main() {
 	}
 
 	// 5. Initialize Services
+	projectService := service.NewProjectService(dbPool)
 	scheduleService := service.NewScheduleService(dbPool)
 	notificationService := service.NewConsoleEmailProvider()
 	weatherService := service.NewMockWeatherService()
 
 	// 6. Initialize Agents
 	dailyFocusAgent := agents.NewDailyFocusAgent(
-		dbPool,
+		projectService, // Replaces dbPool - Clean Service Layer Pattern
 		scheduleService,
 		weatherService,
 		notificationService,
 		aiClient,
 	)
 
+	// Procurement Agent for long-lead item monitoring
+	// See PRODUCTION_PLAN.md Step 46
+	procurementAgent := agents.NewProcurementAgent(dbPool, weatherService)
+
 	// 7. Initialize Worker Handlers
-	workerHandler := worker.NewWorkerHandler(dailyFocusAgent)
+	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent)
 
 	// 8. Initialize Scheduler (The Clock)
 	// See PRODUCTION_PLAN.md Step 45 (Daily Briefing Job)
@@ -88,11 +93,18 @@ func main() {
 		log.Fatalf("could not register daily briefing cron: %v", err)
 	}
 
+	// Register Procurement Check at 05:00 AM UTC (before daily briefing)
+	// See PRODUCTION_PLAN.md Step 46
+	if _, err := scheduler.RegisterEntry("0 5 * * *", worker.NewProcurementCheckTask()); err != nil {
+		log.Fatalf("could not register procurement check cron: %v", err)
+	}
+
 	// 9. Initialize Worker Server (The Processor)
 	srv := worker.NewServer(redisAddr, 10)
 
 	// Register the actual handler function
 	srv.RegisterHandlerFunc(worker.TypeDailyBriefing, workerHandler.HandleDailyBriefing)
+	srv.RegisterHandlerFunc(worker.TypeProcurementCheck, workerHandler.HandleProcurementCheck)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

@@ -263,6 +263,17 @@ func parseDependencyType(t string) types.DependencyType {
 	}
 }
 
+// ContinuousCalendar treats all days as working days (7-day week).
+// Used ONLY for Golden Master verification against legacy CSV data.
+type ContinuousCalendar struct{}
+
+// AddWorkingDays adds the specified number of working days to a date.
+// Since this is a continuous calendar, it simply adds 24 hours per day
+// without skipping weekends or holidays.
+func (c *ContinuousCalendar) AddWorkingDays(date time.Time, days float64) time.Time {
+	return date.Add(time.Duration(days*24) * time.Hour)
+}
+
 func TestGoldenMasterPhysics(t *testing.T) {
 	scenarios := LoadGoldenMasterScenarios(t)
 
@@ -337,11 +348,13 @@ func TestGoldenMasterPhysics(t *testing.T) {
 			assert.NoError(t, err, "Cycle detected in scenario %s", scenario.ScenarioName)
 
 			// Forward Pass
-			schedule, err := physics.ForwardPass(dag, scenario.ProjectStartDate, &physics.StandardCalendar{})
+			// Use ContinuousCalendar (7-day week) to match legacy CSV golden master data
+			cal := &ContinuousCalendar{}
+			schedule, err := physics.ForwardPass(dag, scenario.ProjectStartDate, cal, nil)
 			require.NoError(t, err, "Forward pass failed")
 
 			// Backward Pass
-			_, err = physics.BackwardPass(dag, schedule, &physics.StandardCalendar{})
+			_, err = physics.BackwardPass(dag, schedule, cal, nil)
 			require.NoError(t, err, "Backward pass failed")
 
 			// 4. Assert Final Results

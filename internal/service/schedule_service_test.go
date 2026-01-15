@@ -54,10 +54,10 @@ func TestRecalculateSchedule_CriticalPathChange(t *testing.T) {
 	// Initial CPM: Project duration = 2 + 3 + 1 = 6 working days
 	cal := &physics.StandardCalendar{}
 	graph := physics.BuildDependencyGraph(tasks, deps)
-	schedule, err := physics.ForwardPass(graph, projectStart, cal)
+	schedule, err := physics.ForwardPass(graph, projectStart, cal, nil)
 	require.NoError(t, err)
 
-	criticalPath, err := physics.BackwardPass(graph, schedule, cal)
+	criticalPath, err := physics.BackwardPass(graph, schedule, cal, nil)
 	require.NoError(t, err)
 
 	// Verify all tasks are critical
@@ -75,10 +75,10 @@ func TestRecalculateSchedule_CriticalPathChange(t *testing.T) {
 	// Rebuild graph with override
 	tasks[1] = taskB
 	graph = physics.BuildDependencyGraph(tasks, deps)
-	schedule, err = physics.ForwardPass(graph, projectStart, cal)
+	schedule, err = physics.ForwardPass(graph, projectStart, cal, nil)
 	require.NoError(t, err)
 
-	_, err = physics.BackwardPass(graph, schedule, cal)
+	_, err = physics.BackwardPass(graph, schedule, cal, nil)
 	require.NoError(t, err)
 
 	// New project end: 2 + 7 + 1 = 10 working days
@@ -144,10 +144,10 @@ func TestRecalculateSchedule_NonCriticalChange(t *testing.T) {
 	// Initial CPM
 	cal := &physics.StandardCalendar{}
 	graph := physics.BuildDependencyGraph(tasks, deps)
-	schedule, err := physics.ForwardPass(graph, projectStart, cal)
+	schedule, err := physics.ForwardPass(graph, projectStart, cal, nil)
 	require.NoError(t, err)
 
-	_, err = physics.BackwardPass(graph, schedule, cal)
+	_, err = physics.BackwardPass(graph, schedule, cal, nil)
 	require.NoError(t, err)
 
 	// Initial project end: 1 + 5 + 1 = 7 working days (critical path A→B→D)
@@ -167,10 +167,10 @@ func TestRecalculateSchedule_NonCriticalChange(t *testing.T) {
 	// Rebuild graph with override
 	tasks[2] = taskC
 	graph = physics.BuildDependencyGraph(tasks, deps)
-	schedule, err = physics.ForwardPass(graph, projectStart, cal)
+	schedule, err = physics.ForwardPass(graph, projectStart, cal, nil)
 	require.NoError(t, err)
 
-	_, err = physics.BackwardPass(graph, schedule, cal)
+	_, err = physics.BackwardPass(graph, schedule, cal, nil)
 	require.NoError(t, err)
 
 	// Project end should NOT change since C is still non-critical
@@ -233,10 +233,10 @@ func TestRecalculateSchedule_NonCriticalExceedsFloat(t *testing.T) {
 
 	cal := &physics.StandardCalendar{}
 	graph := physics.BuildDependencyGraph(tasks, deps)
-	schedule, err := physics.ForwardPass(graph, projectStart, cal)
+	schedule, err := physics.ForwardPass(graph, projectStart, cal, nil)
 	require.NoError(t, err)
 
-	criticalPath, err := physics.BackwardPass(graph, schedule, cal)
+	criticalPath, err := physics.BackwardPass(graph, schedule, cal, nil)
 	require.NoError(t, err)
 
 	// Task C is now critical (longer than B)
@@ -264,11 +264,11 @@ func TestRecalculateSchedule_EmptyProject(t *testing.T) {
 	projectStart := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
 
 	graph := physics.BuildDependencyGraph(nil, nil)
-	schedule, err := physics.ForwardPass(graph, projectStart, &physics.StandardCalendar{})
+	schedule, err := physics.ForwardPass(graph, projectStart, &physics.StandardCalendar{}, nil)
 	require.NoError(t, err)
 	assert.Len(t, schedule, 0, "Empty project should have no scheduled tasks")
 
-	criticalPath, err := physics.BackwardPass(graph, schedule, &physics.StandardCalendar{})
+	criticalPath, err := physics.BackwardPass(graph, schedule, &physics.StandardCalendar{}, nil)
 	require.NoError(t, err)
 	assert.Nil(t, criticalPath, "Empty project should have no critical path")
 }

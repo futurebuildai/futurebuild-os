@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/platform/db"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -38,6 +39,9 @@ type InvoiceService interface {
 // MessagePersister defines operations for saving chat messages.
 type MessagePersister interface {
 	SaveMessage(ctx context.Context, msg models.ChatMessage) error
+	// Pool returns the underlying Transactor for callers that need to start transactions.
+	// See PRODUCTION_PLAN.md Step 45 (Zombie Write Fix)
+	Pool() Transactor
 }
 
 // --- Orchestrator Struct ---
@@ -342,12 +346,29 @@ func NewPgxMessageStore(pool Transactor) *PgxMessageStore {
 	return &PgxMessageStore{pool: pool}
 }
 
+// Pool returns the underlying Transactor for transaction management.
+// This allows callers to start transactions and inject them into context.
+// See PRODUCTION_PLAN.md Step 45 (Zombie Write Fix)
+func (s *PgxMessageStore) Pool() Transactor {
+	return s.pool
+}
+
 // SaveMessage persists a ChatMessage and its ToolCalls to the database atomically.
 // CRITICAL FAANG STANDARD: Both chat_messages and chat_tool_usage inserts
 // happen in a single transaction. If tool usage save fails, message save rolls back.
 // See DATA_SPINE_SPEC.md Section 5.3, Phase 2 Remediation Task 1.
+//
+// Distributed Transaction Support (Step 45 Zombie Write Fix):
+//   - If a transaction is injected via context (db.InjectTx), uses that transaction.
+//     Caller owns Commit/Rollback lifecycle.
+//   - Otherwise, starts its own transaction (legacy behavior).
 func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessage) error {
-	// Start transaction for atomic write
+	// Check for context-propagated transaction (caller owns Tx lifecycle)
+	if tx, ok := db.ExtractTx(ctx); ok {
+		return s.saveMessageWithTx(ctx, tx, msg)
+	}
+
+	// Legacy behavior: start own transaction
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -357,12 +378,27 @@ func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessag
 		_ = tx.Rollback(ctx)
 	}()
 
+	if err := s.saveMessageWithTx(ctx, tx, msg); err != nil {
+		return err
+	}
+
+	// Commit transaction (we own it)
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// saveMessageWithTx performs the actual message save using the provided transaction.
+// This is the internal implementation shared by both injected and local transactions.
+func (s *PgxMessageStore) saveMessageWithTx(ctx context.Context, tx pgx.Tx, msg models.ChatMessage) error {
 	// 1. Insert into chat_messages
 	messageQuery := `
 		INSERT INTO chat_messages (id, project_id, user_id, role, content, tool_calls, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err = tx.Exec(ctx, messageQuery,
+	_, err := tx.Exec(ctx, messageQuery,
 		msg.ID, msg.ProjectID, msg.UserID, msg.Role, msg.Content, msg.ToolCalls, msg.CreatedAt,
 	)
 	if err != nil {
@@ -387,11 +423,6 @@ func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessag
 				return fmt.Errorf("db insert chat_tool_usage failed for tool %s: %w", tc.Name, err)
 			}
 		}
-	}
-
-	// 3. Commit transaction
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

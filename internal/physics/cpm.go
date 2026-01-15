@@ -315,8 +315,9 @@ func getTaskDuration(task models.ProjectTask) float64 {
 // ForwardPass calculates Early Start (ES) and Early Finish (EF) for all tasks.
 // Processes tasks in topological order, handling FS, SS, FF, SF dependencies.
 // Uses the provided Calendar for working day calculations.
-// See BACKEND_SCOPE.md Section 6.3 and CPM_RES_MODEL_SPEC.md Section 11.4
-func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar) (map[uuid.UUID]TaskSchedule, error) {
+// materialConstraints enforces "Start No Earlier Than" dates based on material availability.
+// See BACKEND_SCOPE.md Section 6.3, CPM_RES_MODEL_SPEC.md Section 11.4, PRODUCTION_PLAN.md Step 46
+func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar, materialConstraints map[uuid.UUID]time.Time) (map[uuid.UUID]TaskSchedule, error) {
 	sorted, err := TopologicalSort(g)
 	if err != nil {
 		return nil, fmt.Errorf("forward pass failed: %w", err)
@@ -339,7 +340,6 @@ func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar) (map[
 		if len(predecessors) == 0 {
 			// Root task: starts at project start date
 			earlyStart = projectStart
-			earlyFinish = cal.AddWorkingDays(earlyStart, duration)
 		} else {
 			// Calculate ES based on all predecessor constraints
 			// Start with zero time, then find the maximum constraint date
@@ -377,8 +377,20 @@ func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar) (map[
 			}
 
 			earlyStart = maxConstraintDate
-			earlyFinish = cal.AddWorkingDays(earlyStart, duration)
 		}
+
+		// Material Constraint Check (MRP Feedback Loop)
+		// See PRODUCTION_PLAN.md Step 46: Treat as hard constraint
+		// Task cannot start before material arrives on site
+		if materialConstraints != nil {
+			if matDate, ok := materialConstraints[taskID]; ok {
+				if matDate.After(earlyStart) {
+					earlyStart = matDate
+				}
+			}
+		}
+
+		earlyFinish = cal.AddWorkingDays(earlyStart, duration)
 
 		schedule[taskID] = TaskSchedule{
 			TaskID:      taskID,
@@ -457,8 +469,14 @@ func (g *DependencyGraph) GetSuccessors(taskID uuid.UUID) []uuid.UUID {
 // and identifies the critical path for all tasks.
 // Must be called after ForwardPass has populated ES/EF in the schedule.
 // Uses the provided Calendar for working day calculations.
+// Accepts optional SchedulingConfig; if nil, uses DefaultSchedulingConfig().
 // See BACKEND_SCOPE.md Section 6.3
-func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal Calendar) ([]string, error) {
+func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal Calendar, config *SchedulingConfig) ([]string, error) {
+	// Defensive Default: fall back to default config if nil
+	if config == nil {
+		config = DefaultSchedulingConfig()
+	}
+
 	if len(schedule) == 0 {
 		return nil, nil
 	}
@@ -550,8 +568,8 @@ func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal C
 		sched.LateStart = lateStart
 		sched.LateFinish = lateFinish
 		sched.TotalFloat = floatDays
-		// Use tolerance-based comparison per PRODUCTION_PLAN Step 33 (0.01 precision)
-		sched.IsCritical = math.Abs(floatDays) < 0.001
+		// Use configurable tolerance-based comparison per PRODUCTION_PLAN Step 33
+		sched.IsCritical = math.Abs(floatDays) < config.CriticalPathThreshold
 
 		schedule[taskID] = sched
 	}

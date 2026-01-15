@@ -102,14 +102,14 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 43.1 | **Domain Modeling (Types)**: Define strict data contracts for Chat domain (Intent, ChatRequest, ChatResponse) in `internal/chat/types.go` | Step 36, 37 | 0.5 |
-| 43.2 | **Intent Classification (Router)**: Implement KeywordClassifier (V1 MVP) and tests in `internal/chat/intents.go` | Step 43.1 | 0.5 |
-| 43.3 | **Orchestration Service (Executor)**: Build traffic controller, persistence, and logic flow in `internal/chat/orchestrator.go` | Step 43.2 | 1 |
-| 43.4 | **API Handler (Interface)**: Expose orchestrator via HTTP with strict security in `internal/api/handlers/chat_handler.go` | Step 43.3 | 0.5 |
-| 43.5 | **Wiring & Assembly**: Register components in `internal/server/server.go` and apply AuthMiddleware | Step 43.4 | 0.5 |
-| 43.6 | **Verification**: Verify endpoint with mock Auth Token and DB check | Step 43.5 | 0.5 |
-| 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | 2 |
-| 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 |
+| 43.1 | **Domain Modeling (Types)**: Define strict data contracts for Chat domain (Intent, ChatRequest, ChatResponse) in `internal/chat/types.go` | Step 36, 37 | x|
+| 43.2 | **Intent Classification (Router)**: Implement KeywordClassifier (V1 MVP) and tests in `internal/chat/intents.go` | Step 43.1 | x|
+| 43.3 | **Orchestration Service (Executor)**: Build traffic controller, persistence, and logic flow in `internal/chat/orchestrator.go` | Step 43.2 |x|
+| 43.4 | **API Handler (Interface)**: Expose orchestrator via HTTP with strict security in `internal/api/handlers/chat_handler.go` | Step 43.3 |x|
+| 43.5 | **Wiring & Assembly**: Register components in `internal/server/server.go` and apply AuthMiddleware | Step 43.4 |x|
+| 43.6 | **Verification**: Verify endpoint with mock Auth Token and DB check | Step 43.5 |x|
+| 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | x|
+| 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 | [x] |
 | 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |
 | 47 | **Update Sub Liaison Agent**: Use DirectoryService for contact resolving | Step 19, 38 | 1.5 |
 | 48 | Implement inbound message processing and state-machine updates | Step 43, 47 | 2 |

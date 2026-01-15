@@ -10,14 +10,13 @@ import (
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/genai"
 )
 
 // DailyFocusAgent orchestrates the morning briefing generation.
+// See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
 type DailyFocusAgent struct {
-	db       *pgxpool.Pool
+	projects *service.ProjectService // Replaces *pgxpool.Pool
 	schedule *service.ScheduleService
 	weather  types.WeatherService
 	notifier types.NotificationService
@@ -26,14 +25,14 @@ type DailyFocusAgent struct {
 
 // NewDailyFocusAgent creates a new agent instance.
 func NewDailyFocusAgent(
-	db *pgxpool.Pool,
+	projects *service.ProjectService, // Replaces db
 	schedule *service.ScheduleService,
 	weather types.WeatherService,
 	notifier types.NotificationService,
 	aiClient ai.Client,
 ) *DailyFocusAgent {
 	return &DailyFocusAgent{
-		db:       db,
+		projects: projects,
 		schedule: schedule,
 		weather:  weather,
 		notifier: notifier,
@@ -45,11 +44,9 @@ func NewDailyFocusAgent(
 func (a *DailyFocusAgent) Execute(ctx context.Context) error {
 	log.Println("Starting Daily Focus Agent...")
 
-	// 1. Fetch Active Projects
-	// We query the DB directly here for batch processing, skipping service layer for efficiency if needed,
-	// but strictly we should use service. However, ProjectService doesn't have ListProjects yet.
-	// For now, simple query.
-	projects, err := a.fetchActiveProjects(ctx)
+	// 1. Fetch Active Projects via Service Layer
+	// Clean Service Call - enables mocking for Time-Travel simulation
+	projects, err := a.projects.ListActiveProjects(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch active projects: %w", err)
 	}
@@ -63,32 +60,6 @@ func (a *DailyFocusAgent) Execute(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (a *DailyFocusAgent) fetchActiveProjects(ctx context.Context) ([]models.Project, error) {
-	// Helper query
-	// Ideally this belongs in a Repository
-	query := `
-		SELECT id, org_id, name, address, permit_issued_date, target_end_date, status
-		FROM projects
-		WHERE status IN ('Active', 'Preconstruction') -- Include Precon for planning
-	`
-	rows, err := a.db.Query(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var projects []models.Project
-	for rows.Next() {
-		var p models.Project
-		err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.Status)
-		if err != nil {
-			return nil, err
-		}
-		projects = append(projects, p)
-	}
-	return projects, nil
 }
 
 func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) error {
@@ -111,8 +82,8 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 	// Re-using ScheduleService.GetProjectSchedule gives high level stats,
 	// but we need specific task details for the prompt.
 
-	// Let's implement a specific query here for the agent's needs.
-	tasks, err := a.fetchRelevantTasks(ctx, p.ID)
+	// Clean Service Call - enables mocking for Time-Travel simulation
+	tasks, err := a.schedule.GetAgentFocusTasks(ctx, p.ID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch relevant tasks: %w", err)
 	}
@@ -144,50 +115,6 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 	}
 
 	return nil
-}
-
-func (a *DailyFocusAgent) fetchRelevantTasks(ctx context.Context, projectID uuid.UUID) ([]models.ProjectTask, error) {
-	// Select tasks that are:
-	// 1. In Progress
-	// 2. Scheduled to start/end this week
-	// 3. On Critical Path and not complete
-	// Limit to 20 to fit context window comfortably.
-	// See BACKEND_SCOPE.md Section 3.4 (Live Project Graph)
-	//
-	// NOTE: Status literals must match DB enum values. See pkg/types/enums.go.
-	// DB uses lowercase, types use Title_Case. Queries use lowercase per schema.
-	query := `
-        SELECT id, name, status, planned_start, planned_end, is_on_critical_path
-        FROM project_tasks
-        WHERE project_id = $1
-          AND (
-              status = 'in_progress'
-              OR (status = 'pending' AND planned_start <= CURRENT_DATE + INTERVAL '7 days')
-              OR (is_on_critical_path = true AND status != 'completed')
-          )
-        ORDER BY planned_start ASC
-        LIMIT 20
-    `
-	// Note: using minimal struct scan or map
-	rows, err := a.db.Query(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tasks []models.ProjectTask
-	for rows.Next() {
-		var t models.ProjectTask
-		// We only fetch a subset of fields, so we need to be careful with the full struct scan
-		// OR just scan what we asked for. The struct has more fields.
-		// Let's scan into variables and populate the struct.
-		err := rows.Scan(&t.ID, &t.Name, &t.Status, &t.PlannedStart, &t.PlannedEnd, &t.IsOnCriticalPath)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, t)
-	}
-	return tasks, nil
 }
 
 func (a *DailyFocusAgent) buildPrompt(p models.Project, w types.Forecast, tasks []models.ProjectTask) string {

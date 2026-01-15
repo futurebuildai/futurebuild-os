@@ -8,8 +8,10 @@ import (
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/physics"
+	"github.com/colton/futurebuild/internal/platform/db"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -71,6 +73,40 @@ func (s *ScheduleService) GetProjectSchedule(ctx context.Context, projectID, org
 	return summary, nil
 }
 
+// GetAgentFocusTasks fetches tasks relevant for the Daily Focus briefing.
+// Returns: In Progress, Starting Soon (7 days), or Critical Path tasks.
+// See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
+func (s *ScheduleService) GetAgentFocusTasks(ctx context.Context, projectID uuid.UUID) ([]models.ProjectTask, error) {
+	query := `
+		SELECT id, name, status, planned_start, planned_end, is_on_critical_path
+		FROM project_tasks
+		WHERE project_id = $1
+		  AND (
+			  status = 'in_progress'
+			  OR (status = 'pending' AND planned_start <= CURRENT_DATE + INTERVAL '7 days')
+			  OR (is_on_critical_path = true AND status != 'completed')
+		  )
+		ORDER BY planned_start ASC
+		LIMIT 20
+	`
+	rows, err := s.db.Query(ctx, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query agent focus tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []models.ProjectTask
+	for rows.Next() {
+		var t models.ProjectTask
+		err := rows.Scan(&t.ID, &t.Name, &t.Status, &t.PlannedStart, &t.PlannedEnd, &t.IsOnCriticalPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan task: %w", err)
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, rows.Err()
+}
+
 // RecalculateSchedule runs the full CPM (ForwardPass + BackwardPass) for a project.
 // Updates all task ES/EF/LS/LF values and the project's target_end_date.
 // See PRODUCTION_PLAN.md Step 32
@@ -114,6 +150,13 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 		return nil, fmt.Errorf("failed to fetch dependencies: %w", err)
 	}
 
+	// Step 3.5: Fetch material constraints from procurement_items
+	// See PRODUCTION_PLAN.md Step 46 (MRP Feedback Loop)
+	materialConstraints, err := s.getMaterialConstraints(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch material constraints: %w", err)
+	}
+
 	// Step 4: Build dependency graph and run CPM
 	// See BACKEND_SCOPE.md Section 6.3
 	graph := physics.BuildDependencyGraph(tasks, deps)
@@ -123,44 +166,97 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 		return nil, fmt.Errorf("schedule contains circular dependencies: %w", err)
 	}
 
-	schedule, err := physics.ForwardPass(graph, projectStart, &physics.StandardCalendar{})
+	schedule, err := physics.ForwardPass(graph, projectStart, &physics.StandardCalendar{}, materialConstraints)
 	if err != nil {
 		return nil, fmt.Errorf("forward pass failed: %w", err)
 	}
 
-	criticalPath, err := physics.BackwardPass(graph, schedule, &physics.StandardCalendar{})
+	criticalPath, err := physics.BackwardPass(graph, schedule, &physics.StandardCalendar{}, physics.DefaultSchedulingConfig())
 	if err != nil {
 		return nil, fmt.Errorf("backward pass failed: %w", err)
 	}
 
 	// Step 5: Batch-update all task schedules in a single transaction
+	// FAANG STANDARD: Replaced N+1 Write Anti-Pattern with Bulk Update via UNNEST.
 	// See PRODUCTION_PLAN.md Step 32 (Optimization: transaction-based batch update)
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	//
+	// Distributed Transaction Support (Step 45 Zombie Write Fix):
+	// - If called within a Lane B flow with injected Tx, use that transaction (caller owns lifecycle)
+	// - Otherwise, start our own transaction (service owns lifecycle)
+	var tx pgx.Tx
+	var txErr error
+	localTx := false // Flag: did we start this transaction?
+
+	if injectedTx, ok := db.ExtractTx(ctx); ok {
+		tx = injectedTx
+	} else {
+		tx, txErr = s.db.Begin(ctx)
+		if txErr != nil {
+			return nil, fmt.Errorf("failed to start transaction: %w", txErr)
+		}
+		localTx = true
+		defer func() {
+			if localTx {
+				_ = tx.Rollback(ctx)
+			}
+		}()
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+
+	// 5a. Prepare Columnar Slices (In-Memory)
+	// Performance: O(N) memory, O(1) network round-trips
+	count := len(schedule)
+	ids := make([]uuid.UUID, 0, count)
+	earlyStarts := make([]time.Time, 0, count)
+	earlyFinishes := make([]time.Time, 0, count)
+	lateStarts := make([]time.Time, 0, count)
+	lateFinishes := make([]time.Time, 0, count)
+	totalFloats := make([]float64, 0, count)
+	isCriticals := make([]bool, 0, count)
 
 	var projectEnd time.Time
-	for taskID, sched := range schedule {
-		_, err := tx.Exec(ctx, `
-			UPDATE project_tasks 
-			SET early_start = $1, early_finish = $2, 
-			    late_start = $3, late_finish = $4,
-			    total_float_days = $5, is_on_critical_path = $6,
-			    updated_at = NOW()
-			WHERE id = $7 AND project_id = $8
-		`, sched.EarlyStart, sched.EarlyFinish,
-			sched.LateStart, sched.LateFinish,
-			sched.TotalFloat, sched.IsCritical,
-			taskID, projectID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update task %s: %w", taskID, err)
-		}
 
-		// Track the latest finish date for project end
+	for _, sched := range schedule {
+		ids = append(ids, sched.TaskID)
+		earlyStarts = append(earlyStarts, sched.EarlyStart)
+		earlyFinishes = append(earlyFinishes, sched.EarlyFinish)
+		lateStarts = append(lateStarts, sched.LateStart)
+		lateFinishes = append(lateFinishes, sched.LateFinish)
+		totalFloats = append(totalFloats, sched.TotalFloat)
+		isCriticals = append(isCriticals, sched.IsCritical)
+
+		// Track max project end date
 		if sched.EarlyFinish.After(projectEnd) {
 			projectEnd = sched.EarlyFinish
+		}
+	}
+
+	// 5b. Execute Single Bulk Update Query
+	// Security: $8 (projectID) enforces multi-tenancy scope
+	if count > 0 {
+		query := `
+			UPDATE project_tasks pt
+			SET 
+				early_start = data.early_start,
+				early_finish = data.early_finish,
+				late_start = data.late_start,
+				late_finish = data.late_finish,
+				total_float_days = data.total_float,
+				is_on_critical_path = data.is_critical,
+				updated_at = NOW()
+			FROM (
+				SELECT * FROM UNNEST(
+					$1::uuid[], $2::timestamptz[], $3::timestamptz[], 
+					$4::timestamptz[], $5::timestamptz[], $6::float8[], $7::bool[]
+				) AS t(id, early_start, early_finish, late_start, late_finish, total_float, is_critical)
+			) AS data
+			WHERE pt.id = data.id AND pt.project_id = $8
+		`
+		_, err = tx.Exec(ctx, query,
+			ids, earlyStarts, earlyFinishes, lateStarts, lateFinishes, totalFloats, isCriticals,
+			projectID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to bulk update task schedules: %w", err)
 		}
 	}
 
@@ -172,8 +268,11 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 		return nil, fmt.Errorf("failed to update project end date: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	// Only commit if we started the transaction (localTx)
+	if localTx {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		}
 	}
 
 	// Build result
@@ -276,14 +375,26 @@ func (s *ScheduleService) UpdateTaskDuration(ctx context.Context, taskID, projec
 
 // UpdateTaskStatus updates a task's status.
 // See CPM_RES_MODEL_SPEC.md Section 20.2 (Task Status Transitions)
+//
+// Distributed Transaction Support (Step 45 Zombie Write Fix):
+// - If a transaction is injected via context (db.InjectTx), uses that transaction.
+// - Otherwise, uses the connection pool directly (legacy behavior).
 func (s *ScheduleService) UpdateTaskStatus(ctx context.Context, taskID, projectID, orgID uuid.UUID, status types.TaskStatus) error {
-	// Harden multi-tenancy by joining with projects
-	_, err := s.db.Exec(ctx, `
+	updateSQL := `
 		UPDATE project_tasks pt
 		SET status = $1, updated_at = NOW()
 		FROM projects p
 		WHERE pt.project_id = p.id AND pt.id = $2 AND pt.project_id = $3 AND p.org_id = $4
-	`, status, taskID, projectID, orgID)
+	`
+
+	// Check for context-propagated transaction (caller owns Tx lifecycle)
+	if tx, ok := db.ExtractTx(ctx); ok {
+		_, err := tx.Exec(ctx, updateSQL, status, taskID, projectID, orgID)
+		return err
+	}
+
+	// Legacy behavior: use pool directly
+	_, err := s.db.Exec(ctx, updateSQL, status, taskID, projectID, orgID)
 	return err
 }
 
@@ -309,4 +420,34 @@ func (s *ScheduleService) CreateInspectionRecord(ctx context.Context, projectID,
 		FROM project_tasks WHERE id = $2 AND project_id = $7
 	`, uuid.New(), taskID, inspectorName, inspectionDate, result, notes, projectID)
 	return err
+}
+
+// getMaterialConstraints fetches expected delivery dates for procurement items.
+// Returns map of TaskID -> EarliestAvailableDate for material constraint enforcement.
+// See PRODUCTION_PLAN.md Step 46 (MRP Feedback Loop)
+func (s *ScheduleService) getMaterialConstraints(ctx context.Context, projectID uuid.UUID) (map[uuid.UUID]time.Time, error) {
+	// Query procurement_items for tasks with known delivery dates
+	// Multi-tenancy enforced via project_tasks.project_id join
+	query := `
+		SELECT pi.project_task_id, pi.expected_delivery_date
+		FROM procurement_items pi
+		JOIN project_tasks pt ON pi.project_task_id = pt.id
+		WHERE pt.project_id = $1 AND pi.expected_delivery_date IS NOT NULL
+	`
+	rows, err := s.db.Query(ctx, query, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	constraints := make(map[uuid.UUID]time.Time)
+	for rows.Next() {
+		var taskID uuid.UUID
+		var deliveryDate time.Time
+		if err := rows.Scan(&taskID, &deliveryDate); err != nil {
+			return nil, err
+		}
+		constraints[taskID] = deliveryDate
+	}
+	return constraints, rows.Err()
 }

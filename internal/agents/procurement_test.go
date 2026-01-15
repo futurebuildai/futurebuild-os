@@ -1,0 +1,158 @@
+package agents
+
+import (
+	"testing"
+	"time"
+
+	"github.com/colton/futurebuild/pkg/types"
+	"github.com/google/uuid"
+)
+
+// mockWeatherService implements types.WeatherService for testing.
+type mockWeatherService struct {
+	forecast types.Forecast
+	err      error
+}
+
+func (m *mockWeatherService) GetForecast(lat, long float64) (types.Forecast, error) {
+	return m.forecast, m.err
+}
+
+// TestAnalyzeItem_ScenarioA tests OK status when plenty of time remains.
+// See PRODUCTION_PLAN.md Step 46: Scenario A
+func TestAnalyzeItem_ScenarioA(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+	}
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	earlyStart := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC) // 30 days away
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Roof Trusses",
+		LeadTimeWeeks: 1, // 7 days
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+	}
+
+	// Lead time = 7 days, buffer = 5 days, total = 12 days needed.
+	// 30 days available > 12 days needed => OK
+	result := agent.analyzeItem(item, now)
+
+	if result.NewStatus != types.ProcurementAlertOK {
+		t.Errorf("Expected OK, got %s", result.NewStatus)
+	}
+	if result.ShouldNotify {
+		t.Error("Should not notify for OK status")
+	}
+}
+
+// TestAnalyzeItem_ScenarioB tests CRITICAL status when time has run out.
+// See PRODUCTION_PLAN.md Step 46: Scenario B
+func TestAnalyzeItem_ScenarioB(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+	}
+
+	now := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)        // Day 16
+	earlyStart := time.Date(2026, 1, 30, 0, 0, 0, 0, time.UTC) // 14 days away
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Windows",
+		LeadTimeWeeks: 2, // 14 days
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+	}
+
+	// Lead time = 14 days, buffer = 5 days, total = 19 days needed.
+	// 14 days available < 19 days needed => CRITICAL
+	// MustOrderDate = Jan 30 - 19 = Jan 11. Now (Jan 16) > Jan 11 => CRITICAL
+	result := agent.analyzeItem(item, now)
+
+	if result.NewStatus != types.ProcurementAlertCritical {
+		t.Errorf("Expected CRITICAL, got %s", result.NewStatus)
+	}
+	if !result.ShouldNotify {
+		t.Error("Should notify for CRITICAL status transition")
+	}
+}
+
+// TestAnalyzeItem_ScenarioC tests weather buffer extending the order deadline.
+// See PRODUCTION_PLAN.md Step 46: Scenario C (SWIM)
+func TestAnalyzeItem_ScenarioC(t *testing.T) {
+	// Storm forecast: 60% precipitation
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.6}},
+	}
+
+	now := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)         // Day 5
+	earlyStart := time.Date(2026, 1, 21, 0, 0, 0, 0, time.UTC) // 16 days away
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "HVAC Unit",
+		LeadTimeWeeks: 2, // 14 days
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+	}
+
+	// New formula: NeedBy = EarlyStart - 2 = Jan 19
+	// CalculatedOrderDate = NeedBy - LeadTime - WeatherBuffer = Jan 19 - 14 - 2 = Jan 3
+	// Now (Jan 5) > Jan 3 => CRITICAL
+	result := agent.analyzeItem(item, now)
+
+	if result.NewStatus != types.ProcurementAlertCritical {
+		t.Errorf("Expected CRITICAL with weather buffer, got %s", result.NewStatus)
+	}
+}
+
+// TestAnalyzeItem_Warning tests WARNING status when within 3 days of deadline.
+func TestAnalyzeItem_Warning(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+	}
+
+	now := time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC)        // Day 13
+	earlyStart := time.Date(2026, 1, 24, 0, 0, 0, 0, time.UTC) // 11 days away
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Exterior Doors",
+		LeadTimeWeeks: 1, // 7 days
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+	}
+
+	// New formula: NeedBy = EarlyStart - 2 = Jan 22
+	// CalculatedOrderDate = NeedBy - LeadTime = Jan 22 - 7 = Jan 15
+	// Now (Jan 13) is 2 days before Jan 15 => within 3-day warning threshold
+	result := agent.analyzeItem(item, now)
+
+	if result.NewStatus != types.ProcurementAlertWarning {
+		t.Errorf("Expected WARNING, got %s", result.NewStatus)
+	}
+	if !result.ShouldNotify {
+		t.Error("Should notify for WARNING status transition")
+	}
+}
+
+// TestAnalyzeItem_NilEarlyStart tests handling of missing schedule data.
+func TestAnalyzeItem_NilEarlyStart(t *testing.T) {
+	agent := &ProcurementAgent{}
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Cabinets",
+		LeadTimeWeeks: 4,
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    nil, // No schedule yet
+	}
+
+	result := agent.analyzeItem(item, time.Now())
+
+	if result.NewStatus != types.ProcurementAlertPending {
+		t.Errorf("Expected PENDING for nil EarlyStart, got %s", result.NewStatus)
+	}
+}

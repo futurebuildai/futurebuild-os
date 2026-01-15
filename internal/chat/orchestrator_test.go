@@ -30,6 +30,12 @@ func (m *MockMessagePersister) SaveMessage(_ context.Context, msg models.ChatMes
 	return nil
 }
 
+// Pool returns nil for unit tests that don't test transactional behavior.
+// See PRODUCTION_PLAN.md Step 45 (Zombie Write Fix)
+func (m *MockMessagePersister) Pool() Transactor {
+	return nil
+}
+
 // MockTaskService is a no-op mock for TaskService.
 type MockTaskService struct{}
 
@@ -189,6 +195,11 @@ func (m *FailOnSecondSavePersister) SaveMessage(_ context.Context, _ models.Chat
 	if m.CallCount == 2 {
 		return assert.AnError
 	}
+	return nil
+}
+
+// Pool returns nil for unit tests that don't test transactional behavior.
+func (m *FailOnSecondSavePersister) Pool() Transactor {
 	return nil
 }
 

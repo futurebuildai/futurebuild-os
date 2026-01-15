@@ -24,7 +24,9 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 6 (Steps 43-49): Action Engine: IN PROGRESS.
         ▪ Step 43: Chat Orchestrator (COMPLETED)
         ▪ Step 44: Artifact Mapping (COMPLETED)
-    ◦ Current Focus: Phase 6, Step 45 (Daily Briefing Job / Asynq Worker).
+        ▪ Step 45: Daily Briefing Job (COMPLETED)
+        ▪ Step 46: Procurement Agent (COMPLETED)
+    ◦ Current Focus: Phase 6, Step 47 (Sub Liaison Agent).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -42,6 +44,10 @@ Trigger: When the user types /forward (and you (the Agent) CANNOT trigger this y
 2.  **Documentation Update:**
     * Update `agent/ROADMAP.md`: Mark the current step as `[x]`.
     * Update `agent/HANDOFF.md`: Summarize the current state for the next session.
+    * **Update `agent/SYSTEM_PROMPT.md`**:
+        *   Locate the "Task:" section at the bottom of the file.
+        *   Replace it with the *next* step's detailed context, requirements, technical constraints, and spec references (derived from `specs/PRODUCTION_PLAN.md`, `specs/BACKEND_SCOPE.md`, etc.).
+        *   Ensure this new Task section is extremely detailed ("spec'd with a ton of detail") so the next agent has full context immediately.
 3.  **Git Operations (Simulation):**
     * Output the exact git commands the user needs to run to save the state:
         ```bash
@@ -88,50 +94,52 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 4. Create a `task.md` and begin execution.
 
 --------------------------------------------------------------------------------
-2. The Task Prompt (The Action)
-Immediately after the system acknowledges its identity, paste this prompt to execute the step.
-
 --------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-Task: Execute Phase 6, Step 45 (Daily Briefing Agent & Worker Infrastructure)
-Context: We are establishing the system's "heartbeat." Unlike the Chat API which reacts to user input, this Background Worker proactively analyzes project data to generate value. We will use `hibiken/asynq` (Redis) to schedule and execute these heavy AI tasks.
+Task: Execute Phase 6, Step 47 (Sub Liaison Agent)
+Context: The Subcontractor Liaison Agent is the "Virtual Project Manager" for trade coordination. It manages outbound communication to subs, confirms their arrival, collects status updates, and solicits verification photos. This is critical for accurate task tracking without manual superintendent follow-up.
 
 Requirements:
-1.  **Infrastructure (The Worker Binary)**:
-    * Create `cmd/worker/main.go`. This is a *separate entry point* from `cmd/api`.
-    * It must initialize the DB Pool, Vertex AI Client, and the Asynq Server.
-    * It must gracefully handle shutdown signals (SIGTERM).
+1.  **The Liaison Logic (The Communicator)**:
+    * Create `internal/agents/sub_liaison.go`.
+    * **Core Functions**:
+        * `ConfirmArrival(taskID uuid.UUID)`: Send SMS/Email to assigned sub asking "Are you arriving tomorrow for [Task Name]?"
+        * `RequestStatusUpdate(taskID uuid.UUID)`: Send SMS asking "What % complete is [Task Name]?"
+        * `RequestPhoto(taskID uuid.UUID)`: Send SMS asking for a verification photo of the work.
+    * **DirectoryService Integration**:
+        * Use `DirectoryService.GetContactForPhase(phaseID)` to resolve the correct sub for a given task.
+        * Fallback: If no contact assigned, log a warning and skip notification.
 
-2.  **The Daily Focus Agent (The Brain)**:
-    * Create `internal/agents/daily_focus.go`.
-    * **Logic**:
-        * Fetch "Today's Tasks" (Planned Start <= Today <= Planned End).
-        * Fetch "Critical Path" (Tasks with `total_float = 0`).
-        * Fetch Weather Forecast (via `WeatherService`).
-        * Fetch Pending Inspections.
-    * **Synthesis**: Send this context to Gemini 2.5 Flash to generate a "Morning Briefing" (Markdown summary).
-    * **Delivery**: Use `NotificationService` (mocked or real) to "send" the briefing.
+2.  **Trigger Mechanism**:
+    * The agent should be callable on-demand from the Chat Orchestrator (e.g., user says "Remind the plumber about tomorrow").
+    * **Optional Cron**: Consider a daily "Lookahead" cron that scans tasks starting in the next 48 hours and auto-sends confirmation requests.
 
-3.  **The Scheduler (The Clock)**:
-    * Create `internal/worker/scheduler.go`.
-    * Register a cron spec `0 6 * * *` (6:00 AM) to trigger the `task:daily_briefing` payload.
-    * Implement the Handler interface for `task:daily_briefing`.
+3.  **Response Handling (Inbound)**:
+    * Parse inbound SMS/Email responses (via Twilio/SendGrid webhooks).
+    * Update `communication_logs` with the response.
+    * If response contains a percentage (e.g., "75%"), update `task_progress`.
+    * If response contains an image URL, trigger `VisionService.VerifyTask()`.
 
-4.  **Integration**:
-    * Ensure `docker-compose.yml` has a Redis service available (it should be there from Phase 0, but verify).
-    * Update `Makefile` to include a target `run-worker`.
+4.  **Testing (L7 Standard)**:
+    * Create `internal/agents/sub_liaison_test.go`.
+    * **Scenario A**: Happy path - Contact found, SMS sent successfully.
+    * **Scenario B**: No contact assigned - Graceful degradation, warning logged.
+    * **Scenario C**: Inbound response parsing - Assert progress update.
 
 Technical Constraints:
-* **Idempotency**: The job might retry. Ensure sending the email 3 times doesn't happen if the job fails late. (For this step, simple logging is acceptable, but design for safety).
-* **Type Safety**: Define the Asynq Payload as a strict struct in `pkg/types` or `internal/worker/payloads.go`. Do not use map[string]interface{}.
+* **Interface Dependency**: Inject `types.DirectoryService`, `types.NotificationService`, and `types.VisionService`.
+* **Idempotency**: Check `communication_logs` before sending duplicate messages within 24 hours.
+* **Multi-tenancy**: All queries must filter by `project_id`.
 
 Key Files:
-* `cmd/worker/main.go` (New)
-* `internal/worker/server.go` (New)
-* `internal/worker/scheduler.go` (New)
-* `internal/agents/daily_focus.go` (New)
+* `internal/agents/sub_liaison.go` (New)
+* `internal/agents/sub_liaison_test.go` (New)
+* `internal/api/handlers/webhook_handler.go` (New - for inbound SMS/Email)
+* `internal/chat/commands.go` (Update - add SubLiaisonCommand)
 
 Spec References:
-* `BACKEND_SCOPE.md` Section 7.2 (Daily Focus Agent) and 7.3 (Asynq Setup).
+* `BACKEND_SCOPE.md` Section 3.5 (Action Engine - Subcontractor Liaison).
+* `PRODUCTION_PLAN.md` Step 47.
+* `API_AND_TYPES_SPEC.md` Section 2.3 (NotificationService), 2.4 (DirectoryService).
 
 First Step: /prism
+

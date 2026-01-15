@@ -32,6 +32,11 @@ func (m *mockMessagePersister) SaveMessage(_ context.Context, _ models.ChatMessa
 	return nil
 }
 
+// Pool returns nil for unit tests that don't test transactional behavior.
+func (m *mockMessagePersister) Pool() chat.Transactor {
+	return nil
+}
+
 type mockTaskService struct{}
 
 func (m *mockTaskService) UpdateTaskStatus(_ context.Context, _, _, _ uuid.UUID, _ types.TaskStatus) error {

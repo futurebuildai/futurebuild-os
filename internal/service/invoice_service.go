@@ -118,11 +118,12 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 }
 
 // SaveExtraction persists the analyzed invoice to the DB.
-// Uses UPSERT pattern when sourceDocID is provided for re-processing.
+// Uses atomic PostgreSQL UPSERT pattern to eliminate race conditions.
 // See DATA_SPINE_SPEC.md Section 4.2
 // See PRODUCTION_PLAN.md Step 41 for re-processing support
+// CONCURRENCY FIX: Replaced Check-Then-Act with INSERT ... ON CONFLICT
 func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID, extraction *types.InvoiceExtraction, sourceDocID *uuid.UUID) (uuid.UUID, error) {
-	// Map types.InvoiceExtraction to models.LineItems
+	// 1. Map Domain Types
 	var lineItems models.LineItems
 	for _, item := range extraction.LineItems {
 		lineItems = append(lineItems, models.LineItem{
@@ -133,62 +134,48 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		})
 	}
 
-	// Logic Integration: Flag for human review if confidence is low
+	// 2. Evaluate Human Review Requirement
 	// See PRODUCTION_PLAN.md Step 39
 	isHumanReviewRequired := extraction.Confidence < ConfidenceThresholdForReview
 
-	// Check for existing invoice if sourceDocID provided (re-processing case)
-	// See PRODUCTION_PLAN.md Step 41
-	if sourceDocID != nil {
-		var existingID uuid.UUID
-		err := s.db.QueryRow(ctx,
-			"SELECT id FROM invoices WHERE source_document_id = $1",
-			*sourceDocID).Scan(&existingID)
-		if err == nil {
-			// UPDATE existing invoice
-			updateQuery := `
-				UPDATE invoices SET
-					vendor_name = $2,
-					amount = $3,
-					line_items = $4,
-					detected_wbs_code = $5,
-					confidence = $6,
-					invoice_date = $7,
-					invoice_number = $8,
-					is_human_review_required = $9
-				WHERE id = $1
-			`
-			_, err = s.db.Exec(ctx, updateQuery,
-				existingID,
-				extraction.Vendor,
-				extraction.TotalAmount,
-				lineItems,
-				extraction.SuggestedWBSCode,
-				extraction.Confidence,
-				extraction.Date,
-				extraction.InvoiceNumber,
-				isHumanReviewRequired,
-			)
-			if err != nil {
-				return uuid.Nil, fmt.Errorf("failed to update invoice: %w", err)
-			}
-			return existingID, nil
-		}
-		// If no existing invoice found, fall through to INSERT
-	}
+	// 3. Prepare Variables
+	// Generate a new ID to use IF this turns out to be an INSERT.
+	// If it's an UPDATE via ON CONFLICT, RETURNING gives us the existing ID.
+	newID := uuid.New()
 
-	// INSERT new invoice
-	invoiceID := uuid.New()
-	insertQuery := `
+	// 4. Atomic Upsert (PostgreSQL specific)
+	// This query handles both INSERT and UPDATE in a single atomic operation,
+	// eliminating the race condition where two concurrent requests could both
+	// see "no record" and both attempt to INSERT.
+	//
+	// The partial index constraint (WHERE source_document_id IS NOT NULL) ensures:
+	// - New invoices without sourceDocID always INSERT (no conflict possible on NULL)
+	// - Re-processed invoices with sourceDocID either INSERT or UPDATE atomically
+	query := `
 		INSERT INTO invoices (
 			id, project_id, vendor_name, amount, line_items, 
 			detected_wbs_code, status, confidence, invoice_date, 
 			invoice_number, is_human_review_required, source_document_id
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		ON CONFLICT (source_document_id) 
+		WHERE source_document_id IS NOT NULL
+		DO UPDATE SET
+			vendor_name = EXCLUDED.vendor_name,
+			amount = EXCLUDED.amount,
+			line_items = EXCLUDED.line_items,
+			detected_wbs_code = EXCLUDED.detected_wbs_code,
+			confidence = EXCLUDED.confidence,
+			invoice_date = EXCLUDED.invoice_date,
+			invoice_number = EXCLUDED.invoice_number,
+			is_human_review_required = EXCLUDED.is_human_review_required,
+			status = EXCLUDED.status
+		RETURNING id
 	`
-	_, err := s.db.Exec(ctx, insertQuery,
-		invoiceID,
+
+	var finalID uuid.UUID
+	err := s.db.QueryRow(ctx, query,
+		newID,
 		projectID,
 		extraction.Vendor,
 		extraction.TotalAmount,
@@ -199,11 +186,12 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		extraction.Date,
 		extraction.InvoiceNumber,
 		isHumanReviewRequired,
-		sourceDocID, // Can be nil
-	)
+		sourceDocID, // pgx handles *uuid.UUID correctly (nil -> NULL)
+	).Scan(&finalID)
+
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to save invoice: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to upsert invoice: %w", err)
 	}
 
-	return invoiceID, nil
+	return finalID, nil
 }
