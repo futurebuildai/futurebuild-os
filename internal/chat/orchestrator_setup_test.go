@@ -1,10 +1,19 @@
 package chat
 
 import (
+	"context"
 	"testing"
 
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/stretchr/testify/assert"
 )
+
+// mockDLQ is a no-op DLQPersister for testing.
+type mockDLQ struct{}
+
+func (m *mockDLQ) EnqueueRetry(_ context.Context, _ models.ChatMessage) error {
+	return nil
+}
 
 func TestNewOrchestrator_InitializesCorrectly(t *testing.T) {
 	// Arrange
@@ -15,9 +24,11 @@ func TestNewOrchestrator_InitializesCorrectly(t *testing.T) {
 	mockTask := &MockTaskService{}
 	mockSchedule := &MockScheduleService{}
 	mockInvoice := &MockInvoiceService{}
+	mockDlq := &mockDLQ{}
 
 	// Act
-	orch := NewOrchestrator(mockPersister, mockTask, mockSchedule, mockInvoice)
+	// P0 FIX: DLQ is now mandatory
+	orch := NewOrchestrator(mockPersister, mockTask, mockSchedule, mockInvoice, mockDlq)
 
 	// Assert
 	assert.NotNil(t, orch)

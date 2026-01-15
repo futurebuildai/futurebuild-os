@@ -297,13 +297,15 @@ func (a *SubLiaisonAgent) getTaskDetails(ctx context.Context, taskID uuid.UUID) 
 }
 
 // extractPhaseCode extracts the major phase from a WBS code.
-// Convention: "9.1.2" -> "9", "14.3" -> "14"
+// Uses types.WBSCode value object for robust format handling.
+// Technical Debt Remediation (P2): Supports various formats beyond simple X.Y.Z
 func extractPhaseCode(wbsCode string) string {
-	parts := strings.Split(wbsCode, ".")
-	if len(parts) > 0 {
-		return parts[0]
+	parsed, err := types.ParseWBSCode(wbsCode)
+	if err != nil {
+		slog.Warn("Invalid WBS code format, using raw value", "wbs_code", wbsCode, "error", err)
+		return wbsCode
 	}
-	return wbsCode
+	return parsed.GetMajorPhase()
 }
 
 func (a *SubLiaisonAgent) hasRecentCommunication(ctx context.Context, contactID, taskID uuid.UUID, window time.Duration) (bool, error) {

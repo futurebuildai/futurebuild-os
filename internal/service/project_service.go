@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/google/uuid"
@@ -11,16 +12,32 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ProjectService struct {
-	db *pgxpool.Pool
+// HydrationEnqueuer enqueues project hydration tasks.
+// Abstracts the async task queue for testability and to avoid import cycles.
+// P1 Performance Fix: Enables event-driven hydration.
+type HydrationEnqueuer interface {
+	EnqueueHydration(ctx context.Context, projectID uuid.UUID) error
 }
 
+type ProjectService struct {
+	db               *pgxpool.Pool
+	hydrationEnqueue HydrationEnqueuer // Optional: nil means no async hydration
+}
+
+// NewProjectService creates a new ProjectService instance.
 func NewProjectService(db *pgxpool.Pool) *ProjectService {
 	return &ProjectService{db: db}
 }
 
+// NewProjectServiceWithHydration creates a ProjectService with async hydration support.
+// P1 Performance Fix: Enables event-driven hydration on project creation.
+func NewProjectServiceWithHydration(db *pgxpool.Pool, enqueue HydrationEnqueuer) *ProjectService {
+	return &ProjectService{db: db, hydrationEnqueue: enqueue}
+}
+
 // CreateProject persists a new project to the database.
 // See DATA_SPINE_SPEC.md Section 3.1
+// P1 Performance Fix: Enqueues hydration task after successful creation.
 func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) error {
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
@@ -43,6 +60,17 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 			return fmt.Errorf("project with name '%s' already exists in this organization", p.Name)
 		}
 		return fmt.Errorf("failed to create project: %w", err)
+	}
+
+	// Event-driven hydration: Enqueue task to populate procurement_items
+	// P1 Performance Fix: Replaces inefficient cron-swept hydration
+	if s.hydrationEnqueue != nil {
+		if err := s.hydrationEnqueue.EnqueueHydration(ctx, p.ID); err != nil {
+			// Log but don't fail - hydration can be retried manually
+			slog.Error("failed to enqueue hydration task", "project_id", p.ID, "error", err)
+		} else {
+			slog.Info("Enqueued hydration task for new project", "project_id", p.ID)
+		}
 	}
 
 	return nil

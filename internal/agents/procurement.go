@@ -54,75 +54,84 @@ type alertResult struct {
 	Message             string
 }
 
+// ItemProcessor is a callback function for processing procurement items one-by-one.
+// Uses cursor-based iteration to prevent OOM at scale (P1 Scalability Fix).
+type ItemProcessor func(item procurementRow) error
+
 // Execute runs the procurement analysis for all active projects.
 // See PRODUCTION_PLAN.md Step 46
+// P1 Scalability Fix: Uses streaming iteration instead of loading all items into memory.
+// P1 Performance Fix: Hydration is now event-driven (HydrateProject), not cron-swept.
 func (a *ProcurementAgent) Execute(ctx context.Context) error {
 	slog.Info("Starting Procurement Agent...")
 
-	// 1. Discovery Step (Auto-Hydration)
-	// See User Amendment #2: Idempotent population of procurement_items
-	if err := a.hydrateItems(ctx); err != nil {
-		return fmt.Errorf("hydration failed: %w", err)
-	}
-
-	// 2. Fetch all items with single optimized query
-	// See User Amendment #3: No N+1
-	items, err := a.fetchItems(ctx)
-	if err != nil {
-		return fmt.Errorf("fetch failed: %w", err)
-	}
+	// NOTE: Hydration is now event-driven via HandleHydrateProject task.
+	// See implementation_plan.md: "Event-Driven Hydration"
 
 	now := a.clock.Now().Truncate(24 * time.Hour)
+	var processed int
 
-	// 3. Process each item
-	for _, item := range items {
+	// Stream items one-by-one to avoid unbounded memory allocation
+	err := a.streamItems(ctx, func(item procurementRow) error {
 		result := a.analyzeItem(item, now)
 		if err := a.updateItem(ctx, result); err != nil {
 			slog.Error("failed to update item", "id", item.ID, "error", err)
-			continue
+			// Continue processing other items
+			return nil
 		}
 
-		// 4. Notification Dampening & Delivery
+		// Notification Dampening & Delivery
 		// See User Amendment #4
 		if result.ShouldNotify {
 			shouldSend, err := a.shouldSendNotification(ctx, result.ID)
 			if err != nil {
 				slog.Error("notification check failed", "id", item.ID, "error", err)
-				continue
+				return nil
 			}
 			if shouldSend {
 				a.logNotification(ctx, result)
 			}
 		}
+		processed++
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("streaming items failed: %w", err)
 	}
 
-	slog.Info("Procurement Agent completed", "items_processed", len(items))
+	slog.Info("Procurement Agent completed", "items_processed", processed)
 	return nil
 }
 
-// hydrateItems populates procurement_items for tasks marked as is_long_lead.
-// See User Amendment #2
-// Critical Blocker A.3 Remediation: Uses wbs_tasks.lead_time_weeks_min instead of hardcoded 4
-func (a *ProcurementAgent) hydrateItems(ctx context.Context) error {
+// HydrateProject populates procurement_items for a specific project.
+// Called via event-driven task (TypeHydrateProject) on project creation.
+// P1 Performance Fix: Replaces cron-swept hydrateItems with project-scoped operation.
+// See User Amendment #2, Critical Blocker A.3 Remediation
+func (a *ProcurementAgent) HydrateProject(ctx context.Context, projectID uuid.UUID) error {
 	query := `
 		INSERT INTO procurement_items (project_task_id, name, lead_time_weeks)
 		SELECT pt.id, pt.name, COALESCE(wt.lead_time_weeks_min, 4)
 		FROM project_tasks pt
 		LEFT JOIN procurement_items pi ON pi.project_task_id = pt.id
-		JOIN projects p ON pt.project_id = p.id
 		JOIN wbs_tasks wt ON pt.wbs_code = wt.code
 		WHERE wt.is_long_lead = true 
 		  AND pi.id IS NULL
-		  AND p.status IN ('Active', 'Preconstruction')
+		  AND pt.project_id = $1
 		ON CONFLICT DO NOTHING
 	`
-	_, err := a.db.Exec(ctx, query)
-	return err
+	_, err := a.db.Exec(ctx, query, projectID)
+	if err != nil {
+		return fmt.Errorf("hydrate project %s: %w", projectID, err)
+	}
+	slog.Info("Project hydration completed", "project_id", projectID)
+	return nil
 }
 
-// fetchItems retrieves all relevant items with a single JOIN query.
+// streamItems iterates through procurement items one-by-one via callback.
+// P1 Scalability Fix: Uses cursor-based iteration to prevent OOM at scale.
 // See User Amendment #3, BACKEND_SCOPE.md Section 2.5
-func (a *ProcurementAgent) fetchItems(ctx context.Context) ([]procurementRow, error) {
+func (a *ProcurementAgent) streamItems(ctx context.Context, process ItemProcessor) error {
 	// Single optimized query per L7 performance standard
 	query := `
 		SELECT 
@@ -142,19 +151,20 @@ func (a *ProcurementAgent) fetchItems(ctx context.Context) ([]procurementRow, er
 	`
 	rows, err := a.db.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("query items: %w", err)
 	}
 	defer rows.Close()
 
-	var items []procurementRow
 	for rows.Next() {
 		var r procurementRow
 		if err := rows.Scan(&r.ID, &r.Name, &r.LeadTimeWeeks, &r.Status, &r.EarlyStart, &r.ZipCode, &r.ProjectTaskID); err != nil {
-			return nil, err
+			return fmt.Errorf("scan row: %w", err)
 		}
-		items = append(items, r)
+		if err := process(r); err != nil {
+			return fmt.Errorf("process item %s: %w", r.ID, err)
+		}
 	}
-	return items, rows.Err()
+	return rows.Err()
 }
 
 // analyzeItem calculates the order date and determines the alert status.
@@ -183,13 +193,19 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	// Weather interaction (SWIM integration)
 	// See PRODUCTION_PLAN.md Step 46: Weather Buffer
 	// For MVP, we check if precipitation probability > 50% near the start date
-	// Critical Blocker A: ZipCode available in item.ZipCode but geocoding not yet wired.
+	// P0 FIX: Do NOT use hardcoded fallback coordinates. If geocoding is unavailable,
+	// we default to 0 weather buffer rather than use incorrect location data.
 	// TODO: Inject GeocodingService and use item.ZipCode for location-specific weather.
-	if a.weather != nil {
-		forecast, err := a.weather.GetForecast(30.2672, -97.7431) // Austin, TX fallback
-		if err == nil && forecast.PrecipitationProbability > 0.5 {
-			weatherBuffer = 2
-		}
+	if a.weather != nil && item.ZipCode != "" {
+		// ZipCode is available but geocoding service is not yet wired.
+		// Log a metric indicating geocoding is needed for accurate weather data.
+		// FAIL SAFE: Skip weather buffer calculation until geocoding is implemented.
+		slog.Warn("weather buffer skipped: geocoding not implemented",
+			"item_id", item.ID,
+			"zip_code", item.ZipCode,
+			"action", "using_zero_buffer",
+		)
+		// weatherBuffer remains 0 - no incorrect location data will be used
 	}
 
 	// MRP Feedback Loop Calculations (PRODUCTION_PLAN.md Step 46):

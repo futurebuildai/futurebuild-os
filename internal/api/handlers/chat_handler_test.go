@@ -68,6 +68,13 @@ func (m *mockInvoiceService) SaveExtraction(_ context.Context, _ uuid.UUID, _ *t
 	return uuid.Nil, nil
 }
 
+// mockDLQPersister is a no-op DLQPersister for testing.
+type mockDLQPersister struct{}
+
+func (m *mockDLQPersister) EnqueueRetry(_ context.Context, _ models.ChatMessage) error {
+	return nil
+}
+
 // --- Helpers ---
 
 func newTestOrchestrator() *chat.Orchestrator {
@@ -77,6 +84,7 @@ func newTestOrchestrator() *chat.Orchestrator {
 		&mockTaskService{},
 		&mockScheduleService{},
 		&mockInvoiceService{},
+		&mockDLQPersister{},
 	)
 }
 
@@ -240,6 +248,7 @@ func TestHandleChat_OrchestratorError(t *testing.T) {
 		&mockTaskService{},
 		&mockScheduleService{},
 		&mockInvoiceService{},
+		&mockDLQPersister{},
 	)
 	handler := NewChatHandler(failingOrch)
 

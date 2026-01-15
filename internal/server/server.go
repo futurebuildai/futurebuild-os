@@ -1,11 +1,11 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/colton/futurebuild/internal/adapters"
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/api/handlers"
 	"github.com/colton/futurebuild/internal/chat"
@@ -16,7 +16,6 @@ import (
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/time/rate"
 )
@@ -53,8 +52,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See PRODUCTION_PLAN.md Step 43.5: Chat Orchestrator wiring
 	// ENGINEERING STANDARD: Instantiate MessagePersister explicitly, then inject.
 	// ScheduleService satisfies both TaskService and ScheduleService interfaces.
+	// P0 FIX: DLQ is now MANDATORY for compliance audit trails.
 	messageStore := chat.NewPgxMessageStore(db)
-	chatOrchestrator := chat.NewOrchestrator(messageStore, scheduleService, scheduleService, invoiceService)
+	dlq := chat.NewAsynqDLQ(cfg.RedisURL)
+	chatOrchestrator := chat.NewOrchestrator(messageStore, scheduleService, scheduleService, invoiceService, dlq)
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()
@@ -66,16 +67,17 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// See PRODUCTION_PLAN.md Step 48: Inbound Processor (inbound message handling)
 	// VisionService is optional - pass nil if AI client not configured
+	// Technical Debt Remediation (P2): Uses adapters package for cleaner separation
 	var visionVerifier agents.InboundVisionVerifier
 	if aiClient != nil {
 		visionService := service.NewVisionService(aiClient)
-		visionVerifier = &visionServiceAdapter{vs: visionService}
+		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
 	}
 
 	inboundProcessor := agents.NewInboundProcessor(
 		db,
 		directoryService, // Implements InboundContactLookup
-		&scheduleServiceAdapter{ss: scheduleService, db: db}, // Implements InboundProgressUpdater
+		adapters.NewScheduleServiceAdapter(scheduleService, db), // Implements InboundProgressUpdater
 		visionVerifier,
 		clock.RealClock{},
 	)
@@ -169,38 +171,4 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
-}
-
-// --- Adapters for Interface Satisfaction ---
-// See PRODUCTION_PLAN.md Step 48 (Separation of Concerns)
-
-// scheduleServiceAdapter adapts ScheduleService to InboundProgressUpdater interface.
-type scheduleServiceAdapter struct {
-	ss *service.ScheduleService
-	db *pgxpool.Pool
-}
-
-func (a *scheduleServiceAdapter) UpdateTaskProgress(ctx context.Context, taskID uuid.UUID, percent int) error {
-	// Fetch projectID from task for proper service call
-	var projectID uuid.UUID
-	err := a.db.QueryRow(ctx, `SELECT project_id FROM project_tasks WHERE id = $1`, taskID).Scan(&projectID)
-	if err != nil {
-		return err
-	}
-	// Use nil userID for automated updates
-	return a.ss.CreateTaskProgress(ctx, projectID, taskID, uuid.Nil, percent, "Updated via inbound webhook")
-}
-
-func (a *scheduleServiceAdapter) RecalculateSchedule(ctx context.Context, projectID, orgID uuid.UUID) error {
-	_, err := a.ss.RecalculateSchedule(ctx, projectID, orgID)
-	return err
-}
-
-// visionServiceAdapter adapts VisionService to InboundVisionVerifier interface.
-type visionServiceAdapter struct {
-	vs *service.VisionService
-}
-
-func (a *visionServiceAdapter) VerifyTask(ctx context.Context, imageURL, taskDescription string) (bool, float64, error) {
-	return a.vs.VerifyTask(ctx, imageURL, taskDescription)
 }

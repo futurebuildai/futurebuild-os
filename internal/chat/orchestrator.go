@@ -49,13 +49,14 @@ type MessagePersister interface {
 // Orchestrator is the central traffic controller for the chat system.
 // See PRODUCTION_PLAN.md Step 43.3
 // Critical Blocker C Remediation: Added dlq for async retry of failed messages
+// P0 FIX (Blocker B): DLQ is now MANDATORY for compliance audit trails.
 type Orchestrator struct {
 	db              MessagePersister
 	classifier      IntentClassifier
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
-	dlq             DLQPersister // Optional - nil means no DLQ
+	dlq             DLQPersister // REQUIRED - must never be nil
 }
 
 // --- Command Pattern (The "Actions") ---
@@ -132,37 +133,49 @@ func (c *PlaceholderCommand) Execute(_ context.Context) (string, *Artifact, erro
 // See PRODUCTION_PLAN.md Step 43.3
 // ENGINEERING STANDARD: Accepts MessagePersister interface, not *pgxpool.Pool,
 // to enable strict dependency injection and testability.
+// P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
 func NewOrchestrator(
 	persister MessagePersister,
 	taskService TaskService,
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
+	dlq DLQPersister,
 ) *Orchestrator {
+	if dlq == nil {
+		panic("chat: DLQPersister is required for compliance audit trails")
+	}
 	return &Orchestrator{
 		db:              persister,
 		classifier:      NewDefaultRegexClassifier(),
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
+		dlq:             dlq,
 	}
 }
 
 // NewOrchestratorWithPersister creates a new Orchestrator with a custom MessagePersister and IntentClassifier.
 // This is primarily used for testing to inject mock dependencies.
 // See PRODUCTION_PLAN.md Step 43.4
+// P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
 func NewOrchestratorWithPersister(
 	persister MessagePersister,
 	classifier IntentClassifier,
 	taskService TaskService,
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
+	dlq DLQPersister,
 ) *Orchestrator {
+	if dlq == nil {
+		panic("chat: DLQPersister is required for compliance audit trails")
+	}
 	return &Orchestrator{
 		db:              persister,
 		classifier:      classifier,
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
+		dlq:             dlq,
 	}
 }
 
@@ -235,18 +248,19 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 				"user_id", userID,
 				"error", err,
 			)
-			// Critical Blocker C Remediation: Enqueue for async retry if DLQ is configured
-			if o.dlq != nil {
-				if dlqErr := o.dlq.EnqueueRetry(ctx, modelMsg); dlqErr != nil {
-					slog.Error("DLQ enqueue failed - message will be lost",
-						"message_id", modelMsg.ID,
-						"error", dlqErr,
-					)
-				} else {
-					slog.Info("Message enqueued to DLQ for retry",
-						"message_id", modelMsg.ID,
-					)
-				}
+			// P0 FIX (Blocker B): DLQ is MANDATORY - no nil check needed.
+			// If DLQ enqueue fails, we have a critical compliance issue.
+			if dlqErr := o.dlq.EnqueueRetry(ctx, modelMsg); dlqErr != nil {
+				slog.Error("CRITICAL COMPLIANCE FAILURE: DLQ enqueue failed - audit trail incomplete",
+					"message_id", modelMsg.ID,
+					"error", dlqErr,
+				)
+				// Even on DLQ failure, return success to user since AI action completed.
+				// The compliance team must be alerted via monitoring on this error log.
+			} else {
+				slog.Info("Message enqueued to DLQ for retry",
+					"message_id", modelMsg.ID,
+				)
 			}
 			// Return success - user sees the result despite persistence failure
 			return &ChatResponse{

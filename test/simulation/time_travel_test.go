@@ -12,6 +12,7 @@ import (
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/colton/futurebuild/test/simulation/mocks"
+	"github.com/colton/futurebuild/test/testdata"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -45,7 +46,8 @@ func TestTimeTravelSimulation(t *testing.T) {
 	}
 	defer db.Close()
 
-	// 1. SETUP: Seed test data
+	// 1. SETUP: Seed test data using factory functions
+	// Technical Debt Remediation (P2): Uses testdata package instead of raw SQL
 	projectID, taskAID, taskBID := seedSimulationProject(t, ctx, db)
 
 	// 2. Initialize agents with MockClock
@@ -114,7 +116,7 @@ func TestTimeTravelSimulation(t *testing.T) {
 	}
 
 	// Cleanup
-	cleanupSimulationProject(ctx, db, projectID, taskAID, taskBID)
+	testdata.CleanupTestProject(ctx, db, projectID, taskAID, taskBID)
 	t.Log("✓ Simulation test completed")
 }
 
@@ -125,24 +127,22 @@ func getTestDatabaseURL(t *testing.T) string {
 	return "" // Return empty to skip by default
 }
 
+// seedSimulationProject uses factory functions to create test data.
+// Technical Debt Remediation (P2): Replaces raw SQL INSERT statements.
 func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) (projectID, taskAID, taskBID uuid.UUID) {
-	projectID = uuid.New()
-	orgID := uuid.New()
-	taskAID = uuid.New()
-	taskBID = uuid.New()
-
-	// Create org
-	_, err := db.Exec(ctx, `INSERT INTO organizations (id, name) VALUES ($1, 'Sim Test Org')`, orgID)
+	// Create organization
+	orgID, err := testdata.NewTestOrganization(ctx, db, "Sim Test Org")
 	if err != nil {
 		t.Fatalf("Failed to create org: %v", err)
 	}
 
 	// Create project starting at T+0
 	startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	_, err = db.Exec(ctx, `
-		INSERT INTO projects (id, org_id, name, status, permit_issued_date, address)
-		VALUES ($1, $2, 'Simulation Test Project', 'Active', $3, '123 Test St')
-	`, projectID, orgID, startDate)
+	project, err := testdata.NewTestProject(ctx, db, orgID, "Simulation Test Project",
+		testdata.WithProjectStatus("Active"),
+		testdata.WithPermitDate(startDate),
+		testdata.WithAddress("123 Test St"),
+	)
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
 	}
@@ -150,54 +150,44 @@ func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) 
 	// Task A (Framing) - starts T+14, requires lumber
 	// Amendment 1: EarlyStart = T+14, with 1 week lead time → MustOrderDate = T+5
 	taskAStart := startDate.AddDate(0, 0, 14)
-	_, err = db.Exec(ctx, `
-		INSERT INTO project_tasks (id, project_id, wbs_code, name, status, early_start, is_on_critical_path)
-		VALUES ($1, $2, '9.1', 'Framing', 'Pending', $3, true)
-	`, taskAID, projectID, taskAStart)
+	taskA, err := testdata.NewTestTask(ctx, db, project.ID, "9.1", "Framing",
+		testdata.WithEarlyStart(taskAStart),
+		testdata.WithCriticalPath(true),
+	)
 	if err != nil {
 		t.Fatalf("Failed to create task A: %v", err)
 	}
 
 	// Task B (Electrical) - starts T+15, requires sub confirmation
 	taskBStart := startDate.AddDate(0, 0, 15)
-	_, err = db.Exec(ctx, `
-		INSERT INTO project_tasks (id, project_id, wbs_code, name, status, early_start, is_on_critical_path)
-		VALUES ($1, $2, '10.2', 'Electrical Rough-In', 'Pending', $3, true)
-	`, taskBID, projectID, taskBStart)
+	taskB, err := testdata.NewTestTask(ctx, db, project.ID, "10.2", "Electrical Rough-In",
+		testdata.WithEarlyStart(taskBStart),
+		testdata.WithCriticalPath(true),
+	)
 	if err != nil {
 		t.Fatalf("Failed to create task B: %v", err)
 	}
 
 	// Create procurement item for lumber with 1 week lead time (Amendment 1.1)
-	_, err = db.Exec(ctx, `
-		INSERT INTO procurement_items (id, project_task_id, name, lead_time_weeks, status)
-		VALUES ($1, $2, 'Lumber', 1, 'pending')
-	`, uuid.New(), taskAID)
+	_, err = testdata.NewTestProcurementItem(ctx, db, taskA.ID, "Lumber", 1)
 	if err != nil {
 		t.Fatalf("Failed to create procurement item: %v", err)
 	}
 
 	// Create contact for electrical phase
-	contactID := uuid.New()
-	_, err = db.Exec(ctx, `
-		INSERT INTO contacts (id, name, company, phone, email, role, contact_preference)
-		VALUES ($1, 'Electric Joe', 'Joe Electric LLC', '+15551234567', 'joe@electric.com', 'Subcontractor', 'sms')
-	`, contactID)
+	contactID, err := testdata.NewTestContact(ctx, db,
+		"Electric Joe", "+15551234567", "joe@electric.com", "Subcontractor", "sms")
 	if err != nil {
 		t.Fatalf("Failed to create contact: %v", err)
 	}
 
 	// Assign contact to electrical phase (phase 10)
-	_, err = db.Exec(ctx, `
-		INSERT INTO project_assignments (project_id, contact_id, assigned_phase_id)
-		SELECT $1, $2, wp.id FROM wbs_phases wp WHERE wp.code = '10' LIMIT 1
-	`, projectID, contactID)
 	// This may fail if wbs_phases isn't seeded, which is fine for now
-	if err != nil {
+	if err := testdata.NewTestProjectAssignment(ctx, db, project.ID, contactID, "10"); err != nil {
 		t.Logf("Note: Could not create phase assignment (expected if wbs_phases not seeded): %v", err)
 	}
 
-	return projectID, taskAID, taskBID
+	return project.ID, taskA.ID, taskB.ID
 }
 
 func hasLumberAlert(ctx context.Context, db *pgxpool.Pool, projectID uuid.UUID) bool {
@@ -234,16 +224,6 @@ func hasElectricalConfirmation(notifier *mocks.SpyNotifier) bool {
 		}
 	}
 	return false
-}
-
-func cleanupSimulationProject(ctx context.Context, db *pgxpool.Pool, projectID, taskAID, taskBID uuid.UUID) {
-	// Clean up in reverse order of creation
-	db.Exec(ctx, `DELETE FROM communication_logs WHERE project_id = $1`, projectID)
-	db.Exec(ctx, `DELETE FROM procurement_items WHERE project_task_id IN ($1, $2)`, taskAID, taskBID)
-	db.Exec(ctx, `DELETE FROM project_tasks WHERE project_id = $1`, projectID)
-	db.Exec(ctx, `DELETE FROM project_assignments WHERE project_id = $1`, projectID)
-	db.Exec(ctx, `DELETE FROM projects WHERE id = $1`, projectID)
-	// Note: Contacts and orgs left behind for now to avoid FK issues
 }
 
 // mockDirectoryService implements agents.DirectoryService for testing

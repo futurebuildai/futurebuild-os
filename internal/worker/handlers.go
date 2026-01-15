@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -39,5 +40,22 @@ func (h *WorkerHandler) HandleProcurementCheck(ctx context.Context, task *asynq.
 		return fmt.Errorf("procurement agent failed: %w", err)
 	}
 	log.Println("Procurement Check Task Completed Successfully.")
+	return nil
+}
+
+// HandleHydrateProject handles project-scoped hydration of procurement items.
+// Triggered when a new project is created (event-driven).
+// P1 Performance Fix: Replaces inefficient cron-swept hydration.
+func (h *WorkerHandler) HandleHydrateProject(ctx context.Context, task *asynq.Task) error {
+	var payload HydrateProjectPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("invalid hydrate project payload: %w", err)
+	}
+
+	log.Printf("Handling Hydrate Project Task for project: %s", payload.ProjectID)
+	if err := h.procurementAgent.HydrateProject(ctx, payload.ProjectID); err != nil {
+		return fmt.Errorf("hydrate project failed: %w", err)
+	}
+	log.Printf("Hydrate Project Task Completed Successfully for project: %s", payload.ProjectID)
 	return nil
 }
