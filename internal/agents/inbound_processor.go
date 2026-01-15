@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -70,15 +71,18 @@ type InboundProcessor struct {
 	schedule  InboundProgressUpdater
 	vision    InboundVisionVerifier
 	log       *slog.Logger
+	clock     clock.Clock
 }
 
 // NewInboundProcessor creates a new InboundProcessor with injected dependencies.
 // See PRODUCTION_PLAN.md Step 48
+// Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 func NewInboundProcessor(
 	db *pgxpool.Pool,
 	directory InboundContactLookup,
 	schedule InboundProgressUpdater,
 	vision InboundVisionVerifier,
+	clk clock.Clock,
 ) *InboundProcessor {
 	return &InboundProcessor{
 		db:        db,
@@ -86,6 +90,7 @@ func NewInboundProcessor(
 		schedule:  schedule,
 		vision:    vision,
 		log:       slog.With("component", "inbound_processor"),
+		clock:     clk,
 	}
 }
 
@@ -309,13 +314,13 @@ func (p *InboundProcessor) findRecentOutboundContext(ctx context.Context, contac
 		  AND direction = 'Outbound'
 		  AND related_entity_type = 'project_task'
 		  AND related_entity_id IS NOT NULL
-		  AND timestamp > NOW() - ($2 || ' hours')::interval
+		  AND timestamp > $3 - ($2 || ' hours')::interval
 		ORDER BY timestamp DESC
 		LIMIT 1
 	`
 	hours := int(window.Hours())
 	var taskID, projectID uuid.UUID
-	err := p.db.QueryRow(ctx, query, contactID, hours).Scan(&taskID, &projectID)
+	err := p.db.QueryRow(ctx, query, contactID, hours, p.clock.Now()).Scan(&taskID, &projectID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -328,7 +333,7 @@ func (p *InboundProcessor) logInboundMessage(ctx context.Context, contactID, tas
 			id, project_id, contact_id, direction, content, channel, timestamp,
 			related_entity_id, related_entity_type, external_id
 		)
-		VALUES ($1, $2, $3, 'Inbound', $4, $5, NOW(), $6, $7, $8)
+		VALUES ($1, $2, $3, 'Inbound', $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO NOTHING
 	`
 
@@ -353,6 +358,7 @@ func (p *InboundProcessor) logInboundMessage(ctx context.Context, contactID, tas
 		contactID,
 		fmt.Sprintf("[%s] %s", status, msg.Body),
 		msg.Channel,
+		p.clock.Now(),
 		taskID,
 		relatedType,
 		nilIfEmpty(msg.ExternalID),
@@ -384,10 +390,10 @@ func (p *InboundProcessor) getTaskDescription(ctx context.Context, taskID uuid.U
 func (p *InboundProcessor) createRiskFlag(ctx context.Context, taskID uuid.UUID, message string) error {
 	query := `
 		INSERT INTO review_flags (id, entity_type, entity_id, reason, status, created_at)
-		VALUES ($1, 'project_task', $2, $3, 'Pending', NOW())
+		VALUES ($1, 'project_task', $2, $3, 'Pending', $4)
 	`
 	reason := fmt.Sprintf("Subcontractor indicated delay/issue: %s", truncateString(message, 200))
-	_, err := p.db.Exec(ctx, query, uuid.New(), taskID, reason)
+	_, err := p.db.Exec(ctx, query, uuid.New(), taskID, reason, p.clock.Now())
 	return err
 }
 

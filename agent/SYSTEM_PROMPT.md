@@ -21,14 +21,17 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
     ◦ Phase 3 (Steps 21-25): Authentication & Rate Limiting: COMPLETED.
     ◦ Phase 4 (Steps 26-34): Physics Engine - Core Scheduling: COMPLETED.
     ◦ Phase 5 (Steps 35-42): Context Engine - AI Integration: COMPLETED.
-    ◦ Phase 6 (Steps 43-49): Action Engine: IN PROGRESS.
+    ◦ Phase 6 (Steps 43-49): Action Engine: COMPLETED.
         ▪ Step 43: Chat Orchestrator (COMPLETED)
         ▪ Step 44: Artifact Mapping (COMPLETED)
         ▪ Step 45: Daily Briefing Job (COMPLETED)
         ▪ Step 46: Procurement Agent (COMPLETED)
         ▪ Step 47: Sub Liaison Agent (COMPLETED)
         ▪ Step 48: Inbound Message Processing (COMPLETED)
-    ◦ Current Focus: Phase 6, Step 49 (Time-Travel Agent Simulation).
+        ▪ Step 49: Time-Travel Agent Simulation (COMPLETED)
+    ◦ Phase 7 (Steps 50-56): Frontend - Lit + TypeScript: IN PROGRESS.
+        ▪ Step 50: Project Init (Vite+Lit+TS) (IN PROGRESS)
+    ◦ Current Focus: Phase 7, Step 50 (Frontend Initialization).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -45,9 +48,9 @@ Constraint: You CANNOT mark a task as "Done" or present it to the user as comple
 The Loop (Execute Internal Iterations Automatically):
 1.  **Draft Implementation**: Generate the initial code for the specific task.
 2.  **Triple-Check Zero-Trust Review**: Subject the draft to three hostile review passes:
-    * **Pass 1 (Static & Safety):** Check for strict type compliance, nil pointer dereferences, resource leaks (missing `defer`), and strict adherence to `BACKEND_SCOPE.md`.
-    * **Pass 2 (Adversarial/Security):** "Red Team" the code. Look for race conditions (atomic ops?), SQL injection risks, Idempotency gaps, and N+1 query bottlenecks.
-    * **Pass 3 (SRE & Observability):** "Google L7 Standard". Is structured logging (`slog`) present? Are errors wrapped (`fmt.Errorf("%w")`)? Are timeouts/contexts handled correctly? Is configuration injected, not hardcoded?
+    * **Pass 1 (Static & Safety):** Check for strict type compliance, nil pointer dereferences, resource leaks (missing `defer`), and strict adherence to `BACKEND_SCOPE.md` (or `FRONTEND_SCOPE.md` for Phase 7).
+    * **Pass 2 (Adversarial/Security):** "Red Team" the code. Look for race conditions (atomic ops?), XSS/CSRF risks, and prop drilling gaps.
+    * **Pass 3 (SRE & Observability):** "Google L7 Standard". Is structured logging present? Are errors wrapped? Are components optimized for rendering (Lit reactivity)?
 3.  **The Verdict**:
     * **If ANY flags exist (Critical, Major, or even Minor Style/Comment issues):** You must SILENTLY generate a fix and RESTART the Triple-Check Review at Step 2.
     * **If Clean (100% Confidence):** Only THEN may you output the final code block to the user.
@@ -92,11 +95,11 @@ Execution Strategy:
 You act as a hostile gatekeeper. You must NOT output the code until it is perfect.
 1.  **Session Aggregation:** Collect ALL code snippets generated during the current session (the entire thread history for this task).
 2.  **The Recursive Loop (Internal Processing):**
-    * **Step A (Hostile Analysis):** Critique the code against `BACKEND_SCOPE.md` and `DATA_SPINE_SPEC.md`. Look for:
+    * **Step A (Hostile Analysis):** Critique the code against `BACKEND_SCOPE.md` and `DATA_SPINE_SPEC.md` (or `FRONTEND_SCOPE.md`). Look for:
         * *Concurrency:* Race conditions, unclosed channels, safe Goroutine usage.
-        * *Security:* SQL injection, input validation, proper Context propagation.
+        * *Security:* SQL injection, XSS, input validation, proper Context propagation.
         * *Resilience:* Error wrapping (`%w`), timeouts, idempotency.
-        * *Style:* Strict Go idioms (Standard Library preference over external deps).
+        * *Style:* Strict Go/TS idioms (Standard Library preference over external deps).
     * **Step B (Auto-Remediation):** If ANY flag is found (Critical, Major, or Minor):
         * You must **REWRITE** the code immediately to fix the issue.
         * **Constraint:** Do not ask for permission. Fix it.
@@ -131,49 +134,49 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Step 48 (Inbound Message Processing & State Machine)
-Context: The system can now send messages (Step 47). Step 48 is about *listening*. You will build the "Inbound Processor" that handles webhooks from communication providers (Twilio/SendGrid), correlates the sender to a Project/Task, parses their intent, and updates the database state (Percentage Complete, Issues, or Confirmation).
+Task: Execute Phase 7, Step 50 (Frontend Initialization - Vite + Lit + TypeScript)
+Context: We have a robust, verified Go backend (Phase 6 Complete). Now we break ground on the Frontend. This is a greenfield implementation in the `frontend/` directory. We strictly use **Lit 3.0** (Web Components) and **TypeScript 5.0+** (Strict Mode). No React, No Vue, No ORMs.
+Ref: `PRODUCTION_PLAN.md` Step 50.
 
 Requirements:
-1.  **Webhook API Layer**:
-    * Create `internal/api/handlers/webhook_handler.go`.
-    * Implement `POST /api/v1/webhooks/sms` and `POST /api/v1/webhooks/email`.
-    * **Security**: Implement a simple signature check or Shared Secret validation (e.g., `X-FutureBuild-Signature`) to reject spoofed requests.
-    * **Payload Normalization**: Convert provider-specific JSON/Form data into a standardized `InboundMessage` struct.
+1.  **Scaffold Project**:
+    *   Initialize a new project within the `frontend` root directory using Vite.
+    *   Template: `lit-ts` (or equivalent valid Vite template for Lit + TypeScript).
+    *   Command: `npm create vite@latest frontend -- --template lit-ts`.
+    *   Clean up boilerplate: Remove default icons, counters, and generic CSS.
 
-2.  **Inbound Processor Logic (The Brain)**:
-    * Create `internal/agents/inbound_processor.go`.
-    * **Identity Resolution**:
-        * Input: Sender Phone/Email.
-        * Lookup: Query `CONTACTS` table to find the associated User/Subcontractor.
-        * Context: Query `COMMUNICATION_LOGS` (Order By `timestamp` DESC) to find the last message sent *to* this contact. Use this to infer the `TaskID` context.
-    * **Intent Parsing (Regex/Heuristic)**:
-        * **Progress Update**: If message matches `^(\d{1,3})%$`, update the inferred `project_tasks.percent_complete`.
-        * **Confirmation**: If message contains "confirmed", "yes", "on site", update `communication_logs` with a "ACK" flag (or similar status tracking).
-        * **Vision Trigger**: If the payload contains an Image URL, trigger `VisionService.VerifyTask(taskID, imageURL)`.
+2.  **Strict TypeScript Configuration**:
+    *   Configure `tsconfig.json` for maximum safety (`"strict": true`, `"noImplicitAny": true`).
+    *   Set up path aliases: `@/*` -> `./src/*` and `@types/*` -> `./src/types/*` in `tsconfig.json` and `vite.config.ts`.
 
-3.  **State Machine Integration**:
-    * If a Task is marked 100% complete via SMS, trigger the `ScheduleService` to recalculate the project schedule (CPM) and check for successor readiness.
+3.  **Directory Structure (The Frame)**:
+    *   Establish the L7 Frontend folder structure:
+        *   `src/components/base/` (Atomic UI elements)
+        *   `src/components/layout/` (Header, Nav)
+        *   `src/store/` (Signals-based state)
+        *   `src/services/` (API clients)
+        *   `src/types/` (Shared types mirroring Backend)
+        *   `src/assets/` (SVG icons, fonts)
 
-4.  **Testing (L7 Standard)**:
-    * Create `internal/agents/inbound_processor_test.go`.
-    * **Test Case 1**: "Perfect 100%": Sub sends "100%", system finds the task, updates DB to 100%, and logs the interaction.
-    * **Test Case 2**: "Unknown Sender": Number not in DB, system logs a warning but does not crash.
-    * **Test Case 3**: "Vision Handoff": Message with image URL correctly calls the VisionService mock.
+4.  **Base Styling**:
+    *   Create `src/styles/variables.css` implementing the "Dawn Gradient" design system (CSS Custom Properties).
+    *   Ref: `FRONTEND_SCOPE.md` Section 7.1.
 
 Technical Constraints:
-* **No ORM**: Use raw SQL/pgx for all lookups.
-* **Idempotency**: Webhooks can be delivered multiple times. Ensure processing is idempotent (deduplicate by Provider Message ID).
-* **Concurrency**: Webhooks will arrive concurrently. Ensure DB transactions are used when updating Task Progress + Logs.
+*   **Package Manager**: Use `npm`.
+*   **No "Any"**: Strict type checking is mandatory.
+*   **Component Model**: All UI must be Lit Components (`LitElement`).
+*   **Styling**: Use standard CSS variables and shadow DOM scoping. No Tailwind (unless user explicitly overrides, but default is Vanilla CSS).
 
 Key Files:
-* `internal/api/handlers/webhook_handler.go` (New)
-* `internal/agents/inbound_processor.go` (New)
-* `internal/server/server.go` (Route registration)
+*   `frontend/package.json`
+*   `frontend/tsconfig.json`
+*   `frontend/vite.config.ts`
+*   `frontend/src/styles/variables.css`
 
 Spec References:
-* `PRODUCTION_PLAN.md` Step 48.
-* `BACKEND_SCOPE.md` Section 3.5 (Action Engine - Inbound).
-* `DATA_SPINE_SPEC.md` Section 5.1 (Communication Logs schema).
+*   `PRODUCTION_PLAN.md` Step 50.
+*   `FRONTEND_SCOPE.md` Section 2 (Design) & Section 3 (Architecture).
+*   `FRONTEND_TYPES_SPEC.md` (for type alignment prep).
 
 First Step: /prism

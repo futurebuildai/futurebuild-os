@@ -7,6 +7,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -63,10 +64,9 @@ func TestDailyFocusAgent_BuildPrompt(t *testing.T) {
 		{Name: "Install Windows", Status: "pending", IsOnCriticalPath: false, PlannedStart: &later},
 	}
 
-	agent := &DailyFocusAgent{} // No deps needed for pure function check if we export/expose prompt builder
-	// But BuildPrompt is private. We can test via ProcessProject if we mock DB?
-	// Or we can just use reflection or internal test.
-	// Since we are in `agents` package, we can access private methods if test is in `agents` package (not `agents_test`).
+	// Create agent with a MockClock (required after Step 49 refactoring)
+	mockClock := clock.NewMockClock(time.Date(2026, 1, 15, 8, 0, 0, 0, time.UTC))
+	agent := &DailyFocusAgent{clock: mockClock}
 
 	prompt := agent.buildPrompt(p, w, tasks)
 

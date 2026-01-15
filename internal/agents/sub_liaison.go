@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,10 +27,12 @@ var (
 // SubLiaisonAgent handles outbound subcontractor coordination and inbound status updates.
 // This is the "Virtual Superintendent" for trade communication.
 // See PRODUCTION_PLAN.md Step 47
+// Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 type SubLiaisonAgent struct {
 	db        *pgxpool.Pool
 	directory DirectoryService
 	notifier  NotificationService
+	clock     clock.Clock
 }
 
 // DirectoryService defines contact lookup operations.
@@ -46,12 +49,60 @@ type NotificationService interface {
 }
 
 // NewSubLiaisonAgent creates a new agent with injected dependencies.
-func NewSubLiaisonAgent(db *pgxpool.Pool, directory DirectoryService, notifier NotificationService) *SubLiaisonAgent {
+// Clock is required for deterministic time simulation (Step 49).
+func NewSubLiaisonAgent(db *pgxpool.Pool, directory DirectoryService, notifier NotificationService, clk clock.Clock) *SubLiaisonAgent {
 	return &SubLiaisonAgent{
 		db:        db,
 		directory: directory,
 		notifier:  notifier,
+		clock:     clk,
 	}
+}
+
+// ScanAndNotify finds tasks starting within 72h and sends confirmation requests.
+// See PRODUCTION_PLAN.md Step 49 Amendment 2
+func (a *SubLiaisonAgent) ScanAndNotify(ctx context.Context) error {
+	windowStart := a.clock.Now()
+	windowEnd := a.clock.Now().Add(72 * time.Hour)
+
+	// Query tasks where early_start is between windowStart and windowEnd
+	// and status is not 'Completed'
+	query := `
+		SELECT id FROM project_tasks
+		WHERE early_start >= $1
+		  AND early_start <= $2
+		  AND status != 'Completed'
+	`
+	rows, err := a.db.Query(ctx, query, windowStart, windowEnd)
+	if err != nil {
+		return fmt.Errorf("failed to query upcoming tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var taskIDs []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			slog.Error("Failed to scan task ID", "error", err)
+			continue
+		}
+		taskIDs = append(taskIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	// Iterate and send confirmations, logging errors but continuing
+	var errs []error
+	for _, taskID := range taskIDs {
+		if err := a.ConfirmArrival(ctx, taskID); err != nil {
+			slog.Error("Failed to confirm arrival for task", "task_id", taskID, "error", err)
+			errs = append(errs, err)
+		}
+	}
+
+	slog.Info("ScanAndNotify completed", "tasks_found", len(taskIDs), "errors", len(errs))
+	return nil
 }
 
 // CommunicationLogType defines the type of communication log entry.
@@ -259,16 +310,17 @@ func (a *SubLiaisonAgent) hasRecentCommunication(ctx context.Context, contactID,
 	// Check communication_logs for recent outbound to this contact for this task
 	// Uses 'related_entity_id' column added in migration 000046
 	// ENGINEERING STANDARD: Use explicit hours for PostgreSQL interval (Code Review WARN #2)
+	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
 		SELECT COUNT(*) FROM communication_logs
 		WHERE contact_id = $1
 		  AND related_entity_id = $2
-		  AND timestamp > NOW() - ($3 || ' hours')::interval
+		  AND timestamp > $4 - ($3 || ' hours')::interval
 		  AND direction = 'Outbound'
 	`
 	hours := int(window.Hours())
 	var count int
-	err := a.db.QueryRow(ctx, query, contactID, taskID, hours).Scan(&count)
+	err := a.db.QueryRow(ctx, query, contactID, taskID, hours, a.clock.Now()).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -294,12 +346,13 @@ func (a *SubLiaisonAgent) sendNotification(contact *types.Contact, message strin
 }
 
 func (a *SubLiaisonAgent) logCommunication(ctx context.Context, projectID, contactID uuid.UUID, taskID *uuid.UUID, logType CommunicationLogType, content string) error {
+	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
 		INSERT INTO communication_logs (
 			project_id, contact_id, direction, content, channel, timestamp,
 			related_entity_id, related_entity_type
 		)
-		VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	direction := "Outbound"
 	if logType == CommLogInboundReply {
@@ -320,7 +373,7 @@ func (a *SubLiaisonAgent) logCommunication(ctx context.Context, projectID, conta
 	}
 
 	_, err := a.db.Exec(ctx, query,
-		projectID, contactID, direction, content, "SMS",
+		projectID, contactID, direction, content, "SMS", a.clock.Now(),
 		relatedID, "project_task",
 	)
 	return err
@@ -350,6 +403,7 @@ func (a *SubLiaisonAgent) findContactBySender(ctx context.Context, sender string
 
 // findRecentOutboundTask finds the task_id from the most recent outbound communication to this contact.
 // See PRODUCTION_PLAN.md Step 47 (Amendment #1: Context Binding)
+// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *SubLiaisonAgent) findRecentOutboundTask(ctx context.Context, contactID uuid.UUID, window time.Duration) (*uuid.UUID, error) {
 	// ENGINEERING STANDARD: Use explicit hours for PostgreSQL interval (Code Review WARN #2)
 	query := `
@@ -357,13 +411,13 @@ func (a *SubLiaisonAgent) findRecentOutboundTask(ctx context.Context, contactID 
 		WHERE contact_id = $1
 		  AND direction = 'Outbound'
 		  AND related_entity_type = 'project_task'
-		  AND timestamp > NOW() - ($2 || ' hours')::interval
+		  AND timestamp > $3 - ($2 || ' hours')::interval
 		ORDER BY timestamp DESC
 		LIMIT 1
 	`
 	hours := int(window.Hours())
 	var taskID uuid.UUID
-	err := a.db.QueryRow(ctx, query, contactID, hours).Scan(&taskID)
+	err := a.db.QueryRow(ctx, query, contactID, hours, a.clock.Now()).Scan(&taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -373,23 +427,25 @@ func (a *SubLiaisonAgent) findRecentOutboundTask(ctx context.Context, contactID 
 func (a *SubLiaisonAgent) updateTaskProgress(ctx context.Context, taskID uuid.UUID, percent int) error {
 	// Update percent_complete on project_tasks
 	// Note: percent_complete column may not exist in current schema, fallback to task_progress table
+	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
 		INSERT INTO task_progress (id, task_id, reported_by, reported_at, percent_complete, notes)
-		VALUES ($1, $2, NULL, NOW(), $3, 'Updated via SMS')
+		VALUES ($1, $2, NULL, $3, $4, 'Updated via SMS')
 	`
-	_, err := a.db.Exec(ctx, query, uuid.New(), taskID, percent)
+	_, err := a.db.Exec(ctx, query, uuid.New(), taskID, a.clock.Now(), percent)
 	return err
 }
 
 func (a *SubLiaisonAgent) createRiskFlag(ctx context.Context, taskID uuid.UUID, originalMessage string) error {
 	// Insert into project_flags table (create flag for PM review)
 	// Note: project_flags table structure assumed from DATA_SPINE_SPEC.md
+	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
 		INSERT INTO review_flags (id, entity_type, entity_id, reason, status, created_at)
-		VALUES ($1, 'project_task', $2, $3, 'Pending', NOW())
+		VALUES ($1, 'project_task', $2, $3, 'Pending', $4)
 	`
 	reason := fmt.Sprintf("Subcontractor indicated delay/issue: %s", truncateString(originalMessage, 200))
-	_, err := a.db.Exec(ctx, query, uuid.New(), taskID, reason)
+	_, err := a.db.Exec(ctx, query, uuid.New(), taskID, reason, a.clock.Now())
 	return err
 }
 

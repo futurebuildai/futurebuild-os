@@ -13,6 +13,7 @@ import (
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -59,8 +60,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	notificationService := service.NewConsoleEmailProvider()
 
 	// See PRODUCTION_PLAN.md Step 47: Sub Liaison Agent (outbound coordination)
+	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
 	directoryService := service.NewDirectoryService(db)
-	_ = agents.NewSubLiaisonAgent(db, directoryService, notificationService)
+	_ = agents.NewSubLiaisonAgent(db, directoryService, notificationService, clock.RealClock{})
 
 	// See PRODUCTION_PLAN.md Step 48: Inbound Processor (inbound message handling)
 	// VisionService is optional - pass nil if AI client not configured
@@ -75,6 +77,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		directoryService, // Implements InboundContactLookup
 		&scheduleServiceAdapter{ss: scheduleService, db: db}, // Implements InboundProgressUpdater
 		visionVerifier,
+		clock.RealClock{},
 	)
 	webhookHandler := handlers.NewWebhookHandler(inboundProcessor, cfg.WebhookSecret)
 

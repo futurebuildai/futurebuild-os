@@ -14,6 +14,7 @@ import (
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/joho/godotenv"
 )
 
@@ -70,17 +71,21 @@ func main() {
 	weatherService := service.NewMockWeatherService()
 
 	// 6. Initialize Agents
+	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
+	realClock := clock.RealClock{}
+
 	dailyFocusAgent := agents.NewDailyFocusAgent(
 		projectService, // Replaces dbPool - Clean Service Layer Pattern
 		scheduleService,
 		weatherService,
 		notificationService,
 		aiClient,
+		realClock,
 	)
 
 	// Procurement Agent for long-lead item monitoring
-	// See PRODUCTION_PLAN.md Step 46
-	procurementAgent := agents.NewProcurementAgent(dbPool, weatherService)
+	// See PRODUCTION_PLAN.md Step 46, 49
+	procurementAgent := agents.NewProcurementAgent(dbPool, weatherService, realClock)
 
 	// 7. Initialize Worker Handlers
 	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent)

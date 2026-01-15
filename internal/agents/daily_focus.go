@@ -4,32 +4,36 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"google.golang.org/genai"
 )
 
 // DailyFocusAgent orchestrates the morning briefing generation.
 // See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
+// Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 type DailyFocusAgent struct {
 	projects *service.ProjectService // Replaces *pgxpool.Pool
 	schedule *service.ScheduleService
 	weather  types.WeatherService
 	notifier types.NotificationService
 	aiClient ai.Client
+	clock    clock.Clock
 }
 
 // NewDailyFocusAgent creates a new agent instance.
+// Clock is required for deterministic time simulation (Step 49).
 func NewDailyFocusAgent(
 	projects *service.ProjectService, // Replaces db
 	schedule *service.ScheduleService,
 	weather types.WeatherService,
 	notifier types.NotificationService,
 	aiClient ai.Client,
+	clk clock.Clock,
 ) *DailyFocusAgent {
 	return &DailyFocusAgent{
 		projects: projects,
@@ -37,6 +41,7 @@ func NewDailyFocusAgent(
 		weather:  weather,
 		notifier: notifier,
 		aiClient: aiClient,
+		clock:    clk,
 	}
 }
 
@@ -151,7 +156,7 @@ Generate a concise "Morning Briefing" for the site team.
 3. Identify any blocked tasks or risks based on the task list.
 4. Keep it professional, direct, and motivating.
 5. Use Markdown formatting.
-`, p.Name, time.Now().Format("Monday, Jan 02"), p.Address,
+`, p.Name, a.clock.Now().Format("Monday, Jan 02"), p.Address,
 		w.HighTempC, w.LowTempC, w.PrecipitationMM, w.PrecipitationProbability*100, w.Conditions,
 		taskContext)
 }

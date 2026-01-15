@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,16 +14,20 @@ import (
 
 // ProcurementAgent monitors long-lead items and calculates order dates.
 // See PRODUCTION_PLAN.md Step 46, BACKEND_SCOPE.md Section 2.5
+// Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 type ProcurementAgent struct {
 	db      *pgxpool.Pool
 	weather types.WeatherService
+	clock   clock.Clock
 }
 
 // NewProcurementAgent creates a new agent instance.
-func NewProcurementAgent(db *pgxpool.Pool, weather types.WeatherService) *ProcurementAgent {
+// Clock is required for deterministic time simulation (Step 49).
+func NewProcurementAgent(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
 	return &ProcurementAgent{
 		db:      db,
 		weather: weather,
+		clock:   clk,
 	}
 }
 
@@ -67,7 +72,7 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
 
-	now := time.Now().Truncate(24 * time.Hour)
+	now := a.clock.Now().Truncate(24 * time.Hour)
 
 	// 3. Process each item
 	for _, item := range items {
@@ -224,29 +229,31 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 }
 
 // updateItem persists the calculated status and order date.
+// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *ProcurementAgent) updateItem(ctx context.Context, result alertResult) error {
 	query := `
 		UPDATE procurement_items
-		SET status = $1, calculated_order_date = $2, last_checked_at = NOW()
-		WHERE id = $3
+		SET status = $1, calculated_order_date = $2, last_checked_at = $3
+		WHERE id = $4
 	`
-	_, err := a.db.Exec(ctx, query, string(result.NewStatus), result.CalculatedOrderDate, result.ID)
+	_, err := a.db.Exec(ctx, query, string(result.NewStatus), result.CalculatedOrderDate, a.clock.Now(), result.ID)
 	return err
 }
 
 // shouldSendNotification checks communication_logs for recent alerts.
 // See User Amendment #4: 72-hour dampening, Optimized via Migration 000046
+// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *ProcurementAgent) shouldSendNotification(ctx context.Context, itemID uuid.UUID) (bool, error) {
 	// Check for alerts in the last 72 hours linked to this specific entity
 	// Uses 'related_entity_id' column added in migration 000046
 	query := `
 		SELECT COUNT(*) FROM communication_logs
 		WHERE related_entity_id = $1
-		  AND timestamp > NOW() - INTERVAL '72 hours'
+		  AND timestamp > $2 - INTERVAL '72 hours'
 		  AND direction = 'Outbound'
 	`
 	var count int
-	err := a.db.QueryRow(ctx, query, itemID).Scan(&count)
+	err := a.db.QueryRow(ctx, query, itemID, a.clock.Now()).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -254,6 +261,7 @@ func (a *ProcurementAgent) shouldSendNotification(ctx context.Context, itemID uu
 }
 
 // logNotification persists the alert to communication_logs.
+// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *ProcurementAgent) logNotification(ctx context.Context, result alertResult) {
 	// Insert into communication_logs with structured entity data
 	query := `
@@ -261,14 +269,14 @@ func (a *ProcurementAgent) logNotification(ctx context.Context, result alertResu
 			project_id, direction, content, channel, timestamp, 
 			related_entity_id, related_entity_type
 		)
-		SELECT p.id, 'Outbound', $1, 'Chat', NOW(), $2, 'procurement_item'
+		SELECT p.id, 'Outbound', $1, 'Chat', $2, $3, 'procurement_item'
 		FROM procurement_items pi
 		JOIN project_tasks pt ON pi.project_task_id = pt.id
 		JOIN projects p ON pt.project_id = p.id
-		WHERE pi.id = $3
+		WHERE pi.id = $4
 	`
 	content := fmt.Sprintf("[PROCUREMENT ALERT] %s", result.Message)
-	_, err := a.db.Exec(ctx, query, content, result.ID, result.ID)
+	_, err := a.db.Exec(ctx, query, content, a.clock.Now(), result.ID, result.ID)
 	if err != nil {
 		slog.Error("failed to log notification", "id", result.ID, "error", err)
 	} else {
