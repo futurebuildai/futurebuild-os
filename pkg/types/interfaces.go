@@ -54,5 +54,5 @@ type NotificationService interface {
 // DirectoryService defines contact and assignment lookups.
 // See API_AND_TYPES_SPEC.md Section 2.4
 type DirectoryService interface {
-	GetContactForPhase(phaseID string) (Contact, error)
+	GetContactForPhase(ctx context.Context, projectID, orgID uuid.UUID, phaseCode string) (*Contact, error)
 }

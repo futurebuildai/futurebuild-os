@@ -110,8 +110,8 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 43.6 | **Verification**: Verify endpoint with mock Auth Token and DB check | Step 43.5 |x|
 | 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | x|
 | 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 | [x] |
-| 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |
-| 47 | **Update Sub Liaison Agent**: Use DirectoryService for contact resolving | Step 19, 38 | 1.5 |
+| 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |[x] |
+| 47 | **Update Sub Liaison Agent**: Use DirectoryService for contact resolving | Step 19, 38 | 1.5 | [x] |
 | 48 | Implement inbound message processing and state-machine updates | Step 43, 47 | 2 |
 | 49 | **Time-Travel Agent Simulation**: Create an integration test using a mocked Clock interface. Fast-forward a test project by 30 days, triggering cron jobs at every interval, and assert that the COMMUNICATION_LOGS table contains the expected "Order Material" and "Start Confirmation" messages. | Step 48 | 2 |
 

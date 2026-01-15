@@ -2,6 +2,7 @@
   "name": "futurebuild-root",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "FutureBuild - AI-Powered Construction Scheduling Platform",
   "scripts": {
     "dev": "concurrently \"go run ./cmd/api\" \"npm --prefix frontend run dev\"",

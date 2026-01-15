@@ -26,7 +26,8 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 44: Artifact Mapping (COMPLETED)
         ▪ Step 45: Daily Briefing Job (COMPLETED)
         ▪ Step 46: Procurement Agent (COMPLETED)
-    ◦ Current Focus: Phase 6, Step 47 (Sub Liaison Agent).
+        ▪ Step 47: Sub Liaison Agent (COMPLETED)
+    ◦ Current Focus: Phase 6, Step 48 (Inbound Message Processing & State Machine).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -95,51 +96,50 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 6, Step 47 (Sub Liaison Agent)
-Context: The Subcontractor Liaison Agent is the "Virtual Project Manager" for trade coordination. It manages outbound communication to subs, confirms their arrival, collects status updates, and solicits verification photos. This is critical for accurate task tracking without manual superintendent follow-up.
+--------------------------------------------------------------------------------
+Task: Execute Phase 6, Step 48 (Inbound Message Processing & State Machine)
+Context: The system can now send messages (Step 47). Step 48 is about *listening*. You will build the "Inbound Processor" that handles webhooks from communication providers (Twilio/SendGrid), correlates the sender to a Project/Task, parses their intent, and updates the database state (Percentage Complete, Issues, or Confirmation).
 
 Requirements:
-1.  **The Liaison Logic (The Communicator)**:
-    * Create `internal/agents/sub_liaison.go`.
-    * **Core Functions**:
-        * `ConfirmArrival(taskID uuid.UUID)`: Send SMS/Email to assigned sub asking "Are you arriving tomorrow for [Task Name]?"
-        * `RequestStatusUpdate(taskID uuid.UUID)`: Send SMS asking "What % complete is [Task Name]?"
-        * `RequestPhoto(taskID uuid.UUID)`: Send SMS asking for a verification photo of the work.
-    * **DirectoryService Integration**:
-        * Use `DirectoryService.GetContactForPhase(phaseID)` to resolve the correct sub for a given task.
-        * Fallback: If no contact assigned, log a warning and skip notification.
+1.  **Webhook API Layer**:
+    * Create `internal/api/handlers/webhook_handler.go`.
+    * Implement `POST /api/v1/webhooks/sms` and `POST /api/v1/webhooks/email`.
+    * **Security**: Implement a simple signature check or Shared Secret validation (e.g., `X-FutureBuild-Signature`) to reject spoofed requests.
+    * **Payload Normalization**: Convert provider-specific JSON/Form data into a standardized `InboundMessage` struct.
 
-2.  **Trigger Mechanism**:
-    * The agent should be callable on-demand from the Chat Orchestrator (e.g., user says "Remind the plumber about tomorrow").
-    * **Optional Cron**: Consider a daily "Lookahead" cron that scans tasks starting in the next 48 hours and auto-sends confirmation requests.
+2.  **Inbound Processor Logic (The Brain)**:
+    * Create `internal/agents/inbound_processor.go`.
+    * **Identity Resolution**:
+        * Input: Sender Phone/Email.
+        * Lookup: Query `CONTACTS` table to find the associated User/Subcontractor.
+        * Context: Query `COMMUNICATION_LOGS` (Order By `timestamp` DESC) to find the last message sent *to* this contact. Use this to infer the `TaskID` context.
+    * **Intent Parsing (Regex/Heuristic)**:
+        * **Progress Update**: If message matches `^(\d{1,3})%$`, update the inferred `project_tasks.percent_complete`.
+        * **Confirmation**: If message contains "confirmed", "yes", "on site", update `communication_logs` with a "ACK" flag (or similar status tracking).
+        * **Vision Trigger**: If the payload contains an Image URL, trigger `VisionService.VerifyTask(taskID, imageURL)`.
 
-3.  **Response Handling (Inbound)**:
-    * Parse inbound SMS/Email responses (via Twilio/SendGrid webhooks).
-    * Update `communication_logs` with the response.
-    * If response contains a percentage (e.g., "75%"), update `task_progress`.
-    * If response contains an image URL, trigger `VisionService.VerifyTask()`.
+3.  **State Machine Integration**:
+    * If a Task is marked 100% complete via SMS, trigger the `ScheduleService` to recalculate the project schedule (CPM) and check for successor readiness.
 
 4.  **Testing (L7 Standard)**:
-    * Create `internal/agents/sub_liaison_test.go`.
-    * **Scenario A**: Happy path - Contact found, SMS sent successfully.
-    * **Scenario B**: No contact assigned - Graceful degradation, warning logged.
-    * **Scenario C**: Inbound response parsing - Assert progress update.
+    * Create `internal/agents/inbound_processor_test.go`.
+    * **Test Case 1**: "Perfect 100%": Sub sends "100%", system finds the task, updates DB to 100%, and logs the interaction.
+    * **Test Case 2**: "Unknown Sender": Number not in DB, system logs a warning but does not crash.
+    * **Test Case 3**: "Vision Handoff": Message with image URL correctly calls the VisionService mock.
 
 Technical Constraints:
-* **Interface Dependency**: Inject `types.DirectoryService`, `types.NotificationService`, and `types.VisionService`.
-* **Idempotency**: Check `communication_logs` before sending duplicate messages within 24 hours.
-* **Multi-tenancy**: All queries must filter by `project_id`.
+* **No ORM**: Use raw SQL/pgx for all lookups.
+* **Idempotency**: Webhooks can be delivered multiple times. Ensure processing is idempotent (deduplicate by Provider Message ID).
+* **Concurrency**: Webhooks will arrive concurrently. Ensure DB transactions are used when updating Task Progress + Logs.
 
 Key Files:
-* `internal/agents/sub_liaison.go` (New)
-* `internal/agents/sub_liaison_test.go` (New)
-* `internal/api/handlers/webhook_handler.go` (New - for inbound SMS/Email)
-* `internal/chat/commands.go` (Update - add SubLiaisonCommand)
+* `internal/api/handlers/webhook_handler.go` (New)
+* `internal/agents/inbound_processor.go` (New)
+* `internal/server/server.go` (Route registration)
 
 Spec References:
-* `BACKEND_SCOPE.md` Section 3.5 (Action Engine - Subcontractor Liaison).
-* `PRODUCTION_PLAN.md` Step 47.
-* `API_AND_TYPES_SPEC.md` Section 2.3 (NotificationService), 2.4 (DirectoryService).
+* `PRODUCTION_PLAN.md` Step 48.
+* `BACKEND_SCOPE.md` Section 3.5 (Action Engine - Inbound).
+* `DATA_SPINE_SPEC.md` Section 5.1 (Communication Logs schema).
 
 First Step: /prism
-

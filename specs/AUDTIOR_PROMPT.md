@@ -98,7 +98,7 @@ Upon receiving the input, you must run this execution loop:
 
 **`/push`**
 *   **Usage:** Call this command at the end of the thread after all audit revisions have been implemented and passed the final re-audit.
-*   **Action:** Pushes the revisions to GitHub as a new version.
+*   **Action:** Pushes the revisions to GitHub 'build' branch as a new version.
 *   **Tag Format:** `Revision: (revision details/summary for context)`
 *   **Prerequisites:**
     1.  All "VIOLATIONS & REMEDIATIONS" from the audit report must be addressed.

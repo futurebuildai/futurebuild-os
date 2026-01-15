@@ -172,6 +172,10 @@ const (
 
 	// IntentUnknown is the fallback when no intent is classified.
 	IntentUnknown Intent = "UNKNOWN"
+
+	// IntentContactSubcontractor triggers outbound subcontractor coordination.
+	// See PRODUCTION_PLAN.md Step 47 (Sub Liaison Agent)
+	IntentContactSubcontractor Intent = "CONTACT_SUBCONTRACTOR"
 )
 
 // DynamicComponentType defines the type of atomic UI element.

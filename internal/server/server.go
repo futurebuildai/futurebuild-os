@@ -6,6 +6,7 @@ import (
 
 	"time"
 
+	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/api/handlers"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
@@ -27,7 +28,8 @@ type Server struct {
 	TaskHandler     *handlers.TaskHandler
 	AuthHandler     *handlers.AuthHandler
 	DocumentHandler *handlers.DocumentHandler
-	ChatHandler     *handlers.ChatHandler // See PRODUCTION_PLAN.md Step 43.5
+	ChatHandler     *handlers.ChatHandler    // See PRODUCTION_PLAN.md Step 43.5
+	WebhookHandler  *handlers.WebhookHandler // See PRODUCTION_PLAN.md Step 47
 	AuthMiddleware  *middleware.AuthMiddleware
 	AuthRateLimiter *middleware.IPRateLimiter
 }
@@ -54,6 +56,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()
+
+	// See PRODUCTION_PLAN.md Step 47: Sub Liaison Agent
+	directoryService := service.NewDirectoryService(db)
+	subLiaisonAgent := agents.NewSubLiaisonAgent(db, directoryService, notificationService)
+	webhookHandler := handlers.NewWebhookHandler(subLiaisonAgent)
+
 	authService := service.NewAuthService(db, cfg)
 	authHandler := handlers.NewAuthHandler(authService, notificationService, "http://localhost:8080")
 	authMiddleware := middleware.NewAuthMiddleware(cfg)
@@ -68,7 +76,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		TaskHandler:     taskHandler,
 		AuthHandler:     authHandler,
 		DocumentHandler: documentHandler,
-		ChatHandler:     chatHandler, // See PRODUCTION_PLAN.md Step 43.5
+		ChatHandler:     chatHandler,    // See PRODUCTION_PLAN.md Step 43.5
+		WebhookHandler:  webhookHandler, // See PRODUCTION_PLAN.md Step 47
 		AuthMiddleware:  authMiddleware,
 		AuthRateLimiter: authRateLimiter,
 	}
@@ -111,6 +120,12 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.Post("/", s.ChatHandler.HandleChat)
 		})
+	})
+
+	// Webhooks (unauthenticated - signature verification pending)
+	// See PRODUCTION_PLAN.md Step 47: Inbound Subcontractor Messages
+	s.Router.Route("/webhooks", func(r chi.Router) {
+		r.Post("/messages", s.WebhookHandler.HandleInboundMessage)
 	})
 }
 

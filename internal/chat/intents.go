@@ -136,6 +136,15 @@ func NewDefaultRegexClassifier() *RegexClassifier {
 				Pattern: regexp.MustCompile(`(?i)\b(invoice|bill|receipt)\b`),
 				Weight:  3,
 			},
+
+			// ContactSubcontractor: Communicate with trade partners (Weight 10)
+			// Matches: "ask the plumber", "contact electrician", "message the sub"
+			// See PRODUCTION_PLAN.md Step 47 (Sub Liaison Agent)
+			{
+				Intent:  types.IntentContactSubcontractor,
+				Pattern: regexp.MustCompile(`(?i)\b(ask|contact|check with|message|reach out to|call).*(plumber|electrician|sub|trade|contractor|hvac|drywall|painter|roofer|framer)`),
+				Weight:  10,
+			},
 		},
 	}
 }

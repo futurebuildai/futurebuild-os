@@ -306,6 +306,11 @@ func (o *Orchestrator) createCommand(intent types.Intent, projectID, orgID uuid.
 		return &PlaceholderCommand{message: "I'm analyzing the current schedule to explain potential delays."}
 	case types.IntentUpdateTaskStatus:
 		return &PlaceholderCommand{message: "Ready to update the task status. Please confirm the task and new status."}
+	case types.IntentContactSubcontractor:
+		// See PRODUCTION_PLAN.md Step 47 (Sub Liaison Agent)
+		// Full SubLiaisonCommand implementation requires task parsing and agent injection.
+		// Placeholder returns guidance for now; full wiring is in WebhookHandler.
+		return &PlaceholderCommand{message: "I'll reach out to the subcontractor for you. Which task would you like me to confirm arrival for?"}
 	default:
 		return &PlaceholderCommand{message: "I'm not sure how to help with that. Could you please rephrase your request?"}
 	}
