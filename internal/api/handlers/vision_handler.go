@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/colton/futurebuild/internal/service"
@@ -46,6 +46,7 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 	// 1. Extract IDs and enforce multi-tenancy
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
+		slog.Warn("vision: invalid project/org IDs", "error", err, "method", r.Method)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -53,6 +54,7 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "task_id")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
+		slog.Warn("vision: invalid task ID", "raw_task_id", taskIDStr, "error", err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
@@ -60,19 +62,25 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 	// 2. Parse request body
 	var req VerifyTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("vision: invalid request body", "error", err, "task_id", taskID)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.ImageURL == "" {
+		slog.Warn("vision: image_url missing", "task_id", taskID)
 		http.Error(w, "image_url is required", http.StatusBadRequest)
 		return
 	}
 
 	if req.TaskDescription == "" {
+		slog.Warn("vision: task_description missing", "task_id", taskID)
 		http.Error(w, "task_description is required", http.StatusBadRequest)
 		return
 	}
+
+	slog.Info("vision: verifying task",
+		"task_id", taskID, "project_id", projectID, "org_id", orgID)
 
 	// 3. Call VisionService with Persistence
 	// This satisfies CTO Audit requirement: "Database is State"
@@ -86,9 +94,14 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 		req.TaskDescription,
 	)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Vision verification failed: %v", err), http.StatusInternalServerError)
+		slog.Error("vision: verification failed",
+			"task_id", taskID, "project_id", projectID, "error", err)
+		http.Error(w, "Vision verification failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("vision: verification completed",
+		"task_id", taskID, "is_verified", isVerified, "confidence", confidence)
 
 	// 4. Return result
 	w.Header().Set("Content-Type", "application/json")

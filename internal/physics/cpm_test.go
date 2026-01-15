@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -783,4 +784,134 @@ func TestCalendar_SkipsWeekends(t *testing.T) {
 	assert.Equal(t, projectStart, schedA.EarlyStart, "Task A should start on Friday")
 	assert.Equal(t, expectedFinish, schedA.EarlyFinish, "Task A should finish on Wednesday (skipping Sat/Sun)")
 	assert.Equal(t, time.Wednesday, schedA.EarlyFinish.Weekday(), "Finish day should be Wednesday")
+}
+
+// ============================================================================
+// Floating-Point Precision Tests (Phase 2 Remediation)
+// ============================================================================
+
+// SevenDayCalendar implements a 7-day work week for precision testing.
+// This isolates float drift from calendar/weekend logic.
+type SevenDayCalendar struct{}
+
+// AddWorkingDays adds days without skipping weekends (7-day work week).
+func (c *SevenDayCalendar) AddWorkingDays(date time.Time, days float64) time.Time {
+	// No weekend skipping - pure fractional day arithmetic
+	wholeDays := int(days)
+	fractionalDays := days - float64(wholeDays)
+
+	// Add whole days
+	result := date.AddDate(0, 0, wholeDays)
+
+	// Add fractional days as hours
+	hoursToAdd := fractionalDays * 24
+	result = result.Add(time.Duration(hoursToAdd * float64(time.Hour)))
+
+	return result
+}
+
+// TestFloatPrecision_LongChain proves the CPM engine doesn't suffer from
+// floating-point drift over long dependency chains.
+// See Phase 2 Remediation: Task 2 - Physics Engine Precision Verification.
+//
+// Scenario: 100 tasks in a linear chain (A₁→A₂→A₃→...→A₁₀₀)
+// Each task has duration 0.1 days.
+// Expected project duration: 10.0 days exactly.
+//
+// This test catches the infamous 0.1 + 0.2 != 0.30000000004 problem.
+func TestFloatPrecision_LongChain(t *testing.T) {
+	projectID := uuid.New()
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC) // Monday
+
+	const numTasks = 100
+	const taskDuration = 0.1 // Each task is 0.1 days
+
+	// Build 100 tasks in sequence
+	tasks := make([]models.ProjectTask, numTasks)
+	for i := 0; i < numTasks; i++ {
+		tasks[i] = makeTaskWithDuration(
+			fmt.Sprintf("FP.%d", i+1),
+			taskDuration,
+		)
+	}
+
+	// Create linear dependency chain: Task[0] → Task[1] → ... → Task[99]
+	deps := make([]models.TaskDependency, numTasks-1)
+	for i := 0; i < numTasks-1; i++ {
+		deps[i] = makeDep(projectID, tasks[i].ID, tasks[i+1].ID, types.DependencyTypeFS, 0)
+	}
+
+	// Build graph and run forward pass with 7-day calendar (no weekend logic)
+	g := BuildDependencyGraph(tasks, deps)
+	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{})
+
+	require.NoError(t, err)
+	require.Len(t, schedule, numTasks)
+
+	// Get the final task's early finish
+	lastTaskSchedule := schedule[tasks[numTasks-1].ID]
+
+	// Calculate actual project duration in days
+	projectDuration := lastTaskSchedule.EarlyFinish.Sub(projectStart).Hours() / 24.0
+
+	// Expected duration: 100 tasks × 0.1 days = 10.0 days exactly
+	expectedDuration := 10.0
+
+	// STRICT CHECK: Use very tight epsilon to catch any float drift
+	// If this fails with something like 10.0000000000002, we have a problem
+	assert.InDelta(t, expectedDuration, projectDuration, 0.0000001,
+		"Project duration should be exactly 10.0 days (100 tasks × 0.1 days). "+
+			"Got %.15f, which indicates floating-point drift.", projectDuration)
+
+	// Additional verification: first task should start at project start
+	firstTaskSchedule := schedule[tasks[0].ID]
+	assert.Equal(t, projectStart, firstTaskSchedule.EarlyStart,
+		"First task should start at project start")
+
+	// Log actual values for audit trail
+	t.Logf("Tasks: %d, Duration per task: %.1f days", numTasks, taskDuration)
+	t.Logf("Expected project duration: %.1f days", expectedDuration)
+	t.Logf("Actual project duration: %.15f days", projectDuration)
+	t.Logf("Difference from expected: %.15e days", projectDuration-expectedDuration)
+}
+
+// TestFloatPrecision_AccumulatedFractional tests precision with varying fractional durations.
+// Uses tasks with 1/3 day duration (known to cause IEEE 754 issues).
+func TestFloatPrecision_AccumulatedFractional(t *testing.T) {
+	projectID := uuid.New()
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
+
+	const numTasks = 30
+	const taskDuration = 1.0 / 3.0 // ~0.333... days (repeating decimal)
+
+	// Build 30 tasks in sequence
+	tasks := make([]models.ProjectTask, numTasks)
+	for i := 0; i < numTasks; i++ {
+		tasks[i] = makeTaskWithDuration(
+			fmt.Sprintf("FR.%d", i+1),
+			taskDuration,
+		)
+	}
+
+	deps := make([]models.TaskDependency, numTasks-1)
+	for i := 0; i < numTasks-1; i++ {
+		deps[i] = makeDep(projectID, tasks[i].ID, tasks[i+1].ID, types.DependencyTypeFS, 0)
+	}
+
+	g := BuildDependencyGraph(tasks, deps)
+	schedule, err := ForwardPass(g, projectStart, &SevenDayCalendar{})
+
+	require.NoError(t, err)
+
+	lastTaskSchedule := schedule[tasks[numTasks-1].ID]
+	projectDuration := lastTaskSchedule.EarlyFinish.Sub(projectStart).Hours() / 24.0
+
+	// 30 × (1/3) = 10.0 days exactly
+	expectedDuration := 10.0
+
+	// Allow slightly larger epsilon for repeating decimals, but still tight
+	assert.InDelta(t, expectedDuration, projectDuration, 0.000001,
+		"30 tasks × 1/3 day should equal 10.0 days. Got %.15f", projectDuration)
+
+	t.Logf("30 × (1/3) day tasks = %.15f days (expected 10.0)", projectDuration)
 }

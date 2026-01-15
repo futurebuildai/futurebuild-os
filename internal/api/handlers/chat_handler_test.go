@@ -68,6 +68,7 @@ func (m *mockInvoiceService) SaveExtraction(_ context.Context, _ uuid.UUID, _ *t
 func newTestOrchestrator() *chat.Orchestrator {
 	return chat.NewOrchestratorWithPersister(
 		&mockMessagePersister{},
+		chat.NewDefaultRegexClassifier(),
 		&mockTaskService{},
 		&mockScheduleService{},
 		&mockInvoiceService{},
@@ -230,6 +231,7 @@ func TestHandleChat_OrchestratorError(t *testing.T) {
 	// We need to extend the mock helper to support failure
 	failingOrch := chat.NewOrchestratorWithPersister(
 		failingPersister,
+		chat.NewDefaultRegexClassifier(),
 		&mockTaskService{},
 		&mockScheduleService{},
 		&mockInvoiceService{},

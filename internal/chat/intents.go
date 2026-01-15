@@ -1,66 +1,175 @@
 package chat
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/colton/futurebuild/pkg/types"
 )
 
-// Keyword is a strictly typed string for matching rules.
-// See CTO Audit Step 43.2
-type Keyword string
-
-// keywordRule defines a set of keywords that map to a specific Intent.
-type keywordRule struct {
-	Intent   types.Intent
-	Keywords []Keyword
+// IntentClassifier defines the interface for intent classification.
+// Implementations must provide a Classify method that maps a raw message to an Intent.
+// See PRODUCTION_PLAN.md Step 43.2 (Weighted Regex Router Refactor)
+type IntentClassifier interface {
+	Classify(message string) types.Intent
 }
 
-// ClassifyIntent maps a raw user message to a strict Intent type based on keyword matching.
-// Architecture: Linear scan of an ordered slice to guarantee deterministic results.
-// Logic: Specific-to-Generic priority (e.g., "Schedule" checks before "Update").
+// IntentRule defines a weighted regex pattern for intent classification.
+type IntentRule struct {
+	Intent  types.Intent
+	Pattern *regexp.Regexp
+	Weight  int // Higher weight = more specific match
+}
+
+// RegexClassifier implements IntentClassifier using weighted regex patterns.
+// It accumulates scores for each intent based on matching patterns and
+// returns the intent with the highest score.
+type RegexClassifier struct {
+	rules []IntentRule
+}
+
+// NewRegexClassifier creates a RegexClassifier with custom rules.
+func NewRegexClassifier(rules []IntentRule) *RegexClassifier {
+	return &RegexClassifier{rules: rules}
+}
+
+// =============================================================================
+// RULE ORDERING AND SHADOWING PREVENTION
+// =============================================================================
+//
+// CRITICAL: Intent classification uses a WEIGHTED SCORING system, not first-match.
+// However, the rule definitions below follow a deliberate ordering principle to
+// prevent "shadowing" bugs where generic patterns could outweigh specific ones.
+//
+// ORDERING PRINCIPLE: Specific-to-Generic
+//
+// 1. ACTION INTENTS (Weight: 10+) - Patterns that MODIFY state
+//    These require an action verb + domain noun combination.
+//    Examples: "update schedule", "process invoice", "mark complete"
+//
+// 2. QUERY INTENTS (Weight: 5) - Patterns that READ state
+//    These match on domain nouns without requiring action verbs.
+//    Examples: "show me the schedule", "what is the delay"
+//
+// WHY THIS MATTERS:
+// Input "Update Schedule" contains both:
+//   - "update" (action verb) → should trigger state modification
+//   - "schedule" (domain noun) → could trigger schedule query
+//
+// By giving ACTION patterns a higher weight (10) than QUERY patterns (5),
+// the action intent wins when both patterns match.
+//
+// ADDING NEW RULES:
+// - If your rule MODIFIES state: Use Weight >= 10
+// - If your rule READS state: Use Weight <= 5
+// - Always add tests for phrases that could match multiple patterns
+//
+// =============================================================================
+
+// NewDefaultRegexClassifier creates a RegexClassifier with the standard production rules.
+// Rules are designed to prevent false positives and implement Specific-to-Generic matching.
 // See PRODUCTION_PLAN.md Step 43.2
-func ClassifyIntent(message string) types.Intent {
-	// 1. Normalize Input
-	normalized := strings.ToLower(strings.TrimSpace(message))
+func NewDefaultRegexClassifier() *RegexClassifier {
+	return &RegexClassifier{
+		rules: []IntentRule{
+			// =================================================================
+			// ACTION INTENTS (Weight: 10) - State-modifying operations
+			// These patterns require both an ACTION VERB and a DOMAIN NOUN.
+			// =================================================================
+
+			// ProcessInvoice: Requires action verb + invoice noun (Weight 10)
+			// Matches: "process invoice", "upload bill", "scan receipt"
+			// Does NOT match: "invoice for delay" (no action verb before noun)
+			{
+				Intent:  types.IntentProcessInvoice,
+				Pattern: regexp.MustCompile(`(?i)\b(upload|process|scan|check|submit).*(invoice|bill|receipt)`),
+				Weight:  10,
+			},
+
+			// UpdateTaskStatus: Requires action verb + status/task noun (Weight 10)
+			// Matches: "update schedule", "mark task complete", "set as done", "change status"
+			// The pattern now includes "schedule" and "task" to capture modification intent.
+			{
+				Intent:  types.IntentUpdateTaskStatus,
+				Pattern: regexp.MustCompile(`(?i)\b(mark|set|update|change)\b.*(status|complete|done|schedule|task|progress)`),
+				Weight:  10,
+			},
+
+			// =================================================================
+			// QUERY INTENTS (Weight: 5) - Read-only operations
+			// These patterns match on DOMAIN NOUNS without requiring action verbs.
+			// Lower weight ensures they don't shadow action intents.
+			// =================================================================
+
+			// ExplainDelay: Generic delay-related keywords (Weight 5)
+			// Matches: "why is it delayed", "running late", "behind schedule", "slipped"
+			// Uses word-start boundary only to match stems with suffixes (delayed, slipping, waiting)
+			{
+				Intent:  types.IntentExplainDelay,
+				Pattern: regexp.MustCompile(`(?i)\b(delay|late|slip|behind|wait)`),
+				Weight:  5,
+			},
+
+			// GetSchedule: Generic schedule-related keywords (Weight 5)
+			// Matches: "show schedule", "project timeline", "when is..."
+			// NOTE: "schedule" alone triggers this, but "update schedule" triggers
+			// UpdateTaskStatus due to higher weight from action verb match.
+			{
+				Intent:  types.IntentGetSchedule,
+				Pattern: regexp.MustCompile(`(?i)\b(schedule|timeline|gantt|when|date)\b`),
+				Weight:  5,
+			},
+
+			// =================================================================
+			// IMPLICIT ACTION INTENTS (Weight: 3) - Noun-only shorthand
+			// Construction workers are curt. "invoice" implies "process this invoice".
+			// Weight 3 ensures explicit action verbs (Weight 10) still take priority.
+			// See Step 2: Regression Verification (Invoice Shorthand)
+			// =================================================================
+
+			// ProcessInvoice (Shorthand): Noun-only invoice/bill/receipt (Weight 3)
+			// Matches: "invoice", "bill", "receipt" without action verb
+			// Lower weight than action patterns but triggers invoice processing.
+			{
+				Intent:  types.IntentProcessInvoice,
+				Pattern: regexp.MustCompile(`(?i)\b(invoice|bill|receipt)\b`),
+				Weight:  3,
+			},
+		},
+	}
+}
+
+// Classify implements IntentClassifier by scoring all matching patterns
+// and returning the intent with the highest accumulated score.
+//
+// Normalization: The input is trimmed of leading/trailing whitespace
+// before processing. Case-insensitive matching is handled by regex flags.
+func (c *RegexClassifier) Classify(message string) types.Intent {
+	// Normalize input: trim whitespace exactly once
+	normalized := strings.TrimSpace(message)
 	if normalized == "" {
 		return types.IntentUnknown
 	}
 
-	// 2. Define Ordered Rules (Specific -> Generic)
-	// This slice preserves order, unlike a map iteration.
-	rules := []keywordRule{
-		// High Priority: Distinct Nouns / Specific Objects
-		{
-			Intent:   types.IntentProcessInvoice,
-			Keywords: []Keyword{"invoice", "bill", "receipt"},
-		},
-		{
-			Intent:   types.IntentExplainDelay,
-			Keywords: []Keyword{"delay", "late", "behind", "slip"},
-		},
-		{
-			Intent:   types.IntentGetSchedule,
-			Keywords: []Keyword{"schedule", "timeline", "gantt", "when"},
-		},
-		// Low Priority: Generic Verbs / Actions
-		// Checked last so "Update Schedule" catches "Schedule" (above) first.
-		{
-			Intent:   types.IntentUpdateTaskStatus,
-			Keywords: []Keyword{"status", "complete", "finish", "done", "update"},
-		},
-	}
+	// Score accumulator: intent -> total weight
+	scores := make(map[types.Intent]int)
 
-	// 3. Execute Linear Scan
-	for _, rule := range rules {
-		for _, keyword := range rule.Keywords {
-			if strings.Contains(normalized, string(keyword)) {
-				return rule.Intent
-			}
+	for _, rule := range c.rules {
+		if rule.Pattern.MatchString(normalized) {
+			scores[rule.Intent] += rule.Weight
 		}
 	}
 
-	// 4. Default Fallback
-	return types.IntentUnknown
-}
+	// Find intent with highest score
+	var bestIntent types.Intent = types.IntentUnknown
+	var bestScore int
 
+	for intent, score := range scores {
+		if score > bestScore {
+			bestScore = score
+			bestIntent = intent
+		}
+	}
+
+	return bestIntent
+}

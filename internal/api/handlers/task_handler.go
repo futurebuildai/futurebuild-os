@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -42,6 +43,7 @@ type UpdateTaskResponse struct {
 func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
+		slog.Warn("task: invalid project/org IDs", "error", err, "method", r.Method)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -49,12 +51,14 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "task_id")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
+		slog.Warn("task: invalid task ID", "raw_task_id", taskIDStr, "error", err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
 	var req UpdateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("task: invalid request body", "error", err, "task_id", taskID)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -62,6 +66,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	// Verify task exists and belongs to project
 	task, err := h.scheduleService.GetTask(r.Context(), taskID, projectID, orgID)
 	if err != nil {
+		slog.Warn("task: not found or access denied", "task_id", taskID, "project_id", projectID, "error", err)
 		http.Error(w, "Task not found or access denied", http.StatusNotFound)
 		return
 	}
@@ -69,7 +74,11 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	// Update the task's manual override if provided
 	recalculated := false
 	if req.ManualOverrideDays != nil {
+		slog.Info("task: updating manual override",
+			"task_id", taskID, "project_id", projectID, "override_days", *req.ManualOverrideDays)
+
 		if err := h.scheduleService.UpdateTaskDuration(r.Context(), taskID, projectID, orgID, *req.ManualOverrideDays, req.OverrideReason); err != nil {
+			slog.Error("task: failed to update duration", "task_id", taskID, "error", err)
 			http.Error(w, "Failed to update task", http.StatusInternalServerError)
 			return
 		}
@@ -78,6 +87,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		// See PRODUCTION_PLAN.md Step 32
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
+			slog.Error("task: schedule recalculation failed", "project_id", projectID, "error", err)
 			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -115,6 +125,7 @@ type ProgressResponse struct {
 func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
+		slog.Warn("task: invalid project/org IDs for progress", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -122,12 +133,14 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "task_id")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
+		slog.Warn("task: invalid task ID for progress", "raw_task_id", taskIDStr, "error", err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
 	var req ProgressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("task: invalid progress request body", "error", err, "task_id", taskID)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -135,6 +148,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	// Verify task exists
 	task, err := h.scheduleService.GetTask(r.Context(), taskID, projectID, orgID)
 	if err != nil {
+		slog.Warn("task: not found for progress", "task_id", taskID, "project_id", projectID, "error", err)
 		http.Error(w, "Task not found or access denied", http.StatusNotFound)
 		return
 	}
@@ -149,7 +163,11 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	slog.Info("task: recording progress",
+		"task_id", taskID, "project_id", projectID, "percent_complete", req.PercentComplete, "user_id", userID)
+
 	if err := h.scheduleService.CreateTaskProgress(r.Context(), projectID, taskID, userID, req.PercentComplete, req.Notes); err != nil {
+		slog.Error("task: failed to persist progress log", "task_id", taskID, "error", err)
 		http.Error(w, "Failed to persist progress log", http.StatusInternalServerError)
 		return
 	}
@@ -161,6 +179,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	// See CPM_RES_MODEL_SPEC.md Section 20.2 (Task Status Transitions)
 	if req.PercentComplete >= 100 && task.Status != types.TaskStatusCompleted {
 		if err := h.scheduleService.UpdateTaskStatus(r.Context(), taskID, projectID, orgID, types.TaskStatusCompleted); err != nil {
+			slog.Error("task: failed to update status to completed", "task_id", taskID, "error", err)
 			http.Error(w, "Failed to update task status", http.StatusInternalServerError)
 			return
 		}
@@ -169,10 +188,13 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 		// Trigger recalculation on status change
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
+			slog.Error("task: schedule recalculation failed after completion", "project_id", projectID, "error", err)
 			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		recalculated = true
+
+		slog.Info("task: marked completed and recalculated", "task_id", taskID, "project_id", projectID)
 
 		// Fetch updated task
 		task, _ = h.scheduleService.GetTask(r.Context(), taskID, projectID, orgID)
@@ -209,6 +231,7 @@ type InspectionResponse struct {
 func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
+		slog.Warn("task: invalid project/org IDs for inspection", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -216,12 +239,14 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "task_id")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
+		slog.Warn("task: invalid task ID for inspection", "raw_task_id", taskIDStr, "error", err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
 	var req InspectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("task: invalid inspection request body", "error", err, "task_id", taskID)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -235,6 +260,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 		types.InspectionResultConditional: true,
 	}
 	if !validResults[req.Result] {
+		slog.Warn("task: invalid inspection result", "result", req.Result, "task_id", taskID)
 		http.Error(w, "Invalid inspection result", http.StatusBadRequest)
 		return
 	}
@@ -242,6 +268,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	// Parse inspection date
 	inspectionDate, err := time.Parse("2006-01-02", req.InspectionDate)
 	if err != nil {
+		slog.Warn("task: invalid inspection date format", "date", req.InspectionDate, "error", err)
 		http.Error(w, "Invalid inspection_date format. Use YYYY-MM-DD", http.StatusBadRequest)
 		return
 	}
@@ -249,17 +276,23 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	// Verify task exists and is an inspection
 	task, err := h.scheduleService.GetTask(r.Context(), taskID, projectID, orgID)
 	if err != nil {
+		slog.Warn("task: not found for inspection", "task_id", taskID, "project_id", projectID, "error", err)
 		http.Error(w, "Task not found or access denied", http.StatusNotFound)
 		return
 	}
 
 	if !task.IsInspection {
+		slog.Warn("task: not an inspection task", "task_id", taskID)
 		http.Error(w, "This task is not an inspection task", http.StatusBadRequest)
 		return
 	}
 
+	slog.Info("task: recording inspection",
+		"task_id", taskID, "project_id", projectID, "result", req.Result, "inspector", req.InspectorName)
+
 	// Add audit trail persistence
 	if err := h.scheduleService.CreateInspectionRecord(r.Context(), projectID, taskID, req.InspectorName, string(req.Result), req.Notes, inspectionDate); err != nil {
+		slog.Error("task: failed to persist inspection record", "task_id", taskID, "error", err)
 		http.Error(w, "Failed to persist inspection record", http.StatusInternalServerError)
 		return
 	}
@@ -270,6 +303,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	// See CPM_RES_MODEL_SPEC.md Section 19.1 (Inspection Gate Rule)
 	if req.Result == types.InspectionResultPassed {
 		if err := h.scheduleService.UpdateTaskStatus(r.Context(), taskID, projectID, orgID, types.TaskStatusCompleted); err != nil {
+			slog.Error("task: failed to update inspection status to completed", "task_id", taskID, "error", err)
 			http.Error(w, "Failed to update task status", http.StatusInternalServerError)
 			return
 		}
@@ -277,10 +311,13 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 		// Trigger recalculation to unblock dependent tasks
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
+			slog.Error("task: schedule recalculation failed after inspection", "project_id", projectID, "error", err)
 			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		recalculated = true
+
+		slog.Info("task: inspection passed, marked completed", "task_id", taskID, "project_id", projectID)
 
 		// Fetch updated task
 		task, _ = h.scheduleService.GetTask(r.Context(), taskID, projectID, orgID)

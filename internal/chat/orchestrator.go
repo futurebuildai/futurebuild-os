@@ -2,13 +2,16 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -44,6 +47,7 @@ type MessagePersister interface {
 // See PRODUCTION_PLAN.md Step 43.3
 type Orchestrator struct {
 	db              MessagePersister
+	classifier      IntentClassifier
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
@@ -51,10 +55,12 @@ type Orchestrator struct {
 
 // --- Command Pattern (The "Actions") ---
 // See PRODUCTION_PLAN.md Step 43 (Command Pattern Refactor)
+// See PRODUCTION_PLAN.md Step 44 (Artifact return for Rich UI)
 
 // ChatCommand defines the interface for intent-specific execution.
+// Returns text reply, optional artifact for Rich UI, and error.
 type ChatCommand interface {
-	Execute(ctx context.Context) (string, error)
+	Execute(ctx context.Context) (string, *Artifact, error)
 }
 
 // GetScheduleCommand retrieves project schedule summary from ScheduleService.
@@ -65,18 +71,38 @@ type GetScheduleCommand struct {
 }
 
 // Execute calls the ScheduleService and formats the response.
-func (c *GetScheduleCommand) Execute(ctx context.Context) (string, error) {
+// Returns text summary, schedule_view artifact with structured data, and error.
+// See PRODUCTION_PLAN.md Step 44 (Artifact Mapping)
+func (c *GetScheduleCommand) Execute(ctx context.Context) (string, *Artifact, error) {
 	summary, err := c.scheduleService.GetProjectSchedule(ctx, c.projectID, c.orgID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get schedule: %w", err)
+		return "", nil, fmt.Errorf("failed to get schedule: %w", err)
 	}
-	return fmt.Sprintf(
+
+	// Build text response for chat display
+	reply := fmt.Sprintf(
 		"Project End Date: %s\nCritical Path Tasks: %d\nTotal Tasks: %d\nCompleted: %d",
 		summary.ProjectEnd.Format("Jan 02, 2006"),
 		summary.CriticalPathCount,
 		summary.TotalTasks,
 		summary.CompletedTasks,
-	), nil
+	)
+
+	// Build Rich UI artifact with structured data
+	// See PRODUCTION_PLAN.md Step 44 (schedule_view artifact)
+	artifactData, err := json.Marshal(summary)
+	if err != nil {
+		// Non-fatal: return text without artifact on serialization failure
+		return reply, nil, nil
+	}
+
+	artifact := &Artifact{
+		Type:  ArtifactTypeScheduleView,
+		Title: "Project Schedule Summary",
+		Data:  artifactData,
+	}
+
+	return reply, artifact, nil
 }
 
 // PlaceholderCommand returns a static message for unimplemented intents.
@@ -84,12 +110,14 @@ type PlaceholderCommand struct {
 	message string
 }
 
-// Execute returns the placeholder message.
-func (c *PlaceholderCommand) Execute(_ context.Context) (string, error) {
-	return c.message, nil
+// Execute returns the placeholder message with no artifact.
+// Placeholder commands do not produce Rich UI components.
+func (c *PlaceholderCommand) Execute(_ context.Context) (string, *Artifact, error) {
+	return c.message, nil, nil
 }
 
 // NewOrchestrator creates a new Orchestrator with injected dependencies.
+// Uses the default RegexClassifier for intent classification.
 // See PRODUCTION_PLAN.md Step 43.3
 func NewOrchestrator(
 	db *pgxpool.Pool,
@@ -99,23 +127,26 @@ func NewOrchestrator(
 ) *Orchestrator {
 	return &Orchestrator{
 		db:              NewPgxMessageStore(db), // db satisfies DBExecutor interface (matches method signature even if not explicitly declared in pgx)
+		classifier:      NewDefaultRegexClassifier(),
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
 	}
 }
 
-// NewOrchestratorWithPersister creates a new Orchestrator with a custom MessagePersister.
-// This is primarily used for testing to inject a mock persister.
+// NewOrchestratorWithPersister creates a new Orchestrator with a custom MessagePersister and IntentClassifier.
+// This is primarily used for testing to inject mock dependencies.
 // See PRODUCTION_PLAN.md Step 43.4
 func NewOrchestratorWithPersister(
 	persister MessagePersister,
+	classifier IntentClassifier,
 	taskService TaskService,
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
 ) *Orchestrator {
 	return &Orchestrator{
 		db:              persister,
+		classifier:      classifier,
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
@@ -123,11 +154,13 @@ func NewOrchestratorWithPersister(
 }
 
 // ProcessRequest is the main entry point for handling a user's chat message.
-// Flow: Persist(User) -> Classify -> Route -> Persist(Model) -> Return
-// See PRODUCTION_PLAN.md Step 43.3, 43.4
+// Implements a Two-Lane Consistency Strategy:
+//   - Lane A (Slow/External): AI operations with best-effort persistence
+//   - Lane B (Fast/Internal): DB operations with strict consistency
+//
+// See PRODUCTION_PLAN.md Step 43.3, 43.4, Step 2 (Hybrid Consistency)
 func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, orgID uuid.UUID, req ChatRequest) (*ChatResponse, error) {
-	// Note: orgID is available for future multi-tenancy filtering but not used in V1 placeholder logic.
-	// 1. Inbound Persistence: Save User Message
+	// 1. Inbound Persistence: Save User Message (ALWAYS required)
 	// See DATA_SPINE_SPEC.md Section 5.3
 	userMsg := models.ChatMessage{
 		ID:        uuid.New(),
@@ -141,19 +174,31 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 		return nil, fmt.Errorf("failed to persist user message: %w", err)
 	}
 
-	// 2. Classify Intent
-	// See PRODUCTION_PLAN.md Step 43.2
-	intent := ClassifyIntent(req.Message)
+	// 2. Classify Intent (using injected classifier)
+	// See PRODUCTION_PLAN.md Step 43.2 (Weighted Regex Router)
+	intent := o.classifier.Classify(req.Message)
 
-	// 3. Route & Execute Command
+	// 3. Route & Execute Command with Observability
 	// See PRODUCTION_PLAN.md Step 43 (Command Pattern)
-	reply, err := o.routeIntent(ctx, intent, req.ProjectID, orgID)
+	// See PRODUCTION_PLAN.md Step 44 (Artifact return for Rich UI)
+	cmdStart := time.Now()
+	reply, artifact, err := o.routeIntent(ctx, intent, req.ProjectID, orgID)
+	cmdDurationMs := time.Since(cmdStart).Milliseconds()
+
+	// Log command execution (Lane C: Observability)
+	slog.Info("chat: command executed",
+		"intent", intent,
+		"project_id", req.ProjectID,
+		"duration_ms", cmdDurationMs,
+	)
+
 	if err != nil {
 		return nil, fmt.Errorf("command execution failed: %w", err)
 	}
 
 	// 4. Outbound Persistence: Save Model Response
-	// See DATA_SPINE_SPEC.md Section 5.3
+	// Two-Lane Strategy: Differentiate error handling by intent type
+	// See DATA_SPINE_SPEC.md Section 5.3, Step 2 (Hybrid Consistency)
 	modelMsg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: req.ProjectID,
@@ -162,20 +207,75 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 		Content:   reply,
 		CreatedAt: time.Now().UTC(),
 	}
+
 	if err := o.db.SaveMessage(ctx, modelMsg); err != nil {
+		// Two-Lane Decision Point:
+		// Lane A (Slow/External): AI operations succeed, persistence failure is non-fatal
+		// Lane B (Fast/Internal): DB operations require strict consistency
+		if isSlowExternalIntent(intent) {
+			// Lane A: Action succeeded but chat history save failed
+			// CRITICAL: Log ERROR but return SUCCESS to user
+			// The expensive AI operation completed - user must see the result
+			slog.Error("CRITICAL: Action succeeded but chat history save failed",
+				"intent", intent,
+				"project_id", req.ProjectID,
+				"user_id", userID,
+				"error", err,
+			)
+			// Return success - user sees the result despite persistence failure
+			return &ChatResponse{
+				Reply:    reply,
+				Intent:   intent,
+				Artifact: artifact,
+			}, nil
+		}
+
+		// Lane B: Strict consistency - propagate error for fast/internal ops
+		slog.Error("chat: model persistence failed (strict mode)",
+			"intent", intent,
+			"project_id", req.ProjectID,
+			"user_id", userID,
+			"error", err,
+		)
 		return nil, fmt.Errorf("failed to persist model message: %w", err)
 	}
 
-	// 5. Return Response
+	// 5. Return Response (with optional artifact for Rich UI)
+	// See PRODUCTION_PLAN.md Step 44
 	return &ChatResponse{
-		Reply:  reply,
-		Intent: intent,
+		Reply:    reply,
+		Intent:   intent,
+		Artifact: artifact,
 	}, nil
+}
+
+// isSlowExternalIntent returns true for intents that involve slow/external operations
+// (AI, Vision, LLM calls) where at-least-once execution with best-effort persistence is acceptable.
+// Returns false for fast/internal intents (DB operations) that require strict consistency.
+// See Step 2: Two-Lane Consistency Strategy
+func isSlowExternalIntent(intent types.Intent) bool {
+	switch intent {
+	case types.IntentProcessInvoice,
+		types.IntentExplainDelay,
+		types.IntentUnknown:
+		// Lane A: Slow/External - AI/Vision operations
+		// These are expensive; if they succeed, we must return success to user
+		return true
+	case types.IntentGetSchedule,
+		types.IntentUpdateTaskStatus:
+		// Lane B: Fast/Internal - DB operations
+		// These are idempotent or read-only; retry is safe, strict consistency required
+		return false
+	default:
+		// Unknown intents default to Lane A (graceful degradation)
+		return true
+	}
 }
 
 // routeIntent creates and executes the appropriate command for the given intent.
 // See PRODUCTION_PLAN.md Step 43 (Command Pattern)
-func (o *Orchestrator) routeIntent(ctx context.Context, intent types.Intent, projectID, orgID uuid.UUID) (string, error) {
+// See PRODUCTION_PLAN.md Step 44 (Artifact return for Rich UI)
+func (o *Orchestrator) routeIntent(ctx context.Context, intent types.Intent, projectID, orgID uuid.UUID) (string, *Artifact, error) {
 	cmd := o.createCommand(intent, projectID, orgID)
 	return cmd.Execute(ctx)
 }
@@ -202,35 +302,90 @@ func (o *Orchestrator) createCommand(intent types.Intent, projectID, orgID uuid.
 
 // --- Default MessagePersister Implementation ---
 
+// TxExecutor defines the interface for transaction-capable execution.
+// This is used by the transactional SaveMessage to insert into both
+// chat_messages and chat_tool_usage atomically.
+type TxExecutor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+// Transactor defines the interface for beginning transactions.
+// *pgxpool.Pool satisfies this interface.
+type Transactor interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
 // DBExecutor defines a subset of pgxpool.Pool methods needed for execution.
 // This allows us to mock the database connection for 100% coverage.
+// DEPRECATED: Use Transactor for new code requiring transactions.
 type DBExecutor interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (commandTag pgconn.CommandTag, err error)
 }
 
-// PgxMessageStore implements MessagePersister using a DBExecutor (pgxpool or mock).
+// PgxMessageStore implements MessagePersister using a Transactor (pgxpool or mock).
+// Phase 2 Remediation: Now supports transactional writes for ACID compliance.
 type PgxMessageStore struct {
-	db DBExecutor
+	pool Transactor
 }
 
 // NewPgxMessageStore creates a new PgxMessageStore.
-func NewPgxMessageStore(db DBExecutor) *PgxMessageStore {
-	return &PgxMessageStore{db: db}
+// The pool must satisfy the Transactor interface (*pgxpool.Pool does).
+func NewPgxMessageStore(pool Transactor) *PgxMessageStore {
+	return &PgxMessageStore{pool: pool}
 }
 
-// SaveMessage persists a ChatMessage to the database.
-// See DATA_SPINE_SPEC.md Section 5.3
+// SaveMessage persists a ChatMessage and its ToolCalls to the database atomically.
+// CRITICAL FAANG STANDARD: Both chat_messages and chat_tool_usage inserts
+// happen in a single transaction. If tool usage save fails, message save rolls back.
+// See DATA_SPINE_SPEC.md Section 5.3, Phase 2 Remediation Task 1.
 func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessage) error {
-	query := `
+	// Start transaction for atomic write
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	// Defer rollback - no-op if already committed
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	// 1. Insert into chat_messages
+	messageQuery := `
 		INSERT INTO chat_messages (id, project_id, user_id, role, content, tool_calls, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	// note: commandTag return is ignored as we don't need rows affected count
-	_, err := s.db.Exec(ctx, query,
+	_, err = tx.Exec(ctx, messageQuery,
 		msg.ID, msg.ProjectID, msg.UserID, msg.Role, msg.Content, msg.ToolCalls, msg.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("db insert failed: %w", err)
+		return fmt.Errorf("db insert chat_messages failed: %w", err)
 	}
+
+	// 2. Insert each ToolCall into chat_tool_usage (normalized table)
+	if len(msg.ToolCalls) > 0 {
+		toolQuery := `
+			INSERT INTO chat_tool_usage (message_id, tool_name, input_payload, output_payload, created_at)
+			VALUES ($1, $2, $3, $4, $5)
+		`
+		for _, tc := range msg.ToolCalls {
+			_, err = tx.Exec(ctx, toolQuery,
+				msg.ID,        // message_id FK
+				tc.Name,       // tool_name
+				tc.Args,       // input_payload (JSONB)
+				tc.Response,   // output_payload (JSONB stored as string, will be cast)
+				msg.CreatedAt, // created_at
+			)
+			if err != nil {
+				return fmt.Errorf("db insert chat_tool_usage failed for tool %s: %w", tc.Name, err)
+			}
+		}
+	}
+
+	// 3. Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }
