@@ -58,11 +58,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()
-
-	// See PRODUCTION_PLAN.md Step 47: Sub Liaison Agent (outbound coordination)
-	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
 	directoryService := service.NewDirectoryService(db)
-	_ = agents.NewSubLiaisonAgent(db, directoryService, notificationService, clock.RealClock{})
+
+	// NOTE: Background agents (SubLiaisonAgent, DailyFocusAgent, ProcurementAgent) run in
+	// worker process (cmd/worker/main.go), NOT the API server. Do not instantiate here.
+	// See PRODUCTION_PLAN.md Steps 45-49
 
 	// See PRODUCTION_PLAN.md Step 48: Inbound Processor (inbound message handling)
 	// VisionService is optional - pass nil if AI client not configured

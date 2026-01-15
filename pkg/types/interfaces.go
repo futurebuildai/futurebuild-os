@@ -55,4 +55,15 @@ type NotificationService interface {
 // See API_AND_TYPES_SPEC.md Section 2.4
 type DirectoryService interface {
 	GetContactForPhase(ctx context.Context, projectID, orgID uuid.UUID, phaseCode string) (*Contact, error)
+	// GetProjectManager retrieves the Project Manager contact for notifications.
+	// Falls back to Superintendent or first org admin if no PM assigned.
+	GetProjectManager(ctx context.Context, projectID, orgID uuid.UUID) (*Contact, error)
+}
+
+// GeocodingService provides address-to-coordinate resolution.
+// See PRODUCTION_PLAN.md Critical Blocker A Remediation
+type GeocodingService interface {
+	// Geocode returns lat/long for a given address string.
+	// Returns error if geocoding fails.
+	Geocode(address string) (lat, lng float64, err error)
 }

@@ -87,3 +87,36 @@ func (s *DirectoryService) FindContactBySender(ctx context.Context, sender strin
 	contact.ContactPreference = types.ContactPreference(preference)
 	return &contact, nil
 }
+
+// GetProjectManager retrieves the Project Manager contact for a project.
+// Fallback chain: project_manager role → superintendent role → first org contact.
+// See PRODUCTION_PLAN.md Critical Blocker A Remediation
+func (s *DirectoryService) GetProjectManager(ctx context.Context, projectID, orgID uuid.UUID) (*types.Contact, error) {
+	// L7 Standard: Use explicit priority in SQL with CASE WHEN ordering
+	query := `
+		SELECT c.id, c.name, c.company, COALESCE(c.phone, ''), COALESCE(c.email, ''), c.role, c.contact_preference
+		FROM contacts c
+		JOIN project_assignments pa ON c.id = pa.contact_id
+		WHERE pa.project_id = $1 
+		  AND c.org_id = $2
+		  AND c.role IN ('project_manager', 'superintendent', 'general_contractor')
+		ORDER BY CASE c.role
+			WHEN 'project_manager' THEN 1
+			WHEN 'superintendent' THEN 2
+			WHEN 'general_contractor' THEN 3
+		END
+		LIMIT 1
+	`
+	var contact types.Contact
+	var role, preference string
+	err := s.db.QueryRow(ctx, query, projectID, orgID).Scan(
+		&contact.ID, &contact.Name, &contact.Company, &contact.Phone, &contact.Email,
+		&role, &preference,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("project manager not found for project %s: %w", projectID, err)
+	}
+	contact.Role = types.UserRole(role)
+	contact.ContactPreference = types.ContactPreference(preference)
+	return &contact, nil
+}

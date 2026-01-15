@@ -102,10 +102,11 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 
 // hydrateItems populates procurement_items for tasks marked as is_long_lead.
 // See User Amendment #2
+// Critical Blocker A.3 Remediation: Uses wbs_tasks.lead_time_weeks_min instead of hardcoded 4
 func (a *ProcurementAgent) hydrateItems(ctx context.Context) error {
 	query := `
 		INSERT INTO procurement_items (project_task_id, name, lead_time_weeks)
-		SELECT pt.id, pt.name, 4
+		SELECT pt.id, pt.name, COALESCE(wt.lead_time_weeks_min, 4)
 		FROM project_tasks pt
 		LEFT JOIN procurement_items pi ON pi.project_task_id = pt.id
 		JOIN projects p ON pt.project_id = p.id
@@ -182,9 +183,10 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	// Weather interaction (SWIM integration)
 	// See PRODUCTION_PLAN.md Step 46: Weather Buffer
 	// For MVP, we check if precipitation probability > 50% near the start date
-	// Stub: Using default lat/long for weather check
+	// Critical Blocker A: ZipCode available in item.ZipCode but geocoding not yet wired.
+	// TODO: Inject GeocodingService and use item.ZipCode for location-specific weather.
 	if a.weather != nil {
-		forecast, err := a.weather.GetForecast(30.2672, -97.7431) // Austin, TX default
+		forecast, err := a.weather.GetForecast(30.2672, -97.7431) // Austin, TX fallback
 		if err == nil && forecast.PrecipitationProbability > 0.5 {
 			weatherBuffer = 2
 		}

@@ -16,17 +16,21 @@ import (
 // DailyFocusAgent orchestrates the morning briefing generation.
 // See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
+// Critical Blocker A Remediation: Added geocoder and directory dependencies
 type DailyFocusAgent struct {
-	projects *service.ProjectService // Replaces *pgxpool.Pool
-	schedule *service.ScheduleService
-	weather  types.WeatherService
-	notifier types.NotificationService
-	aiClient ai.Client
-	clock    clock.Clock
+	projects  *service.ProjectService // Replaces *pgxpool.Pool
+	schedule  *service.ScheduleService
+	weather   types.WeatherService
+	notifier  types.NotificationService
+	aiClient  ai.Client
+	clock     clock.Clock
+	geocoder  types.GeocodingService // Blocker A: Address → lat/long
+	directory types.DirectoryService // Blocker A: PM email lookup
 }
 
 // NewDailyFocusAgent creates a new agent instance.
 // Clock is required for deterministic time simulation (Step 49).
+// Critical Blocker A Remediation: geocoder and directory are required
 func NewDailyFocusAgent(
 	projects *service.ProjectService, // Replaces db
 	schedule *service.ScheduleService,
@@ -34,14 +38,18 @@ func NewDailyFocusAgent(
 	notifier types.NotificationService,
 	aiClient ai.Client,
 	clk clock.Clock,
+	geocoder types.GeocodingService,
+	directory types.DirectoryService,
 ) *DailyFocusAgent {
 	return &DailyFocusAgent{
-		projects: projects,
-		schedule: schedule,
-		weather:  weather,
-		notifier: notifier,
-		aiClient: aiClient,
-		clock:    clk,
+		projects:  projects,
+		schedule:  schedule,
+		weather:   weather,
+		notifier:  notifier,
+		aiClient:  aiClient,
+		clock:     clk,
+		geocoder:  geocoder,
+		directory: directory,
 	}
 }
 
@@ -69,10 +77,17 @@ func (a *DailyFocusAgent) Execute(ctx context.Context) error {
 
 func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) error {
 	// 2. Fetch Context Data
-	// A. Weather
-	// TODO: Geocode p.Address to get lat/long. For MVP, using Austin, TX coordinates.
+	// A. Weather - Critical Blocker A Remediation: Use geocoded project address
 	// See BACKEND_SCOPE.md Section 2.4 (Weather-Sensitive Phases)
-	forecast, err := a.weather.GetForecast(30.2672, -97.7431)
+	lat, lng := 30.2672, -97.7431 // Default fallback (Austin, TX)
+	if a.geocoder != nil {
+		if geoLat, geoLng, err := a.geocoder.Geocode(p.Address); err == nil {
+			lat, lng = geoLat, geoLng
+		} else {
+			log.Printf("WARN: geocoding failed for project %s, using default coords: %v", p.ID, err)
+		}
+	}
+	forecast, err := a.weather.GetForecast(lat, lng)
 	if err != nil {
 		log.Printf("WARN: failed to get weather for project %s: %v", p.ID, err)
 		// Graceful degradation: proceed without weather data
@@ -110,12 +125,19 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 		briefing = "[AI Unavailable] Manual briefing required. Please review project schedule and weather conditions."
 	}
 
-	// 5. Deliver
-	// Send to "Project Owner" (stubbed as generic email for now)
+	// 5. Deliver - Critical Blocker A Remediation: Dynamic PM email lookup
 	log.Printf("--- DAILY BRIEFING FOR %s ---\n%s\n-----------------------------", p.Name, briefing)
 
-	// In production, look up Project Manager contact via DirectoryService
-	if err := a.notifier.SendEmail("superintendent@futurebuild.sh", fmt.Sprintf("Daily Briefing: %s", p.Name), briefing); err != nil {
+	// Look up Project Manager contact via DirectoryService (fallback to generic)
+	recipientEmail := "superintendent@futurebuild.sh"
+	if a.directory != nil {
+		if contact, err := a.directory.GetProjectManager(ctx, p.ID, p.OrgID); err == nil && contact.Email != "" {
+			recipientEmail = contact.Email
+		} else {
+			log.Printf("WARN: PM lookup failed for project %s, using fallback email: %v", p.ID, err)
+		}
+	}
+	if err := a.notifier.SendEmail(recipientEmail, fmt.Sprintf("Daily Briefing: %s", p.Name), briefing); err != nil {
 		log.Printf("WARN: failed to send notification: %v", err)
 	}
 

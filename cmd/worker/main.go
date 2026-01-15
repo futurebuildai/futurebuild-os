@@ -69,6 +69,9 @@ func main() {
 	scheduleService := service.NewScheduleService(dbPool)
 	notificationService := service.NewConsoleEmailProvider()
 	weatherService := service.NewMockWeatherService()
+	// Critical Blocker A Remediation: Add geocoding and directory services
+	geocodingService := service.NewGeocodingService()
+	directoryService := service.NewDirectoryService(dbPool)
 
 	// 6. Initialize Agents
 	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
@@ -81,6 +84,8 @@ func main() {
 		notificationService,
 		aiClient,
 		realClock,
+		geocodingService, // Critical Blocker A
+		directoryService, // Critical Blocker A
 	)
 
 	// Procurement Agent for long-lead item monitoring

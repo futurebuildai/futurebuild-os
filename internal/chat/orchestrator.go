@@ -48,12 +48,14 @@ type MessagePersister interface {
 
 // Orchestrator is the central traffic controller for the chat system.
 // See PRODUCTION_PLAN.md Step 43.3
+// Critical Blocker C Remediation: Added dlq for async retry of failed messages
 type Orchestrator struct {
 	db              MessagePersister
 	classifier      IntentClassifier
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
+	dlq             DLQPersister // Optional - nil means no DLQ
 }
 
 // --- Command Pattern (The "Actions") ---
@@ -233,6 +235,19 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 				"user_id", userID,
 				"error", err,
 			)
+			// Critical Blocker C Remediation: Enqueue for async retry if DLQ is configured
+			if o.dlq != nil {
+				if dlqErr := o.dlq.EnqueueRetry(ctx, modelMsg); dlqErr != nil {
+					slog.Error("DLQ enqueue failed - message will be lost",
+						"message_id", modelMsg.ID,
+						"error", dlqErr,
+					)
+				} else {
+					slog.Info("Message enqueued to DLQ for retry",
+						"message_id", modelMsg.ID,
+					)
+				}
+			}
 			// Return success - user sees the result despite persistence failure
 			return &ChatResponse{
 				Reply:    reply,
