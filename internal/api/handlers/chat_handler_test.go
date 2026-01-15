@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +42,15 @@ type mockScheduleService struct{}
 
 func (m *mockScheduleService) GetTask(_ context.Context, _, _, _ uuid.UUID) (*models.ProjectTask, error) {
 	return nil, nil
+}
+
+func (m *mockScheduleService) GetProjectSchedule(_ context.Context, _, _ uuid.UUID) (*service.ProjectScheduleSummary, error) {
+	return &service.ProjectScheduleSummary{
+		ProjectEnd:        time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC),
+		CriticalPathCount: 5,
+		TotalTasks:        20,
+		CompletedTasks:    8,
+	}, nil
 }
 
 type mockInvoiceService struct{}

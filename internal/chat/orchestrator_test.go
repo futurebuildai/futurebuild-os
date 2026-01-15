@@ -3,8 +3,10 @@ package chat
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -34,11 +36,30 @@ func (m *MockTaskService) UpdateTaskStatus(_ context.Context, _, _, _ uuid.UUID,
 	return nil
 }
 
-// MockScheduleService is a no-op mock for ScheduleService.
-type MockScheduleService struct{}
+// MockScheduleService is a configurable mock for ScheduleService.
+type MockScheduleService struct {
+	Summary *service.ProjectScheduleSummary
+	Err     error
+}
 
 func (m *MockScheduleService) GetTask(_ context.Context, _, _, _ uuid.UUID) (*models.ProjectTask, error) {
 	return nil, nil
+}
+
+func (m *MockScheduleService) GetProjectSchedule(_ context.Context, _, _ uuid.UUID) (*service.ProjectScheduleSummary, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	// Return default summary if none provided (for tests that don't care about schedule data)
+	if m.Summary == nil {
+		return &service.ProjectScheduleSummary{
+			ProjectEnd:        time.Now().AddDate(0, 6, 0),
+			CriticalPathCount: 0,
+			TotalTasks:        0,
+			CompletedTasks:    0,
+		}, nil
+	}
+	return m.Summary, nil
 }
 
 // MockInvoiceService is a no-op mock for InvoiceService.
@@ -189,4 +210,89 @@ func TestProcessRequest_ModelPersistError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "failed to persist model message")
+}
+
+// --- Command Pattern Tests ---
+
+func TestGetScheduleCommand_FormatsDataCorrectly(t *testing.T) {
+	// Arrange
+	mockSchedule := &MockScheduleService{
+		Summary: &service.ProjectScheduleSummary{
+			ProjectEnd:        time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC),
+			CriticalPathCount: 5,
+			TotalTasks:        20,
+			CompletedTasks:    8,
+		},
+	}
+
+	cmd := &GetScheduleCommand{
+		scheduleService: mockSchedule,
+		projectID:       uuid.New(),
+		orgID:           uuid.New(),
+	}
+
+	// Act
+	result, err := cmd.Execute(context.Background())
+
+	// Assert
+	require.NoError(t, err)
+	assert.Contains(t, result, "Jun 15, 2026")
+	assert.Contains(t, result, "Critical Path Tasks: 5")
+	assert.Contains(t, result, "Total Tasks: 20")
+	assert.Contains(t, result, "Completed: 8")
+}
+
+func TestGetScheduleCommand_ReturnsErrorOnServiceFailure(t *testing.T) {
+	// Arrange
+	mockSchedule := &MockScheduleService{Err: assert.AnError}
+
+	cmd := &GetScheduleCommand{
+		scheduleService: mockSchedule,
+		projectID:       uuid.New(),
+		orgID:           uuid.New(),
+	}
+
+	// Act
+	result, err := cmd.Execute(context.Background())
+
+	// Assert
+	require.Error(t, err)
+	assert.Empty(t, result)
+	assert.Contains(t, err.Error(), "failed to get schedule")
+}
+
+func TestProcessRequest_CallsScheduleServiceForGetScheduleIntent(t *testing.T) {
+	// Arrange
+	mockDB := &MockMessagePersister{}
+	mockSchedule := &MockScheduleService{
+		Summary: &service.ProjectScheduleSummary{
+			ProjectEnd:        time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
+			CriticalPathCount: 3,
+			TotalTasks:        15,
+			CompletedTasks:    10,
+		},
+	}
+
+	orchestrator := &Orchestrator{
+		db:              mockDB,
+		TaskService:     &MockTaskService{},
+		ScheduleService: mockSchedule,
+		InvoiceService:  &MockInvoiceService{},
+	}
+
+	req := ChatRequest{
+		ProjectID: uuid.New(),
+		Message:   "Show me the project schedule", // triggers IntentGetSchedule
+	}
+
+	// Act
+	resp, err := orchestrator.ProcessRequest(context.Background(), uuid.New(), uuid.New(), req)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, types.IntentGetSchedule, resp.Intent)
+	// Verify the response contains real data from the mock service
+	assert.Contains(t, resp.Reply, "Dec 01, 2026")
+	assert.Contains(t, resp.Reply, "Critical Path Tasks: 3")
 }

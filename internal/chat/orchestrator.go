@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,6 +24,7 @@ type TaskService interface {
 // ScheduleService defines operations for schedule retrieval and recalculation.
 type ScheduleService interface {
 	GetTask(ctx context.Context, taskID, projectID, orgID uuid.UUID) (*models.ProjectTask, error)
+	GetProjectSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*service.ProjectScheduleSummary, error)
 }
 
 // InvoiceService defines operations for invoice processing.
@@ -45,6 +47,46 @@ type Orchestrator struct {
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
+}
+
+// --- Command Pattern (The "Actions") ---
+// See PRODUCTION_PLAN.md Step 43 (Command Pattern Refactor)
+
+// ChatCommand defines the interface for intent-specific execution.
+type ChatCommand interface {
+	Execute(ctx context.Context) (string, error)
+}
+
+// GetScheduleCommand retrieves project schedule summary from ScheduleService.
+type GetScheduleCommand struct {
+	scheduleService ScheduleService
+	projectID       uuid.UUID
+	orgID           uuid.UUID
+}
+
+// Execute calls the ScheduleService and formats the response.
+func (c *GetScheduleCommand) Execute(ctx context.Context) (string, error) {
+	summary, err := c.scheduleService.GetProjectSchedule(ctx, c.projectID, c.orgID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get schedule: %w", err)
+	}
+	return fmt.Sprintf(
+		"Project End Date: %s\nCritical Path Tasks: %d\nTotal Tasks: %d\nCompleted: %d",
+		summary.ProjectEnd.Format("Jan 02, 2006"),
+		summary.CriticalPathCount,
+		summary.TotalTasks,
+		summary.CompletedTasks,
+	), nil
+}
+
+// PlaceholderCommand returns a static message for unimplemented intents.
+type PlaceholderCommand struct {
+	message string
+}
+
+// Execute returns the placeholder message.
+func (c *PlaceholderCommand) Execute(_ context.Context) (string, error) {
+	return c.message, nil
 }
 
 // NewOrchestrator creates a new Orchestrator with injected dependencies.
@@ -103,8 +145,12 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 	// See PRODUCTION_PLAN.md Step 43.2
 	intent := ClassifyIntent(req.Message)
 
-	// 3. Route & Generate Reply (V1 Placeholder Logic)
-	reply := o.routeIntent(ctx, intent)
+	// 3. Route & Execute Command
+	// See PRODUCTION_PLAN.md Step 43 (Command Pattern)
+	reply, err := o.routeIntent(ctx, intent, req.ProjectID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("command execution failed: %w", err)
+	}
 
 	// 4. Outbound Persistence: Save Model Response
 	// See DATA_SPINE_SPEC.md Section 5.3
@@ -127,20 +173,30 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 	}, nil
 }
 
-// routeIntent maps an Intent to a placeholder response string.
-// In later steps, this will dispatch to actual service logic.
-func (o *Orchestrator) routeIntent(_ context.Context, intent types.Intent) string {
+// routeIntent creates and executes the appropriate command for the given intent.
+// See PRODUCTION_PLAN.md Step 43 (Command Pattern)
+func (o *Orchestrator) routeIntent(ctx context.Context, intent types.Intent, projectID, orgID uuid.UUID) (string, error) {
+	cmd := o.createCommand(intent, projectID, orgID)
+	return cmd.Execute(ctx)
+}
+
+// createCommand is the Command Factory that instantiates the correct command.
+func (o *Orchestrator) createCommand(intent types.Intent, projectID, orgID uuid.UUID) ChatCommand {
 	switch intent {
-	case types.IntentProcessInvoice:
-		return "I can help you process that invoice. Please upload the document."
-	case types.IntentExplainDelay:
-		return "I'm analyzing the current schedule to explain potential delays."
 	case types.IntentGetSchedule:
-		return "Fetching the latest schedule information for your project."
+		return &GetScheduleCommand{
+			scheduleService: o.ScheduleService,
+			projectID:       projectID,
+			orgID:           orgID,
+		}
+	case types.IntentProcessInvoice:
+		return &PlaceholderCommand{message: "I can help you process that invoice. Please upload the document."}
+	case types.IntentExplainDelay:
+		return &PlaceholderCommand{message: "I'm analyzing the current schedule to explain potential delays."}
 	case types.IntentUpdateTaskStatus:
-		return "Ready to update the task status. Please confirm the task and new status."
+		return &PlaceholderCommand{message: "Ready to update the task status. Please confirm the task and new status."}
 	default:
-		return "I'm not sure how to help with that. Could you please rephrase your request?"
+		return &PlaceholderCommand{message: "I'm not sure how to help with that. Could you please rephrase your request?"}
 	}
 }
 

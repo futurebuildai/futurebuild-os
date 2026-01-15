@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,15 +20,8 @@ func NewProjectService(db *pgxpool.Pool) *ProjectService {
 }
 
 // CreateProject persists a new project to the database.
-// // See DATA_SPINE_SPEC.md Section 3.1
+// See DATA_SPINE_SPEC.md Section 3.1
 func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) error {
-	// Antagonistic Check: Prevent duplicate names in same Org
-	var exists bool
-	dupErr := s.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM projects WHERE org_id = $1 AND name = $2)", p.OrgID, p.Name).Scan(&exists)
-	if dupErr == nil && exists {
-		return fmt.Errorf("project with name '%s' already exists in this organization", p.Name)
-	}
-
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
 	}
@@ -43,12 +38,15 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 	_, err := s.db.Exec(ctx, query,
 		p.ID, p.OrgID, p.Name, p.Address, p.PermitIssuedDate, p.TargetEndDate, p.GSF, p.Status)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return fmt.Errorf("project with name '%s' already exists in this organization", p.Name)
+		}
 		return fmt.Errorf("failed to create project: %w", err)
 	}
 
 	return nil
 }
-
 
 // GetProject retrieves a project by ID, ensuring multi-tenancy via orgID.
 // // See DATA_SPINE_SPEC.md Section 3.1

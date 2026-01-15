@@ -57,3 +57,11 @@ This document serves as the master map for all technical and product specificati
 ### [MASTER_PRD.md](./MASTER_PRD.md)
 **Purpose:** User Requirements & UI Stories. The detailed Product Requirement Document describing specific features and acceptance criteria.
 **Key Contents:** Command Center, Gantt, Invoice Artifacts, User Stories, and Acceptance criteria for the Generative UI.
+
+---
+
+## Section 5: Remediation & Audits
+
+### [REMEDIATION_HANDLERS_TEST.md](./REMEDIATION_HANDLERS_TEST.md)
+**Purpose:** Phase 8 Remediation Plan.
+**Key Contents:** Specification for refactoring `internal/api/handlers` to use Dependency Injection (Interfaces) to increase unit test coverage from 23% to 80%+.

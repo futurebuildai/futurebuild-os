@@ -7,16 +7,15 @@ import (
 	"strings"
 
 	"github.com/colton/futurebuild/internal/models"
-	"github.com/colton/futurebuild/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type ProjectHandler struct {
-	service *service.ProjectService
+	service ProjectServiceInterface
 }
 
-func NewProjectHandler(s *service.ProjectService) *ProjectHandler {
+func NewProjectHandler(s ProjectServiceInterface) *ProjectHandler {
 	return &ProjectHandler{service: s}
 }
 

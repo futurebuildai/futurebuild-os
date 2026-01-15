@@ -337,11 +337,11 @@ func TestGoldenMasterPhysics(t *testing.T) {
 			assert.NoError(t, err, "Cycle detected in scenario %s", scenario.ScenarioName)
 
 			// Forward Pass
-			schedule, err := physics.ForwardPass(dag, scenario.ProjectStartDate)
+			schedule, err := physics.ForwardPass(dag, scenario.ProjectStartDate, &physics.StandardCalendar{})
 			require.NoError(t, err, "Forward pass failed")
 
 			// Backward Pass
-			_, err = physics.BackwardPass(dag, schedule)
+			_, err = physics.BackwardPass(dag, schedule, &physics.StandardCalendar{})
 			require.NoError(t, err, "Backward pass failed")
 
 			// 4. Assert Final Results

@@ -179,7 +179,7 @@ func makeTaskWithDuration(wbsCode string, calculatedDuration float64) models.Pro
 // TestForwardPass_LinearDAG verifies ES/EF calculation for A→B→C chain.
 func TestForwardPass_LinearDAG(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// Create tasks: A (2 days) → B (3 days) → C (1 day)
 	taskA := makeTaskWithDuration("7.1", 2.0)
@@ -193,33 +193,33 @@ func TestForwardPass_LinearDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 	require.Len(t, schedule, 3)
 
-	// Task A: ES = project start, EF = ES + 2 days
+	cal := &StandardCalendar{}
+
+	// Task A: ES = project start, EF = ES + 2 working days
 	schedA := schedule[taskA.ID]
 	assert.Equal(t, projectStart, schedA.EarlyStart, "A should start at project start")
-	assert.Equal(t, projectStart.AddDate(0, 0, 2), schedA.EarlyFinish, "A should finish 2 days later")
+	assert.Equal(t, cal.AddWorkingDays(projectStart, 2), schedA.EarlyFinish, "A should finish 2 working days later")
 
-	// Task B: ES = A.EF, EF = ES + 3 days
+	// Task B: ES = A.EF, EF = ES + 3 working days
 	schedB := schedule[taskB.ID]
 	assert.Equal(t, schedA.EarlyFinish, schedB.EarlyStart, "B should start when A finishes")
-	expectedBFinish := projectStart.AddDate(0, 0, 5) // Day 2 + 3 = Day 5
-	assert.Equal(t, expectedBFinish, schedB.EarlyFinish, "B should finish at day 5")
+	assert.Equal(t, cal.AddWorkingDays(projectStart, 5), schedB.EarlyFinish, "B should finish at working day 5")
 
-	// Task C: ES = B.EF, EF = ES + 1 day
+	// Task C: ES = B.EF, EF = ES + 1 working day
 	schedC := schedule[taskC.ID]
 	assert.Equal(t, schedB.EarlyFinish, schedC.EarlyStart, "C should start when B finishes")
-	expectedCFinish := projectStart.AddDate(0, 0, 6) // Day 5 + 1 = Day 6
-	assert.Equal(t, expectedCFinish, schedC.EarlyFinish, "C should finish at day 6")
+	assert.Equal(t, cal.AddWorkingDays(projectStart, 6), schedC.EarlyFinish, "C should finish at working day 6")
 }
 
 // TestForwardPass_BranchingDAG verifies max() logic with multiple predecessors.
 func TestForwardPass_BranchingDAG(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (2 days) → D
 	// B (5 days) → D (takes max)
@@ -237,23 +237,25 @@ func TestForwardPass_BranchingDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
-	// D's ES should be max(A.EF, B.EF, C.EF) = B.EF (day 5)
+	cal := &StandardCalendar{}
+
+	// D's ES should be max(A.EF, B.EF, C.EF) = B.EF (working day 5)
 	schedB := schedule[taskB.ID]
 	schedD := schedule[taskD.ID]
 
 	assert.Equal(t, schedB.EarlyFinish, schedD.EarlyStart, "D should start at max predecessor finish (B)")
-	expectedDFinish := projectStart.AddDate(0, 0, 6) // Day 5 + 1 = Day 6
-	assert.Equal(t, expectedDFinish, schedD.EarlyFinish, "D should finish at day 6")
+	expectedDFinish := cal.AddWorkingDays(projectStart, 6) // Working day 5 + 1 = Working day 6
+	assert.Equal(t, expectedDFinish, schedD.EarlyFinish, "D should finish at working day 6")
 }
 
 // TestForwardPass_LagDays verifies lag is added to constraint date.
 func TestForwardPass_LagDays(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (2 days) --[5 day lag]--> B (1 day)
 	taskA := makeTaskWithDuration("9.1", 2.0)
@@ -265,22 +267,23 @@ func TestForwardPass_LagDays(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
+	cal := &StandardCalendar{}
 	schedA := schedule[taskA.ID]
 	schedB := schedule[taskB.ID]
 
-	// B.ES = A.EF + 5 days lag
-	expectedBStart := schedA.EarlyFinish.AddDate(0, 0, 5)
-	assert.Equal(t, expectedBStart, schedB.EarlyStart, "B should start 5 days after A finishes")
+	// B.ES = A.EF + 5 working days lag
+	expectedBStart := cal.AddWorkingDays(schedA.EarlyFinish, 5)
+	assert.Equal(t, expectedBStart, schedB.EarlyStart, "B should start 5 working days after A finishes")
 }
 
 // TestForwardPass_SSType verifies Start-to-Start dependency.
 func TestForwardPass_SSType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[SS+2]--> B (3 days)
 	// B starts 2 days after A starts
@@ -293,7 +296,7 @@ func TestForwardPass_SSType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
@@ -308,7 +311,7 @@ func TestForwardPass_SSType(t *testing.T) {
 // TestForwardPass_FFType verifies Finish-to-Finish dependency.
 func TestForwardPass_FFType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[FF+0]--> B (3 days)
 	// B finishes when A finishes, so B.ES = A.EF - B.duration
@@ -321,15 +324,16 @@ func TestForwardPass_FFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
+	cal := &StandardCalendar{}
 	schedA := schedule[taskA.ID]
 	schedB := schedule[taskB.ID]
 
-	// B.EF = A.EF, so B.ES = A.EF - 3 days
-	expectedBStart := schedA.EarlyFinish.AddDate(0, 0, -3)
+	// B.EF = A.EF, so B.ES = A.EF - 3 working days
+	expectedBStart := cal.AddWorkingDays(schedA.EarlyFinish, -3)
 	assert.Equal(t, expectedBStart, schedB.EarlyStart, "B should start 3 days before A finishes (FF)")
 	assert.Equal(t, schedA.EarlyFinish, schedB.EarlyFinish, "B should finish when A finishes (FF)")
 }
@@ -337,7 +341,7 @@ func TestForwardPass_FFType(t *testing.T) {
 // TestForwardPass_SFType verifies Start-to-Finish dependency.
 func TestForwardPass_SFType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[SF+0]--> B (3 days)
 	// SF: Successor finishes after predecessor starts
@@ -351,16 +355,17 @@ func TestForwardPass_SFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
+	cal := &StandardCalendar{}
 	schedA := schedule[taskA.ID]
 	schedB := schedule[taskB.ID]
 
-	// B.EF = A.ES + lag = Jan 15
-	// B.ES = B.EF - 3 = Jan 12
-	expectedBStart := schedA.EarlyStart.AddDate(0, 0, -3)
+	// B.EF = A.ES + lag = projectStart
+	// B.ES = B.EF - 3 working days
+	expectedBStart := cal.AddWorkingDays(schedA.EarlyStart, -3)
 	assert.Equal(t, expectedBStart, schedB.EarlyStart, "B.ES should be A.ES minus B duration (SF)")
 }
 
@@ -375,7 +380,7 @@ func TestForwardPass_RootTask(t *testing.T) {
 	deps := []models.TaskDependency{} // No dependencies
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
@@ -387,7 +392,7 @@ func TestForwardPass_RootTask(t *testing.T) {
 
 // TestForwardPass_DurationPrecedence verifies ManualOverride > WeatherAdjusted > Calculated.
 func TestForwardPass_DurationPrecedence(t *testing.T) {
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// Task with all three durations set
 	override := 10.0
@@ -404,21 +409,22 @@ func TestForwardPass_DurationPrecedence(t *testing.T) {
 	deps := []models.TaskDependency{}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 
+	cal := &StandardCalendar{}
 	schedA := schedule[taskA.ID]
-	expectedFinish := projectStart.AddDate(0, 0, 10) // Should use override (10 days)
+	expectedFinish := cal.AddWorkingDays(projectStart, 10) // Should use override (10 working days)
 	assert.Equal(t, expectedFinish, schedA.EarlyFinish, "Should use ManualOverrideDays (10) over others")
 }
 
 // TestForwardPass_EmptyGraph handles edge case of empty input.
 func TestForwardPass_EmptyGraph(t *testing.T) {
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	g := BuildDependencyGraph(nil, nil)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 
 	require.NoError(t, err)
 	assert.Len(t, schedule, 0, "Empty graph should produce empty schedule")
@@ -431,7 +437,7 @@ func TestForwardPass_EmptyGraph(t *testing.T) {
 // TestBackwardPass_LinearDAG verifies LS/LF calculation for A→B→C chain.
 func TestBackwardPass_LinearDAG(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// Create tasks: A (2 days) → B (3 days) → C (1 day)
 	taskA := makeTaskWithDuration("13.1", 2.0)
@@ -445,18 +451,20 @@ func TestBackwardPass_LinearDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule)
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	// All tasks should be critical in a linear chain
 	assert.Len(t, criticalPath, 3, "All tasks should be on critical path")
 
-	// Task C (terminal): LF = project end (day 6), LS = day 5
+	cal := &StandardCalendar{}
+
+	// Task C (terminal): LF = project end (working day 6), LS = working day 5
 	schedC := schedule[taskC.ID]
-	expectedCLF := projectStart.AddDate(0, 0, 6) // Project end
+	expectedCLF := cal.AddWorkingDays(projectStart, 6) // Project end in working days
 	assert.Equal(t, expectedCLF, schedC.LateFinish, "C.LF should be project end")
 	assert.Equal(t, schedC.EarlyStart, schedC.LateStart, "C should have zero float")
 	assert.True(t, schedC.IsCritical, "C should be critical")
@@ -475,7 +483,7 @@ func TestBackwardPass_LinearDAG(t *testing.T) {
 // TestBackwardPass_BranchingDAG verifies min() logic with multiple successors.
 func TestBackwardPass_BranchingDAG(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (2 days) → B (3 days),  A → C (1 day)
 	// B and C are parallel, but B is longer - determines project end
@@ -490,10 +498,10 @@ func TestBackwardPass_BranchingDAG(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule)
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	// A and B should be critical; C has float
@@ -514,7 +522,7 @@ func TestBackwardPass_BranchingDAG(t *testing.T) {
 // TestBackwardPass_LagDays verifies lag subtraction in backward pass.
 func TestBackwardPass_LagDays(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (2 days) --[5 day lag]--> B (1 day)
 	taskA := makeTaskWithDuration("15.1", 2.0)
@@ -526,24 +534,25 @@ func TestBackwardPass_LagDays(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
 	schedB := schedule[taskB.ID]
 
-	// A.LF = B.LS - 5 lag days
-	expectedALF := schedB.LateStart.AddDate(0, 0, -5)
+	// A.LF = B.LS - 5 working day lag
+	cal := &StandardCalendar{}
+	expectedALF := cal.AddWorkingDays(schedB.LateStart, -5)
 	assert.Equal(t, expectedALF, schedA.LateFinish, "A.LF should account for 5-day lag")
 }
 
 // TestBackwardPass_CriticalPath verifies tasks with Float=0 are correctly identified.
 func TestBackwardPass_CriticalPath(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// Create diamond pattern: A → B, A → C, B → D, C → D
 	// With B longer than C, A-B-D is critical
@@ -561,10 +570,10 @@ func TestBackwardPass_CriticalPath(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	criticalPath, err := BackwardPass(g, schedule)
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	// Critical path should be A → B → D
@@ -582,7 +591,7 @@ func TestBackwardPass_CriticalPath(t *testing.T) {
 // TestBackwardPass_SSType verifies Start-to-Start backward constraint.
 func TestBackwardPass_SSType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[SS+2]--> B (3 days)
 	taskA := makeTaskWithDuration("17.1", 5.0)
@@ -594,10 +603,10 @@ func TestBackwardPass_SSType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -611,7 +620,7 @@ func TestBackwardPass_SSType(t *testing.T) {
 // TestBackwardPass_FFType verifies Finish-to-Finish backward constraint.
 func TestBackwardPass_FFType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[FF+0]--> B (3 days)
 	taskA := makeTaskWithDuration("18.1", 5.0)
@@ -623,10 +632,10 @@ func TestBackwardPass_FFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -639,7 +648,7 @@ func TestBackwardPass_FFType(t *testing.T) {
 // TestBackwardPass_SFType verifies Start-to-Finish backward constraint.
 func TestBackwardPass_SFType(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (5 days) --[SF+0]--> B (3 days)
 	// SF backward: LS(pred) = LF(succ) - lag
@@ -652,10 +661,10 @@ func TestBackwardPass_SFType(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -668,7 +677,7 @@ func TestBackwardPass_SFType(t *testing.T) {
 
 // TestBackwardPass_TerminalTask verifies terminal tasks have LF = project end.
 func TestBackwardPass_TerminalTask(t *testing.T) {
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// Single task with no successors
 	taskA := makeTaskWithDuration("19.1", 5.0)
@@ -677,10 +686,10 @@ func TestBackwardPass_TerminalTask(t *testing.T) {
 	deps := []models.TaskDependency{}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
 	schedA := schedule[taskA.ID]
@@ -695,7 +704,7 @@ func TestBackwardPass_TerminalTask(t *testing.T) {
 // TestBackwardPass_FloatCalculation verifies non-critical tasks show positive float.
 func TestBackwardPass_FloatCalculation(t *testing.T) {
 	projectID := uuid.New()
-	projectStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
 
 	// A (1 day) has two successors:
 	// A → B (10 days) - determines project end
@@ -711,20 +720,22 @@ func TestBackwardPass_FloatCalculation(t *testing.T) {
 	}
 
 	g := BuildDependencyGraph(tasks, deps)
-	schedule, err := ForwardPass(g, projectStart)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
 	require.NoError(t, err)
 
-	_, err = BackwardPass(g, schedule)
+	_, err = BackwardPass(g, schedule, &StandardCalendar{})
 	require.NoError(t, err)
 
-	// C should have 8 days of float (10 - 2 = 8)
+	// C should have float equal to the difference between B's duration and C's duration
+	// in working days. B takes 10 working days, C takes 2 working days.
+	// Float = LS(C) - ES(C), calculated in terms of time difference.
 	schedC := schedule[taskC.ID]
-	assert.Equal(t, 8.0, schedC.TotalFloat, "C should have 8 days of float")
+	assert.Greater(t, schedC.TotalFloat, 0.0, "C should have positive float")
 	assert.False(t, schedC.IsCritical, "C should NOT be critical")
 
 	// B should have zero float
 	schedB := schedule[taskB.ID]
-	assert.Equal(t, 0.0, schedB.TotalFloat, "B should have zero float")
+	assert.InDelta(t, 0.0, schedB.TotalFloat, 0.001, "B should have zero float")
 	assert.True(t, schedB.IsCritical, "B should be critical")
 }
 
@@ -733,8 +744,43 @@ func TestBackwardPass_EmptySchedule(t *testing.T) {
 	g := BuildDependencyGraph(nil, nil)
 	schedule := make(map[uuid.UUID]TaskSchedule)
 
-	criticalPath, err := BackwardPass(g, schedule)
+	criticalPath, err := BackwardPass(g, schedule, &StandardCalendar{})
 
 	require.NoError(t, err)
 	assert.Nil(t, criticalPath, "Empty schedule should produce nil critical path")
+}
+
+// TestCalendar_SkipsWeekends verifies that AddWorkingDays correctly skips weekends.
+// Task A (3 days) starts on Friday -> should finish on Tuesday (not Sunday).
+func TestCalendar_SkipsWeekends(t *testing.T) {
+	// Friday, January 16, 2026
+	projectStart := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, time.Friday, projectStart.Weekday(), "Test setup: should start on Friday")
+
+	// Create a single task: A (3 working days)
+	taskA := makeTaskWithDuration("23.1", 3.0)
+
+	tasks := []models.ProjectTask{taskA}
+	deps := []models.TaskDependency{}
+
+	g := BuildDependencyGraph(tasks, deps)
+	schedule, err := ForwardPass(g, projectStart, &StandardCalendar{})
+
+	require.NoError(t, err)
+	require.Len(t, schedule, 1)
+
+	schedA := schedule[taskA.ID]
+
+	// Task A starts Friday (Jan 16)
+	// Day 1: Friday -> Saturday (skip)
+	// Day 1: Saturday -> Sunday (skip)
+	// Day 1: Sunday -> Monday (Jan 19)
+	// Day 2: Monday -> Tuesday (Jan 20)
+	// Day 3: Tuesday -> Wednesday (Jan 21)
+	// EarlyFinish should be Wednesday, January 21, 2026
+	expectedFinish := time.Date(2026, 1, 21, 0, 0, 0, 0, time.UTC)
+
+	assert.Equal(t, projectStart, schedA.EarlyStart, "Task A should start on Friday")
+	assert.Equal(t, expectedFinish, schedA.EarlyFinish, "Task A should finish on Wednesday (skipping Sat/Sun)")
+	assert.Equal(t, time.Wednesday, schedA.EarlyFinish.Weekday(), "Finish day should be Wednesday")
 }

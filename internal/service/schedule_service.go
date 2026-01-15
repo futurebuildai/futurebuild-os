@@ -24,6 +24,53 @@ func NewScheduleService(db *pgxpool.Pool) *ScheduleService {
 	return &ScheduleService{db: db}
 }
 
+// ProjectScheduleSummary represents a high-level schedule overview.
+// Used by the Chat Orchestrator to provide schedule status responses.
+type ProjectScheduleSummary struct {
+	ProjectEnd        time.Time
+	CriticalPathCount int
+	TotalTasks        int
+	CompletedTasks    int
+}
+
+// GetProjectSchedule returns a summary of the project's schedule status.
+// See PRODUCTION_PLAN.md Step 43 (Chat Orchestrator Command Pattern)
+func (s *ScheduleService) GetProjectSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*ProjectScheduleSummary, error) {
+	// Verify project ownership and fetch target_end_date
+	var targetEndDate *time.Time
+	err := s.db.QueryRow(ctx, `
+		SELECT target_end_date FROM projects 
+		WHERE id = $1 AND org_id = $2
+	`, projectID, orgID).Scan(&targetEndDate)
+	if err != nil {
+		return nil, fmt.Errorf("project not found or access denied: %w", err)
+	}
+
+	// Aggregate task statistics
+	var totalTasks, completedTasks, criticalPathCount int
+	err = s.db.QueryRow(ctx, `
+		SELECT 
+			COUNT(*) AS total_tasks,
+			COUNT(*) FILTER (WHERE status = 'complete') AS completed_tasks,
+			COUNT(*) FILTER (WHERE is_on_critical_path = true) AS critical_path_count
+		FROM project_tasks WHERE project_id = $1
+	`, projectID).Scan(&totalTasks, &completedTasks, &criticalPathCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate task stats: %w", err)
+	}
+
+	summary := &ProjectScheduleSummary{
+		TotalTasks:        totalTasks,
+		CompletedTasks:    completedTasks,
+		CriticalPathCount: criticalPathCount,
+	}
+	if targetEndDate != nil {
+		summary.ProjectEnd = *targetEndDate
+	}
+
+	return summary, nil
+}
+
 // RecalculateSchedule runs the full CPM (ForwardPass + BackwardPass) for a project.
 // Updates all task ES/EF/LS/LF values and the project's target_end_date.
 // See PRODUCTION_PLAN.md Step 32
@@ -76,12 +123,12 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 		return nil, fmt.Errorf("schedule contains circular dependencies: %w", err)
 	}
 
-	schedule, err := physics.ForwardPass(graph, projectStart)
+	schedule, err := physics.ForwardPass(graph, projectStart, &physics.StandardCalendar{})
 	if err != nil {
 		return nil, fmt.Errorf("forward pass failed: %w", err)
 	}
 
-	criticalPath, err := physics.BackwardPass(graph, schedule)
+	criticalPath, err := physics.BackwardPass(graph, schedule, &physics.StandardCalendar{})
 	if err != nil {
 		return nil, fmt.Errorf("backward pass failed: %w", err)
 	}
