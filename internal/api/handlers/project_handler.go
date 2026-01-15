@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-
 	"strings"
 
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -20,14 +20,15 @@ func NewProjectHandler(s ProjectServiceInterface) *ProjectHandler {
 }
 
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
-	orgIDStr := r.Header.Get("X-Org-ID")
-	if orgIDStr == "" {
-		http.Error(w, "X-Org-ID header is required for multi-tenancy validation", http.StatusBadRequest)
+	// Extract OrgID from authenticated JWT claims (secure, not from header)
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		http.Error(w, "Internal server error: missing authentication context", http.StatusInternalServerError)
 		return
 	}
-	authOrgID, err := uuid.Parse(orgIDStr)
+	authOrgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
-		http.Error(w, "Invalid X-Org-ID", http.StatusBadRequest)
+		http.Error(w, "Internal server error: invalid OrgID in token", http.StatusInternalServerError)
 		return
 	}
 
@@ -37,12 +38,14 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rigid Multi-Tenancy Enforcement: Header MUST match body
-	if p.OrgID != uuid.Nil && p.OrgID != authOrgID {
-		http.Error(w, "Authorized OrgID does not match request body", http.StatusForbidden)
+	// Multi-Tenancy Enforcement: If body OrgID is empty, assign from claims.
+	// If body OrgID differs from claims, deny the request.
+	if p.OrgID == uuid.Nil {
+		p.OrgID = authOrgID
+	} else if p.OrgID != authOrgID {
+		http.Error(w, "cannot create project for another organization", http.StatusForbidden)
 		return
 	}
-	p.OrgID = authOrgID
 
 	if p.Name == "" {
 		http.Error(w, "project name is required", http.StatusBadRequest)
@@ -76,15 +79,15 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Placeholder for multi-tenancy until Auth is implemented
-	orgIDStr := r.Header.Get("X-Org-ID")
-	if orgIDStr == "" {
-		http.Error(w, "X-Org-ID header is required for multi-tenancy validation", http.StatusBadRequest)
+	// Extract OrgID from authenticated JWT claims (secure, not from header)
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		http.Error(w, "Internal server error: missing authentication context", http.StatusInternalServerError)
 		return
 	}
-	orgID, err := uuid.Parse(orgIDStr)
+	orgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
-		http.Error(w, "Invalid X-Org-ID", http.StatusBadRequest)
+		http.Error(w, "Internal server error: invalid OrgID in token", http.StatusInternalServerError)
 		return
 	}
 

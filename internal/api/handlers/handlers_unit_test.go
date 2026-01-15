@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/physics"
 	"github.com/colton/futurebuild/pkg/types"
@@ -18,6 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Helper to create a context with authenticated claims
+func ctxWithClaims(orgID uuid.UUID) context.Context {
+	return middleware.WithClaims(context.Background(), &types.Claims{
+		OrgID:  orgID.String(),
+		UserID: uuid.New().String(),
+	})
+}
 
 // --- Mock ProjectService ---
 
@@ -55,7 +64,7 @@ func TestProjectHandler_CreateProject_Success(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
+	req = req.WithContext(ctxWithClaims(orgID))
 
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
@@ -64,47 +73,53 @@ func TestProjectHandler_CreateProject_Success(t *testing.T) {
 	assert.True(t, mock.createCalled)
 }
 
-func TestProjectHandler_CreateProject_MissingOrgHeader(t *testing.T) {
+func TestProjectHandler_CreateProject_MissingClaims(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
+	// No claims in context - should return 500 (middleware normally catches this)
 	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "X-Org-ID header is required")
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "missing authentication context")
 }
 
-func TestProjectHandler_CreateProject_InvalidOrgID(t *testing.T) {
+func TestProjectHandler_CreateProject_InvalidOrgIDInClaims(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
+	// Create context with invalid OrgID in claims
+	ctx := middleware.WithClaims(context.Background(), &types.Claims{
+		OrgID:  "not-a-uuid",
+		UserID: uuid.New().String(),
+	})
 	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
-	req.Header.Set("X-Org-ID", "not-a-uuid")
+	req = req.WithContext(ctx)
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Invalid X-Org-ID")
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "invalid OrgID in token")
 }
 
 func TestProjectHandler_CreateProject_OrgMismatch(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
-	headerOrgID := uuid.New()
+	claimsOrgID := uuid.New()
 	bodyOrgID := uuid.New()
 	body := models.Project{Name: "Test Project", OrgID: bodyOrgID}
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", headerOrgID.String())
+	req = req.WithContext(ctxWithClaims(claimsOrgID))
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
-	assert.Contains(t, rr.Body.String(), "does not match")
+	assert.Contains(t, rr.Body.String(), "cannot create project for another organization")
 }
 
 func TestProjectHandler_CreateProject_MissingName(t *testing.T) {
@@ -116,7 +131,7 @@ func TestProjectHandler_CreateProject_MissingName(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
+	req = req.WithContext(ctxWithClaims(orgID))
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
@@ -133,7 +148,7 @@ func TestProjectHandler_CreateProject_ServiceError(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
+	req = req.WithContext(ctxWithClaims(orgID))
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
@@ -149,7 +164,7 @@ func TestProjectHandler_CreateProject_Conflict(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/projects", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
+	req = req.WithContext(ctxWithClaims(orgID))
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
@@ -165,12 +180,13 @@ func TestProjectHandler_GetProject_Success(t *testing.T) {
 	handler := NewProjectHandler(mock)
 
 	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID.String(), nil)
-	req.Header.Set("X-Org-ID", orgID.String())
 
-	// Add chi URL params
+	// Add chi URL params and claims context
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := ctxWithClaims(orgID)
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.GetProject(rr, req)
@@ -187,11 +203,12 @@ func TestProjectHandler_GetProject_NotFound(t *testing.T) {
 	orgID := uuid.New()
 
 	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID.String(), nil)
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := ctxWithClaims(orgID)
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.GetProject(rr, req)
@@ -203,12 +220,14 @@ func TestProjectHandler_GetProject_InvalidID(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
+	orgID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/projects/invalid", nil)
-	req.Header.Set("X-Org-ID", uuid.New().String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "invalid-uuid")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := ctxWithClaims(orgID)
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.GetProject(rr, req)
@@ -216,13 +235,14 @@ func TestProjectHandler_GetProject_InvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
-func TestProjectHandler_GetProject_MissingOrgHeader(t *testing.T) {
+func TestProjectHandler_GetProject_MissingClaims(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
 	projectID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID.String(), nil)
 
+	// No claims in context - only chi route context
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -230,7 +250,8 @@ func TestProjectHandler_GetProject_MissingOrgHeader(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.GetProject(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "missing authentication context")
 }
 
 // --- taskHandlerMockScheduleService (for TaskHandler tests) ---
