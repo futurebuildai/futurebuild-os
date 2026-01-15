@@ -36,6 +36,12 @@ run:
 	# Placeholder for start command, e.g., go run cmd/api/main.go
 	@echo "Please specify a run command in the Makefile when cmd/api is implemented."
 
+# Run Worker: Start the background worker
+run-worker:
+	@echo "--- Starting FutureBuild Worker ---"
+	go run cmd/worker/main.go
+
+
 # Clean: Remove build artifacts
 clean:
 	rm -rf bin/

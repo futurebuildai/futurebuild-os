@@ -2,6 +2,7 @@ package chat
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/colton/futurebuild/pkg/types"
@@ -160,16 +161,31 @@ func (c *RegexClassifier) Classify(message string) types.Intent {
 		}
 	}
 
-	// Find intent with highest score
-	var bestIntent types.Intent = types.IntentUnknown
-	var bestScore int
-
-	for intent, score := range scores {
-		if score > bestScore {
-			bestScore = score
-			bestIntent = intent
-		}
+	// Find intent with highest score using deterministic tie-breaking.
+	// ENGINEERING STANDARD: Map iteration order is non-deterministic in Go.
+	// We sort intents by score (descending), then alphabetically by intent string
+	// to ensure reproducible results when multiple intents have equal scores.
+	if len(scores) == 0 {
+		return types.IntentUnknown
 	}
 
-	return bestIntent
+	// Collect intents into a slice for deterministic sorting
+	type intentScore struct {
+		intent types.Intent
+		score  int
+	}
+	candidates := make([]intentScore, 0, len(scores))
+	for intent, score := range scores {
+		candidates = append(candidates, intentScore{intent: intent, score: score})
+	}
+
+	// Sort: highest score first, then alphabetically by intent for tie-breaking
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score // Higher score wins
+		}
+		return string(candidates[i].intent) < string(candidates[j].intent) // Alphabetical tie-breaker
+	})
+
+	return candidates[0].intent
 }

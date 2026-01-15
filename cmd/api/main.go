@@ -18,9 +18,9 @@ func main() {
 		log.Println("No .env file found, relying on environment variables")
 	}
 
-	cfg := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL environment variable is required")
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 
 	ctx := context.Background()

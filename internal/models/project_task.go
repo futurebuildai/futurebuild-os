@@ -31,6 +31,10 @@ type ProjectTask struct {
 	ManualOverrideDays      *float64         `json:"manual_override_days,omitempty" db:"manual_override_days"`
 	OverrideReason          string           `json:"override_reason,omitempty" db:"override_reason"`
 	Status                  types.TaskStatus `json:"status" db:"status"`
+	PlannedStart            *time.Time       `json:"planned_start" db:"planned_start"`
+	PlannedEnd              *time.Time       `json:"planned_end" db:"planned_end"`
+	ActualStart             *time.Time       `json:"actual_start" db:"actual_start"`
+	ActualEnd               *time.Time       `json:"actual_end" db:"actual_end"`
 	VerifiedByVision        bool             `json:"verified_by_vision" db:"verified_by_vision"`
 	VerificationConfidence  float64          `json:"verification_confidence" db:"verification_confidence"`
 	IsHumanReviewRequired   bool             `json:"is_human_review_required" db:"is_human_review_required"`

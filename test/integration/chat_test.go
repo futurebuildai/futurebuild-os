@@ -27,7 +27,7 @@ func TestChat_EndToEnd(t *testing.T) {
 	}
 
 	// 1. Setup DB Connection
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
 	}
@@ -132,7 +132,7 @@ func TestChat_NoToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
 	}
@@ -173,7 +173,7 @@ func TestChat_InvalidToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
 	}
@@ -214,7 +214,7 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
 	}

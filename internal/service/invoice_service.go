@@ -34,7 +34,19 @@ func NewInvoiceService(db *pgxpool.Pool, client ai.Client) *InvoiceService {
 	}
 }
 
-const invoicePromptTemplate = `
+// =============================================================================
+// AI PROMPTS (OPERATION IRONCLAD TASK 5)
+// =============================================================================
+// ENGINEERING STANDARD: AI prompts are extracted to package-level variables
+// for separation from business logic. This allows configuration loaders or
+// testing frameworks to override prompts without modifying service code.
+//
+// Usage: service.InvoicePromptTemplate = customPrompt
+// =============================================================================
+
+// InvoicePromptTemplate is the AI prompt template for invoice extraction.
+// Exported as a var so it can be overridden by config loaders or tests.
+var InvoicePromptTemplate = `
 Extract the following information from the invoice text provided and return it as a structured JSON object.
 Do NOT include any markdown formatting (like ` + "```" + `json) in your response. Return ONLY the raw JSON string.
 
@@ -84,7 +96,7 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
-	promptPart := &genai.Part{Text: fmt.Sprintf(invoicePromptTemplate, extractedText)}
+	promptPart := &genai.Part{Text: fmt.Sprintf(InvoicePromptTemplate, extractedText)}
 	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, promptPart)
 	if err != nil {
 		return uuid.Nil, nil, fmt.Errorf("ai analysis failed: %w", err)

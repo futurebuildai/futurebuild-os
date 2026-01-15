@@ -23,7 +23,7 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
 	}

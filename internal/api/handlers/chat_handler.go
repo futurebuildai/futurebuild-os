@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/colton/futurebuild/internal/api/response"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/google/uuid"
@@ -32,21 +33,21 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	claims, err := middleware.GetClaims(r.Context())
 	if err != nil {
 		slog.Error("chat: missing claims in context", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		response.JSONError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
 	userID, err := uuid.Parse(claims.UserID)
 	if err != nil {
 		slog.Error("chat: invalid UserID in claims", "raw_user_id", claims.UserID, "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		response.JSONError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
 	orgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
 		slog.Error("chat: invalid OrgID in claims", "raw_org_id", claims.OrgID, "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		response.JSONError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
@@ -54,14 +55,14 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	var req chat.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("chat: invalid request body", "error", err)
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		response.JSONError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
 	// 3. Validate Request (Non-empty message)
 	if req.Message == "" {
 		slog.Warn("chat: empty message received", "user_id", userID, "project_id", req.ProjectID)
-		http.Error(w, "Message cannot be empty", http.StatusBadRequest)
+		response.JSONError(w, http.StatusBadRequest, "Message cannot be empty")
 		return
 	}
 
@@ -86,7 +87,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 			"duration_ms", time.Since(start).Milliseconds(),
 		)
-		http.Error(w, "Failed to process chat request", http.StatusInternalServerError)
+		response.JSONError(w, http.StatusInternalServerError, "Failed to process chat request")
 		return
 	}
 

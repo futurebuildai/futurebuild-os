@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colton/futurebuild/internal/api/response"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
@@ -80,9 +81,9 @@ func TestRequireAuth(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		var body map[string]string
+		var body response.ErrorEnvelope
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "Unauthorized: Missing OrgID", body["error"])
+		assert.Equal(t, "Unauthorized: Missing OrgID", body.Error.Message)
 	})
 
 	t.Run("No Header", func(t *testing.T) {
@@ -92,9 +93,9 @@ func TestRequireAuth(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		var body map[string]string
+		var body response.ErrorEnvelope
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "Unauthorized", body["error"])
+		assert.Equal(t, "Unauthorized", body.Error.Message)
 	})
 
 	t.Run("Invalid Token", func(t *testing.T) {
@@ -105,9 +106,9 @@ func TestRequireAuth(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		var body map[string]string
+		var body response.ErrorEnvelope
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "Unauthorized", body["error"])
+		assert.Equal(t, "Unauthorized", body.Error.Message)
 	})
 
 	t.Run("Expired Token", func(t *testing.T) {
@@ -119,9 +120,9 @@ func TestRequireAuth(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		var body map[string]string
+		var body response.ErrorEnvelope
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "Unauthorized", body["error"])
+		assert.Equal(t, "Unauthorized", body.Error.Message)
 	})
 }
 
@@ -161,9 +162,9 @@ func TestRequireRole(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusForbidden, rec.Code)
-		var body map[string]string
+		var body response.ErrorEnvelope
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "Forbidden", body["error"])
+		assert.Equal(t, "Forbidden", body.Error.Message)
 	})
 
 	t.Run("Builder User Accessing Builder Route -> Allow", func(t *testing.T) {

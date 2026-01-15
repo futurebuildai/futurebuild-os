@@ -77,7 +77,7 @@ func contains(s, substr string) bool {
 func TestVisionService_VerifyTask(t *testing.T) {
 	// 1. Setup Client (Real or Mock)
 	var client ai.Client
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 
 	if cfg.VertexProjectID != "" {
 		// Try to use Real Client

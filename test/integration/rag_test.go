@@ -26,7 +26,7 @@ func TestRag_IngestAndSearch(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 	// Override DB URL if needed for local test run (e.g. port 5433)
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"

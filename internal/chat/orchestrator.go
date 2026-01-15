@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // --- Tool Interfaces (The "Limbs") ---
@@ -79,6 +78,12 @@ func (c *GetScheduleCommand) Execute(ctx context.Context) (string, *Artifact, er
 		return "", nil, fmt.Errorf("failed to get schedule: %w", err)
 	}
 
+	// ENGINEERING STANDARD: Defensive nil check per Operation Ironclad Task 6
+	// Prevents nil pointer dereference even if service returns (nil, nil)
+	if summary == nil {
+		return "", nil, fmt.Errorf("internal error: schedule summary is nil")
+	}
+
 	// Build text response for chat display
 	reply := fmt.Sprintf(
 		"Project End Date: %s\nCritical Path Tasks: %d\nTotal Tasks: %d\nCompleted: %d",
@@ -119,14 +124,16 @@ func (c *PlaceholderCommand) Execute(_ context.Context) (string, *Artifact, erro
 // NewOrchestrator creates a new Orchestrator with injected dependencies.
 // Uses the default RegexClassifier for intent classification.
 // See PRODUCTION_PLAN.md Step 43.3
+// ENGINEERING STANDARD: Accepts MessagePersister interface, not *pgxpool.Pool,
+// to enable strict dependency injection and testability.
 func NewOrchestrator(
-	db *pgxpool.Pool,
+	persister MessagePersister,
 	taskService TaskService,
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
 ) *Orchestrator {
 	return &Orchestrator{
-		db:              NewPgxMessageStore(db), // db satisfies DBExecutor interface (matches method signature even if not explicitly declared in pgx)
+		db:              persister,
 		classifier:      NewDefaultRegexClassifier(),
 		TaskService:     taskService,
 		ScheduleService: scheduleService,

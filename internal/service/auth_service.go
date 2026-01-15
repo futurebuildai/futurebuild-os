@@ -73,53 +73,81 @@ func (s *AuthService) StorePortalToken(ctx context.Context, contactID uuid.UUID,
 }
 
 // VerifyToken validates a token, marks it as used, and returns the Identity.
+// OPTIMIZATION: Uses single UNION query to check both users and contacts.
+// See PRODUCTION_PLAN.md Task 4 (N+1 Remediation).
 func (s *AuthService) VerifyToken(ctx context.Context, plaintextToken string) (models.Identity, error) {
 	tokenHash := s.HashToken(plaintextToken)
 
-	// 1. Try USERS table
-	var user models.User
-	var expiresAt time.Time
-	var used bool
-
-	queryUser := `
-		SELECT u.id, u.org_id, u.email, u.name, u.role, u.created_at, t.expires_at, t.used
+	// Single UNION query to search both tables in one round-trip
+	query := `
+		SELECT 'user' as identity_type, u.id, u.org_id, u.email, u.name, u.role, u.created_at,
+		       t.expires_at, t.used, 'auth_tokens' as token_table
 		FROM users u
 		JOIN auth_tokens t ON u.id = t.user_id
 		WHERE t.token_hash = $1
-	`
-	err := s.db.QueryRow(ctx, queryUser, tokenHash).Scan(
-		&user.ID, &user.OrgID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &expiresAt, &used)
-	
-	if err == nil {
-		if used { return nil, fmt.Errorf("token already used") }
-		if time.Now().After(expiresAt) { return nil, fmt.Errorf("token expired") }
-		
-		_, err = s.db.Exec(ctx, "UPDATE auth_tokens SET used = true WHERE token_hash = $1", tokenHash)
-		if err != nil { return nil, fmt.Errorf("failed to invalidate token: %w", err) }
-		return &user, nil
-	}
-
-	// 2. Try CONTACTS table
-	var contact models.Contact
-	queryContact := `
-		SELECT c.id, c.org_id, c.name, c.email, c.role, c.created_at, t.expires_at, t.used
+		UNION ALL
+		SELECT 'contact', c.id, c.org_id, c.email, c.name, c.role, c.created_at,
+		       t.expires_at, t.used, 'portal_tokens'
 		FROM contacts c
 		JOIN portal_tokens t ON c.id = t.contact_id
 		WHERE t.token_hash = $1
+		LIMIT 1
 	`
-	err = s.db.QueryRow(ctx, queryContact, tokenHash).Scan(
-		&contact.ID, &contact.OrgID, &contact.Name, &contact.Email, &contact.Role, &contact.CreatedAt, &expiresAt, &used)
 
-	if err == nil {
-		if used { return nil, fmt.Errorf("token already used") }
-		if time.Now().After(expiresAt) { return nil, fmt.Errorf("token expired") }
-		
-		_, err = s.db.Exec(ctx, "UPDATE portal_tokens SET used = true WHERE token_hash = $1", tokenHash)
-		if err != nil { return nil, fmt.Errorf("failed to invalidate token: %w", err) }
-		return &contact, nil
+	var identityType, tokenTable string
+	var id uuid.UUID
+	var orgID uuid.UUID
+	var email, name, role string
+	var createdAt, expiresAt time.Time
+	var used bool
+
+	err := s.db.QueryRow(ctx, query, tokenHash).Scan(
+		&identityType, &id, &orgID, &email, &name, &role, &createdAt,
+		&expiresAt, &used, &tokenTable,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid or expired token")
 	}
 
-	return nil, fmt.Errorf("invalid or expired token")
+	// Validate token status
+	if used {
+		return nil, fmt.Errorf("token already used")
+	}
+	if time.Now().After(expiresAt) {
+		return nil, fmt.Errorf("token expired")
+	}
+
+	// Mark token as used
+	updateQuery := fmt.Sprintf("UPDATE %s SET used = true WHERE token_hash = $1", tokenTable)
+	_, err = s.db.Exec(ctx, updateQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to invalidate token: %w", err)
+	}
+
+	// Return appropriate identity type
+	switch identityType {
+	case "user":
+		return &models.User{
+			ID:        id,
+			OrgID:     orgID,
+			Email:     email,
+			Name:      name,
+			Role:      models.UserRole(role),
+			CreatedAt: createdAt,
+		}, nil
+	case "contact":
+		emailPtr := &email
+		return &models.Contact{
+			ID:        id,
+			OrgID:     orgID,
+			Email:     emailPtr,
+			Name:      name,
+			Role:      models.UserRole(role),
+			CreatedAt: createdAt,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown identity type: %s", identityType)
+	}
 }
 
 // LookupUserByEmail finds a user by their email address.
@@ -128,7 +156,9 @@ func (s *AuthService) LookupUserByEmail(ctx context.Context, email string) (*mod
 	query := `SELECT id, org_id, email, name, role FROM users WHERE email = $1`
 	err := s.db.QueryRow(ctx, query, email).Scan(
 		&user.ID, &user.OrgID, &user.Email, &user.Name, &user.Role)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &user, nil
 }
 
@@ -138,17 +168,23 @@ func (s *AuthService) LookupContactByEmail(ctx context.Context, email string) (*
 	query := `SELECT id, org_id, name, email, role, created_at FROM contacts WHERE email = $1`
 	err := s.db.QueryRow(ctx, query, email).Scan(
 		&contact.ID, &contact.OrgID, &contact.Name, &contact.Email, &contact.Role, &contact.CreatedAt)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &contact, nil
 }
 
 // LookupIdentityByEmail attempts to find an identity in Users, then Contacts.
 func (s *AuthService) LookupIdentityByEmail(ctx context.Context, email string) (models.Identity, error) {
 	user, err := s.LookupUserByEmail(ctx, email)
-	if err == nil { return user, nil }
+	if err == nil {
+		return user, nil
+	}
 
 	contact, err := s.LookupContactByEmail(ctx, email)
-	if err == nil { return contact, nil }
+	if err == nil {
+		return contact, nil
+	}
 
 	return nil, fmt.Errorf("identity not found")
 }

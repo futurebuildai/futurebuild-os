@@ -1,14 +1,18 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
+// Config holds all application configuration.
+// See PRODUCTION_PLAN.md Task 3 (Harden Configuration).
 type Config struct {
 	DatabaseURL            string
+	RedisURL               string
 	AppPort                int
 	JWTSecret              string
 	JWTExpiry              time.Duration
@@ -24,7 +28,10 @@ type Config struct {
 	S3SecretKey            string
 }
 
-func LoadConfig() *Config {
+// LoadConfig loads configuration from environment variables.
+// Returns an error if critical configuration is missing (Fail Fast).
+// See PRODUCTION_PLAN.md Task 3.
+func LoadConfig() (*Config, error) {
 	portStr := os.Getenv("APP_PORT")
 	if portStr == "" {
 		portStr = "8080"
@@ -40,8 +47,9 @@ func LoadConfig() *Config {
 		expiry = 24 * time.Hour
 	}
 
-	return &Config{
+	cfg := &Config{
 		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		RedisURL:               getEnvOrDefault("REDIS_URL", "localhost:6379"),
 		AppPort:                port,
 		JWTSecret:              os.Getenv("JWT_SECRET"),
 		JWTExpiry:              expiry,
@@ -56,6 +64,24 @@ func LoadConfig() *Config {
 		S3AccessKey:            os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:            os.Getenv("S3_SECRET_KEY"),
 	}
+
+	// Fail Fast: Validate critical configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// Validate checks that all required configuration is present.
+func (c *Config) Validate() error {
+	if c.DatabaseURL == "" {
+		return errors.New("DATABASE_URL environment variable is required")
+	}
+	if c.JWTSecret == "" {
+		return errors.New("JWT_SECRET environment variable is required")
+	}
+	return nil
 }
 
 func getEnvOrDefault(key, fallback string) string {

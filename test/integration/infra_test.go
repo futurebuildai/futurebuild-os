@@ -19,7 +19,7 @@ import (
 // TestInfra_S3_Vertex verifies the connection to external infrastructure.
 // It requires specific environment variables to be set.
 func TestInfra_S3_Vertex(t *testing.T) {
-	cfg := config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 
 	t.Run("S3_Upload_And_Sign", func(t *testing.T) {
 		if cfg.S3Endpoint == "" || cfg.S3AccessKey == "" {

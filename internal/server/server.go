@@ -47,8 +47,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	documentHandler := handlers.NewDocumentHandler(invoiceService, documentService)
 
 	// See PRODUCTION_PLAN.md Step 43.5: Chat Orchestrator wiring
+	// ENGINEERING STANDARD: Instantiate MessagePersister explicitly, then inject.
 	// ScheduleService satisfies both TaskService and ScheduleService interfaces.
-	chatOrchestrator := chat.NewOrchestrator(db, scheduleService, scheduleService, invoiceService)
+	messageStore := chat.NewPgxMessageStore(db)
+	chatOrchestrator := chat.NewOrchestrator(messageStore, scheduleService, scheduleService, invoiceService)
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()

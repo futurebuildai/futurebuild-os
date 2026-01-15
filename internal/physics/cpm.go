@@ -54,13 +54,71 @@ type Calendar interface {
 	AddWorkingDays(date time.Time, days float64) time.Time
 }
 
-// StandardCalendar implements a Mon-Fri work week calendar.
-// Weekends (Saturday, Sunday) are skipped when calculating working days.
-type StandardCalendar struct{}
+// StandardCalendar implements a configurable work week calendar.
+// Weekends and specified Holidays are skipped when calculating working days.
+// See PRODUCTION_PLAN.md Task 5 (Enhance Physics Engine).
+type StandardCalendar struct {
+	// WorkDays defines which weekdays are working days.
+	// Defaults to Mon-Fri if nil or empty.
+	WorkDays []time.Weekday
+	// Holidays is a list of non-working dates. Comparison is by month and day only,
+	// ignoring year (e.g., Dec 25 matches any year's Christmas).
+	Holidays []time.Time
+}
 
-// AddWorkingDays adds fractional working days to a date, skipping weekends.
-// For positive days (forward pass), if the result lands on a weekend, it advances to Monday.
-// For negative days (backward pass), if the result lands on a weekend, it retreats to Friday.
+// SchedulingConfig holds configurable parameters for CPM scheduling.
+// See PRODUCTION_PLAN.md Task 5.
+type SchedulingConfig struct {
+	// CriticalPathThreshold is the float precision for critical path detection.
+	// Tasks with TotalFloat <= this value are considered critical.
+	// Default: 0.001 (per PRODUCTION_PLAN Step 33)
+	CriticalPathThreshold float64
+}
+
+// DefaultSchedulingConfig returns the default scheduling configuration.
+func DefaultSchedulingConfig() *SchedulingConfig {
+	return &SchedulingConfig{
+		CriticalPathThreshold: 0.001,
+	}
+}
+
+// isHoliday checks if a date matches any holiday (comparing month and day only).
+func (c *StandardCalendar) isHoliday(date time.Time) bool {
+	for _, h := range c.Holidays {
+		if date.Month() == h.Month() && date.Day() == h.Day() {
+			return true
+		}
+	}
+	return false
+}
+
+// isNonWorkingDay returns true if the date is not a working day or is a holiday.
+func (c *StandardCalendar) isNonWorkingDay(date time.Time) bool {
+	workDays := c.WorkDays
+	if len(workDays) == 0 {
+		// Default to Mon-Fri work week
+		workDays = []time.Weekday{time.Monday, time.Tuesday, time.Wednesday,
+			time.Thursday, time.Friday}
+	}
+
+	// Check if weekday is in working days
+	isWorkDay := false
+	for _, wd := range workDays {
+		if date.Weekday() == wd {
+			isWorkDay = true
+			break
+		}
+	}
+
+	if !isWorkDay {
+		return true
+	}
+	return c.isHoliday(date)
+}
+
+// AddWorkingDays adds fractional working days to a date, skipping weekends and holidays.
+// For positive days (forward pass), if the result lands on a non-working day, it advances.
+// For negative days (backward pass), if the result lands on a non-working day, it retreats.
 func (c *StandardCalendar) AddWorkingDays(date time.Time, days float64) time.Time {
 	if days == 0 {
 		return date
@@ -76,8 +134,8 @@ func (c *StandardCalendar) AddWorkingDays(date time.Time, days float64) time.Tim
 		// Forward: add working days
 		for i := 0; i < wholeDays; i++ {
 			result = result.Add(24 * time.Hour)
-			// Skip weekends
-			for result.Weekday() == time.Saturday || result.Weekday() == time.Sunday {
+			// Skip non-working days (weekends and holidays)
+			for c.isNonWorkingDay(result) {
 				result = result.Add(24 * time.Hour)
 			}
 		}
@@ -85,8 +143,8 @@ func (c *StandardCalendar) AddWorkingDays(date time.Time, days float64) time.Tim
 		// Backward: subtract working days
 		for i := 0; i > wholeDays; i-- {
 			result = result.Add(-24 * time.Hour)
-			// Skip weekends
-			for result.Weekday() == time.Saturday || result.Weekday() == time.Sunday {
+			// Skip non-working days (weekends and holidays)
+			for c.isNonWorkingDay(result) {
 				result = result.Add(-24 * time.Hour)
 			}
 		}

@@ -915,3 +915,60 @@ func TestFloatPrecision_AccumulatedFractional(t *testing.T) {
 
 	t.Logf("30 × (1/3) day tasks = %.15f days (expected 10.0)", projectDuration)
 }
+
+// ============================================================================
+// Holiday-Aware Calendar Tests (Operation Ironclad Task 4)
+// ============================================================================
+
+// TestCalendar_SkipsHolidays verifies that StandardCalendar skips configured holidays.
+// Adds 1 working day from Dec 24 should skip Dec 25 (Christmas) and land on Dec 26.
+func TestCalendar_SkipsHolidays(t *testing.T) {
+	// Dec 25, 2026 is a Friday - perfect for testing holiday skipping
+	// Dec 24, 2026 is a Thursday
+	projectStart := time.Date(2026, 12, 24, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, time.Thursday, projectStart.Weekday(), "Test setup: should start on Thursday")
+
+	// Configure calendar with Christmas as a holiday
+	christmas := time.Date(2026, 12, 25, 0, 0, 0, 0, time.UTC)
+	cal := &StandardCalendar{
+		Holidays: []time.Time{christmas},
+	}
+
+	// Add 1 working day from Dec 24
+	// Without holiday: Dec 24 + 1 = Dec 25
+	// With holiday: Dec 24 + 1 = Dec 26 (skips Dec 25)
+	result := cal.AddWorkingDays(projectStart, 1)
+
+	// Should skip Dec 25 and land on Dec 26 (Saturday would be skipped by weekend logic)
+	// Dec 26, 2026 is a Saturday - so it should actually be Dec 28 (Monday)
+	expectedFinish := time.Date(2026, 12, 28, 0, 0, 0, 0, time.UTC)
+
+	assert.Equal(t, expectedFinish, result,
+		"Adding 1 working day from Dec 24 should skip Christmas (Dec 25) and weekend, landing on Dec 28 (Monday)")
+	assert.Equal(t, time.Monday, result.Weekday(), "Result should be Monday")
+}
+
+// TestCalendar_HolidayOnWeekday verifies holiday skipping when Dec 25 is a weekday.
+// Uses 2025 where Dec 25 is a Thursday.
+func TestCalendar_HolidayOnWeekday(t *testing.T) {
+	// Dec 25, 2025 is a Thursday
+	// Dec 24, 2025 is a Wednesday
+	projectStart := time.Date(2025, 12, 24, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, time.Wednesday, projectStart.Weekday(), "Test setup: should start on Wednesday")
+
+	// Configure calendar with Christmas (ignores year per implementation)
+	christmas := time.Date(2000, 12, 25, 0, 0, 0, 0, time.UTC) // Any year works
+	cal := &StandardCalendar{
+		Holidays: []time.Time{christmas},
+	}
+
+	// Add 1 working day from Dec 24 (Wednesday)
+	// Should skip Dec 25 (Thursday holiday) and land on Dec 26 (Friday)
+	result := cal.AddWorkingDays(projectStart, 1)
+
+	expectedFinish := time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)
+
+	assert.Equal(t, expectedFinish, result,
+		"Adding 1 working day from Dec 24 should skip Christmas (Dec 25), landing on Dec 26 (Friday)")
+	assert.Equal(t, time.Friday, result.Weekday(), "Result should be Friday")
+}

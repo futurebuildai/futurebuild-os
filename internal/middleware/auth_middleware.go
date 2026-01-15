@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/colton/futurebuild/internal/api/response"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
@@ -28,13 +28,13 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			writeJSONError(w, http.StatusUnauthorized, "Unauthorized")
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
-			writeJSONError(w, http.StatusUnauthorized, "Unauthorized")
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
@@ -46,21 +46,21 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
-			writeJSONError(w, http.StatusUnauthorized, "Unauthorized")
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		if claims, ok := token.Claims.(*types.Claims); ok && token.Valid {
 			// CRITICAL: Multi-Tenancy Enforcement
 			if claims.OrgID == "" {
-				writeJSONError(w, http.StatusUnauthorized, "Unauthorized: Missing OrgID")
+				response.JSONError(w, http.StatusUnauthorized, "Unauthorized: Missing OrgID")
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		} else {
-			writeJSONError(w, http.StatusUnauthorized, "Unauthorized")
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 		}
 	})
 }
@@ -70,7 +70,7 @@ func (m *AuthMiddleware) RequireRole(allowedRoles ...types.UserRole) func(next h
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, err := GetClaims(r.Context())
 			if err != nil {
-				writeJSONError(w, http.StatusUnauthorized, "Unauthorized")
+				response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 				return
 			}
 
@@ -81,7 +81,7 @@ func (m *AuthMiddleware) RequireRole(allowedRoles ...types.UserRole) func(next h
 				}
 			}
 
-			writeJSONError(w, http.StatusForbidden, "Forbidden")
+			response.JSONError(w, http.StatusForbidden, "Forbidden")
 		})
 	}
 }
@@ -98,10 +98,4 @@ func GetClaims(ctx context.Context) (*types.Claims, error) {
 // This is primarily used for testing to inject mock claims.
 func WithClaims(ctx context.Context, claims *types.Claims) context.Context {
 	return context.WithValue(ctx, claimsContextKey, claims)
-}
-
-func writeJSONError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
