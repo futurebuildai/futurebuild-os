@@ -2,6 +2,7 @@ package worker
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -10,9 +11,10 @@ import (
 // Task Types
 // See BACKEND_SCOPE.md Section 3.5 (Action Engine)
 const (
-	TypeDailyBriefing    = "task:daily_briefing"
-	TypeProcurementCheck = "task:procurement_check"
-	TypeHydrateProject   = "task:hydrate_project"
+	TypeDailyBriefing           = "task:daily_briefing"
+	TypeProcurementCheck        = "task:procurement_check"
+	TypeHydrateProject          = "task:hydrate_project"
+	TypeProcurementNotification = "task:procurement_notification"
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -42,4 +44,26 @@ func NewHydrateProjectTask(projectID uuid.UUID) (*asynq.Task, error) {
 		return nil, err
 	}
 	return asynq.NewTask(TypeHydrateProject, payload), nil
+}
+
+// ProcurementNotificationPayload contains notification data for async delivery.
+// P1 Performance Fix: Enables sidecar notification pattern to reduce DB round-trips.
+type ProcurementNotificationPayload struct {
+	ItemID    uuid.UUID `json:"item_id"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// NewProcurementNotificationTask creates a task for async notification delivery.
+// P1 Performance Fix: Notifications are queued instead of written synchronously.
+func NewProcurementNotificationTask(itemID uuid.UUID, message string, ts time.Time) (*asynq.Task, error) {
+	payload, err := json.Marshal(ProcurementNotificationPayload{
+		ItemID:    itemID,
+		Message:   message,
+		Timestamp: ts,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeProcurementNotification, payload, asynq.Queue("default")), nil
 }

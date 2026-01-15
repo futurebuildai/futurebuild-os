@@ -93,7 +93,8 @@ func main() {
 	procurementAgent := agents.NewProcurementAgent(dbPool, weatherService, realClock)
 
 	// 7. Initialize Worker Handlers
-	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent)
+	// P1 Performance Fix: Pass db and clock for notification handler
+	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock)
 
 	// 8. Initialize Scheduler (The Clock)
 	// See PRODUCTION_PLAN.md Step 45 (Daily Briefing Job)
@@ -115,6 +116,9 @@ func main() {
 	// Register the actual handler function
 	srv.RegisterHandlerFunc(worker.TypeDailyBriefing, workerHandler.HandleDailyBriefing)
 	srv.RegisterHandlerFunc(worker.TypeProcurementCheck, workerHandler.HandleProcurementCheck)
+	srv.RegisterHandlerFunc(worker.TypeHydrateProject, workerHandler.HandleHydrateProject)
+	// P1 Performance Fix: Register async notification handler (sidecar pattern)
+	srv.RegisterHandlerFunc(worker.TypeProcurementNotification, workerHandler.HandleProcurementNotification)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

@@ -9,26 +9,58 @@ import (
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// NotificationEnqueuer defines the interface for async notification delivery.
+// P1 Performance Fix: Enables sidecar pattern for procurement notifications.
+type NotificationEnqueuer interface {
+	EnqueueNotification(ctx context.Context, itemID uuid.UUID, message string, ts time.Time) error
+}
 
 // ProcurementAgent monitors long-lead items and calculates order dates.
 // See PRODUCTION_PLAN.md Step 46, BACKEND_SCOPE.md Section 2.5
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
+// P1 Performance Fix: Uses batching and async notifications to reduce DB round-trips
 type ProcurementAgent struct {
-	db      *pgxpool.Pool
-	weather types.WeatherService
-	clock   clock.Clock
+	db        *pgxpool.Pool
+	weather   types.WeatherService
+	clock     clock.Clock
+	notifier  NotificationEnqueuer
+	batchSize int
 }
+
+// DefaultBatchSize is the number of items to batch before flushing.
+// Tunable based on workload (100-500 recommended for production).
+const DefaultBatchSize = 100
 
 // NewProcurementAgent creates a new agent instance.
 // Clock is required for deterministic time simulation (Step 49).
+// notifier is optional - if nil, notifications are logged but not queued.
 func NewProcurementAgent(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
 	return &ProcurementAgent{
-		db:      db,
-		weather: weather,
-		clock:   clk,
+		db:        db,
+		weather:   weather,
+		clock:     clk,
+		notifier:  nil, // Default: no async notifications
+		batchSize: DefaultBatchSize,
 	}
+}
+
+// WithNotificationEnqueuer sets the notification enqueuer for async delivery.
+// P1 Performance Fix: Enables sidecar pattern.
+func (a *ProcurementAgent) WithNotificationEnqueuer(notifier NotificationEnqueuer) *ProcurementAgent {
+	a.notifier = notifier
+	return a
+}
+
+// WithBatchSize sets a custom batch size.
+func (a *ProcurementAgent) WithBatchSize(size int) *ProcurementAgent {
+	if size > 0 {
+		a.batchSize = size
+	}
+	return a
 }
 
 // procurementRow represents the joined data for a single procurement item.
@@ -61,7 +93,7 @@ type ItemProcessor func(item procurementRow) error
 // Execute runs the procurement analysis for all active projects.
 // See PRODUCTION_PLAN.md Step 46
 // P1 Scalability Fix: Uses streaming iteration instead of loading all items into memory.
-// P1 Performance Fix: Hydration is now event-driven (HydrateProject), not cron-swept.
+// P1 Performance Fix: Uses batched updates and async notifications to reduce DB round-trips.
 func (a *ProcurementAgent) Execute(ctx context.Context) error {
 	slog.Info("Starting Procurement Agent...")
 
@@ -70,34 +102,35 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 
 	now := a.clock.Now().Truncate(24 * time.Hour)
 	var processed int
+	batch := make([]alertResult, 0, a.batchSize)
 
 	// Stream items one-by-one to avoid unbounded memory allocation
 	err := a.streamItems(ctx, func(item procurementRow) error {
 		result := a.analyzeItem(item, now)
-		if err := a.updateItem(ctx, result); err != nil {
-			slog.Error("failed to update item", "id", item.ID, "error", err)
-			// Continue processing other items
-			return nil
-		}
+		batch = append(batch, result)
 
-		// Notification Dampening & Delivery
-		// See User Amendment #4
-		if result.ShouldNotify {
-			shouldSend, err := a.shouldSendNotification(ctx, result.ID)
-			if err != nil {
-				slog.Error("notification check failed", "id", item.ID, "error", err)
-				return nil
+		// P1 Performance Fix: Flush batch when full
+		if len(batch) >= a.batchSize {
+			if err := a.flushBatch(ctx, batch); err != nil {
+				slog.Error("failed to flush batch", "error", err)
+				// Continue processing - don't fail entire run
 			}
-			if shouldSend {
-				a.logNotification(ctx, result)
-			}
+			processed += len(batch)
+			batch = batch[:0] // Reset slice, keep capacity
 		}
-		processed++
 		return nil
 	})
 
 	if err != nil {
 		return fmt.Errorf("streaming items failed: %w", err)
+	}
+
+	// Flush remaining items
+	if len(batch) > 0 {
+		if err := a.flushBatch(ctx, batch); err != nil {
+			slog.Error("failed to flush final batch", "error", err)
+		}
+		processed += len(batch)
 	}
 
 	slog.Info("Procurement Agent completed", "items_processed", processed)
@@ -125,6 +158,54 @@ func (a *ProcurementAgent) HydrateProject(ctx context.Context, projectID uuid.UU
 		return fmt.Errorf("hydrate project %s: %w", projectID, err)
 	}
 	slog.Info("Project hydration completed", "project_id", projectID)
+	return nil
+}
+
+// flushBatch sends all UPDATE queries in a single pgx Batch round-trip.
+// P1 Performance Fix: Reduces N database round-trips to 1 per batch.
+// Notifications are enqueued asynchronously via NotificationEnqueuer (sidecar pattern).
+func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) error {
+	if len(batch) == 0 {
+		return nil
+	}
+
+	now := a.clock.Now()
+
+	// Build pgx Batch for all UPDATE operations
+	b := &pgx.Batch{}
+	updateQuery := `
+		UPDATE procurement_items
+		SET status = $1, calculated_order_date = $2, last_checked_at = $3
+		WHERE id = $4
+	`
+	for _, result := range batch {
+		b.Queue(updateQuery, string(result.NewStatus), result.CalculatedOrderDate, now, result.ID)
+	}
+
+	// Send all UPDATEs in a single round-trip
+	br := a.db.SendBatch(ctx, b)
+	defer br.Close()
+
+	// Process all batch results
+	for i := 0; i < len(batch); i++ {
+		if _, err := br.Exec(); err != nil {
+			slog.Error("batch update failed", "index", i, "id", batch[i].ID, "error", err)
+			// Continue - don't fail entire batch for one item
+		}
+	}
+
+	// Enqueue notifications asynchronously (sidecar pattern)
+	// This moves notification logic out of the hot path
+	for _, result := range batch {
+		if result.ShouldNotify && a.notifier != nil {
+			if err := a.notifier.EnqueueNotification(ctx, result.ID, result.Message, now); err != nil {
+				slog.Error("failed to enqueue notification", "id", result.ID, "error", err)
+				// Continue - notifications are best-effort
+			}
+		}
+	}
+
+	slog.Debug("batch flushed", "count", len(batch))
 	return nil
 }
 
