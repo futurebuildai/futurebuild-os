@@ -26,6 +26,7 @@ type Config struct {
 	S3Bucket               string
 	S3AccessKey            string
 	S3SecretKey            string
+	WebhookSecret          string // See PRODUCTION_PLAN.md Step 48 (Signature Verification)
 }
 
 // LoadConfig loads configuration from environment variables.
@@ -63,6 +64,7 @@ func LoadConfig() (*Config, error) {
 		S3Bucket:               os.Getenv("S3_BUCKET"),
 		S3AccessKey:            os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:            os.Getenv("S3_SECRET_KEY"),
+		WebhookSecret:          os.Getenv("WEBHOOK_SECRET"),
 	}
 
 	// Fail Fast: Validate critical configuration

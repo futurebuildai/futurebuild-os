@@ -1,21 +1,22 @@
-# Handoff: Phase 6 Step 48
+# Handoff: Phase 6 Step 49
 
-**Previous Step:** 47 (Sub Liaison Agent) - **COMPLETED** ✅
-**Current Step:** 48 (Inbound Message Processing)
+**Previous Step:** 48 (Inbound Message Processing) - **COMPLETED** ✅
+**Current Step:** 49 (Time-Travel Agent Simulation)
 
 ## Status
-- **Sub Liaison Agent**: Live. Can resolve contacts via `DirectoryService` and send outbound notifications.
-- **Infrastructure**: Webhook endpoints are the next critical gap to close the feedback loop.
-- **Database**: `COMMUNICATION_LOGS` table is ready to receive inbound records.
+- **Inbound Processor**: Live. Webhooks at `/api/v1/webhooks/sms` and `/api/v1/webhooks/email` process subcontractor replies.
+- **State Machine**: 100% progress triggers automatic CPM recalculation.
+- **Idempotency**: Database-level via `external_id` unique index on `communication_logs`.
+- **Security**: HMAC-SHA256 signature verification via `X-FutureBuild-Signature`.
 
-## Context for Step 48
-We are implementing the **Inbound Action Engine**. Now that the system can "speak" (send SMS/Email), it must "listen." This step involves processing webhooks from providers (simulated or real), parsing the intent of the reply (Progress vs. Confirmation), and updating the database state automatically.
+## Context for Step 49
+We are implementing the **Time-Travel Agent Simulation**. This is a testing/demo tool that simulates the passage of time to show how the system responds to schedule changes, delays, and updates over the project lifecycle.
 
 ## Key Objectives
-1.  **Webhook Handler**: Secure endpoints for Twilio/SendGrid callbacks.
-2.  **Inbound Processor**: Logic to map a phone number -> Contact -> Active Task.
-3.  **State Machine Updates**: "100%" -> Task Complete. "Issue" -> Alert Superintendent.
+1.  **Simulation Engine**: Allow fast-forwarding project timelines for demos.
+2.  **Event Injection**: Simulate weather delays, material arrivals, progress updates.
+3.  **Dashboard Integration**: Visual replay of project state changes.
 
 ## Spec References
--   `BACKEND_SCOPE.md` Section 3.5 (Action Engine).
--   `DATA_SPINE_SPEC.md` Section 5.1 (Communication Logs).
+-   `PRODUCTION_PLAN.md` Step 49.
+-   `BACKEND_SCOPE.md` Section 6 (Simulation Layer).

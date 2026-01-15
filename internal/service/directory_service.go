@@ -64,3 +64,26 @@ func (s *DirectoryService) GetContactForPhase(ctx context.Context, projectID, or
 
 	return &contact, nil
 }
+
+// FindContactBySender resolves a contact by phone number or email address.
+// See PRODUCTION_PLAN.md Step 48 (Identity Resolution)
+func (s *DirectoryService) FindContactBySender(ctx context.Context, sender string) (*types.Contact, error) {
+	query := `
+		SELECT id, name, company, COALESCE(phone, ''), COALESCE(email, ''), role, contact_preference
+		FROM contacts
+		WHERE phone = $1 OR email = $1
+		LIMIT 1
+	`
+	var contact types.Contact
+	var role, preference string
+	err := s.db.QueryRow(ctx, query, sender).Scan(
+		&contact.ID, &contact.Name, &contact.Company, &contact.Phone, &contact.Email,
+		&role, &preference,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("contact not found for sender %s: %w", sender, err)
+	}
+	contact.Role = types.UserRole(role)
+	contact.ContactPreference = types.ContactPreference(preference)
+	return &contact, nil
+}
