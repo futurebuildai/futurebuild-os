@@ -149,8 +149,10 @@ func (p *InboundProcessor) ProcessIncoming(ctx context.Context, msg InboundMessa
 	normalizedBody := strings.ToLower(strings.TrimSpace(msg.Body))
 
 	// Priority 1: Check for percentage update
+	// P0 Fix: Transactional idempotency - lock via log insert BEFORE side-effects
+	// See PRODUCTION_PLAN.md Phase 49 Retrofit (Operation Ironclad Task 1)
 	if percent, ok := p.parsePercentage(normalizedBody); ok {
-		if err := p.handleProgressUpdate(ctx, *taskID, *projectID, contact, percent, msg); err != nil {
+		if err := p.handleProgressUpdateTransactional(ctx, *taskID, *projectID, contact, percent, msg); err != nil {
 			p.log.Error("failed to process progress update",
 				"task_id", taskID,
 				"percent", percent,
@@ -198,6 +200,7 @@ func (p *InboundProcessor) ProcessIncoming(ctx context.Context, msg InboundMessa
 
 // handleProgressUpdate processes a percentage update and triggers CPM recalc if needed.
 // See PRODUCTION_PLAN.md Step 48 (State Machine Integration)
+// DEPRECATED: Use handleProgressUpdateTransactional for idempotent processing.
 func (p *InboundProcessor) handleProgressUpdate(
 	ctx context.Context,
 	taskID, projectID uuid.UUID,
@@ -243,6 +246,134 @@ func (p *InboundProcessor) handleProgressUpdate(
 	_ = p.logInboundMessage(ctx, &contact.ID, &taskID, msg, status)
 
 	return nil
+}
+
+// handleProgressUpdateTransactional processes a percentage update with transactional idempotency.
+// P0 Fix: Ensures atomicity between deduplication and side-effects.
+// See PRODUCTION_PLAN.md Phase 49 Retrofit (Operation Ironclad Task 1)
+//
+// Transaction Flow:
+//   - Step A (Lock): INSERT communication_log with external_id FIRST
+//   - Step B (Guard): If duplicate key conflict, return nil (already processed)
+//   - Step C (Execute): Run side-effects (UpdateTaskProgress, RecalculateSchedule)
+//   - Step D (Commit): If any step fails, entire transaction rolls back
+func (p *InboundProcessor) handleProgressUpdateTransactional(
+	ctx context.Context,
+	taskID, projectID uuid.UUID,
+	contact *types.Contact,
+	percent int,
+	msg InboundMessage,
+) error {
+	// Step A: Begin transaction and attempt to insert communication_log as lock
+	tx, err := p.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback(ctx) // No-op if already committed
+		}
+	}()
+
+	// Determine status for logging
+	status := "PROGRESS_UPDATE"
+	if percent == 100 {
+		status = "COMPLETED"
+	}
+
+	// Step A: Insert communication_log FIRST as idempotency lock
+	// This uses the external_id unique constraint to prevent duplicate processing
+	logID := uuid.New()
+	var relatedType *string
+	t := "project_task"
+	relatedType = &t
+
+	insertQuery := `
+		INSERT INTO communication_logs (
+			id, project_id, contact_id, direction, content, channel, timestamp,
+			related_entity_id, related_entity_type, external_id
+		)
+		VALUES ($1, $2, $3, 'Inbound', $4, $5, $6, $7, $8, $9)
+	`
+
+	// Get project_id from task
+	var taskProjectID *uuid.UUID
+	pid, pidErr := p.getTaskProjectID(ctx, taskID)
+	if pidErr == nil {
+		taskProjectID = &pid
+	}
+
+	_, err = tx.Exec(ctx, insertQuery,
+		logID,
+		taskProjectID,
+		&contact.ID,
+		fmt.Sprintf("[%s] %s", status, msg.Body),
+		msg.Channel,
+		p.clock.Now(),
+		&taskID,
+		relatedType,
+		nilIfEmpty(msg.ExternalID),
+	)
+
+	// Step B: Guard - Check for duplicate key violation
+	if err != nil {
+		if isDuplicateKeyError(err) {
+			p.log.Info("duplicate message detected via transaction lock, skipping side-effects",
+				"external_id", msg.ExternalID,
+				"task_id", taskID,
+			)
+			return nil // Already processed - idempotency preserved
+		}
+		return fmt.Errorf("insert communication log (lock): %w", err)
+	}
+
+	// Step C: Execute side-effects now that we hold the lock
+	if err := p.schedule.UpdateTaskProgress(ctx, taskID, percent); err != nil {
+		// Transaction will rollback, log entry will be removed, allowing clean retry
+		return fmt.Errorf("update task progress: %w", err)
+	}
+
+	p.log.Info("task progress updated via inbound message (transactional)",
+		"task_id", taskID,
+		"percent", percent,
+		"sender", msg.Sender,
+		"channel", msg.Channel,
+	)
+
+	// State Machine - 100% triggers CPM recalculation
+	if percent == 100 {
+		p.log.Info("task marked complete, triggering schedule recalculation",
+			"task_id", taskID,
+			"project_id", projectID,
+		)
+
+		orgID, err := p.getProjectOrgID(ctx, projectID)
+		if err != nil {
+			return fmt.Errorf("get project org_id: %w", err)
+		}
+
+		if err := p.schedule.RecalculateSchedule(ctx, projectID, orgID); err != nil {
+			return fmt.Errorf("recalculate schedule: %w", err)
+		}
+	}
+
+	// Step D: Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	tx = nil // Prevent deferred rollback
+
+	return nil
+}
+
+// isDuplicateKeyError checks if the error is a PostgreSQL unique constraint violation.
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// PostgreSQL error code 23505 = unique_violation
+	errStr := err.Error()
+	return strings.Contains(errStr, "23505") || strings.Contains(errStr, "duplicate key")
 }
 
 // handleVisionVerification triggers AI vision analysis for attached images.

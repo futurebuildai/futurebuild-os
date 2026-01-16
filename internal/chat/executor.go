@@ -68,6 +68,36 @@ func (e *CommandExecutor) Execute(
 	)
 
 	if err != nil {
+		// P0 Fix: Persist user-visible error message before returning error
+		// Eliminates the "Black Hole" where users see broken UI with no explanation.
+		// See PRODUCTION_PLAN.md Phase 49 Retrofit (Operation Ironclad Task 2)
+		slog.Error("chat: command execution failed",
+			"intent", execCtx.Intent,
+			"project_id", execCtx.ProjectID,
+			"error", err,
+		)
+
+		// Generate user-friendly error message for chat history
+		errorMsg := models.ChatMessage{
+			ID:        uuid.New(),
+			ProjectID: execCtx.ProjectID,
+			UserID:    execCtx.UserID,
+			Role:      types.ChatRoleModel,
+			Content:   "I encountered a system error trying to process your request. Please try again, or contact support if the problem persists.",
+			CreatedAt: time.Now().UTC(),
+		}
+
+		// Persist error message using BestEffort strategy (DB → DLQ → WAL)
+		// Don't fail on persistence error - the error is already logged
+		strategy := e.strategyRegistry.Get(types.ConsistencyBestEffort)
+		if persistErr := strategy.Persist(ctx, errorMsg); persistErr != nil {
+			slog.Error("chat: failed to persist error message to chat history",
+				"message_id", errorMsg.ID,
+				"persist_error", persistErr,
+			)
+		}
+
+		// Return error AFTER persistence so API can signal failure metrics
 		return nil, fmt.Errorf("command execution failed: %w", err)
 	}
 

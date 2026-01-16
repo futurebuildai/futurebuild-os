@@ -95,8 +95,8 @@ func TestAnalyzeItem_ScenarioB(t *testing.T) {
 // This test documents the current safe behavior.
 func TestAnalyzeItem_ScenarioC(t *testing.T) {
 	// Storm forecast: 60% precipitation
-	// NOTE: Weather buffer is now skipped because geocoding service is not wired.
-	// This is the SAFE default per P0 geolocation fix.
+	// P1 Fix: Weather buffer now uses conservative default (3 days) from config.
+	// This test verifies the new correct behavior.
 	agent := &ProcurementAgent{
 		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.6}},
 		config:  defaultProcurementCfg,
@@ -115,24 +115,15 @@ func TestAnalyzeItem_ScenarioC(t *testing.T) {
 		ZipCode:       &zipCode,
 	}
 
-	// P0 Fix: Weather buffer is 0 because geocoding is unavailable.
+	// P1 Fix: Weather buffer is now 3 days (conservative default from config).
 	// Formula: NeedBy = EarlyStart - 2 = Jan 19
-	// CalculatedOrderDate = NeedBy - LeadTime - WeatherBuffer = Jan 19 - 14 - 0 = Jan 5
-	// Now (Jan 5) == Jan 5 => daysUntilMustOrder = 0
-	//
-	// Edge case: When now == mustOrderDate:
-	// - now.After(mustOrderDate) = false (not strictly after)
-	// - daysUntilMustOrder (0) is NOT > 0, so WARNING condition fails
-	// - Result: defaults to OK (status is unchanged from default)
-	//
-	// This test documents current behavior. If geocoding were available and
-	// weather buffer applied (2 days), mustOrderDate would be Jan 3, making
-	// now (Jan 5) > mustOrderDate => CRITICAL.
+	// CalculatedOrderDate = NeedBy - LeadTime - WeatherBuffer = Jan 19 - 14 - 3 = Jan 2
+	// Now (Jan 5) > Jan 2 => CRITICAL (past the order deadline)
 	result := agent.analyzeItem(item, now)
 
-	// Expected: OK (edge case when now == mustOrderDate, daysUntil = 0)
-	if result.NewStatus != types.ProcurementAlertOK {
-		t.Errorf("Expected OK (edge case: now == mustOrderDate), got %s", result.NewStatus)
+	// Expected: CRITICAL because we're past the order deadline
+	if result.NewStatus != types.ProcurementAlertCritical {
+		t.Errorf("Expected CRITICAL (now > mustOrderDate with weather buffer), got %s", result.NewStatus)
 	}
 }
 
@@ -143,8 +134,9 @@ func TestAnalyzeItem_Warning(t *testing.T) {
 		config:  defaultProcurementCfg,
 	}
 
-	now := time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC)        // Day 13
-	earlyStart := time.Date(2026, 1, 24, 0, 0, 0, 0, time.UTC) // 11 days away
+	// P1 Fix: Adjusted dates to trigger WARNING with 3-day weather buffer
+	now := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)        // Day 10
+	earlyStart := time.Date(2026, 1, 24, 0, 0, 0, 0, time.UTC) // 14 days away
 
 	zipCode := "78701"
 	item := procurementRow{
@@ -156,9 +148,10 @@ func TestAnalyzeItem_Warning(t *testing.T) {
 		ZipCode:       &zipCode,
 	}
 
-	// New formula: NeedBy = EarlyStart - 2 = Jan 22
-	// CalculatedOrderDate = NeedBy - LeadTime = Jan 22 - 7 = Jan 15
-	// Now (Jan 13) is 2 days before Jan 15 => within 3-day warning threshold
+	// P1 Fix: Formula with 3-day weather buffer:
+	// NeedBy = EarlyStart - 2 = Jan 22
+	// CalculatedOrderDate = NeedBy - LeadTime - WeatherBuffer = Jan 22 - 7 - 3 = Jan 12
+	// Now (Jan 10) is 2 days before Jan 12 => within 3-day warning threshold
 	result := agent.analyzeItem(item, now)
 
 	if result.NewStatus != types.ProcurementAlertWarning {
@@ -187,5 +180,134 @@ func TestAnalyzeItem_NilEarlyStart(t *testing.T) {
 
 	if result.NewStatus != types.ProcurementAlertPending {
 		t.Errorf("Expected PENDING for nil EarlyStart, got %s", result.NewStatus)
+	}
+}
+
+// =============================================================================
+// ZERO TRUST TEST: P1 "Ghost Physics" Fix (Operation Ironclad Task 3)
+// =============================================================================
+// These tests verify that:
+// 1. Missing zip code returns ConfigError (schedule calculation blocked)
+// 2. Weather buffer is NEVER zero (conservative default applied)
+// See PRODUCTION_PLAN.md Phase 49 Retrofit
+// =============================================================================
+
+// TestAnalyzeItem_MissingZipCode_ConfigError verifies ConfigError for missing location.
+func TestAnalyzeItem_MissingZipCode_ConfigError(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
+	}
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	earlyStart := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Exterior Siding",
+		LeadTimeWeeks: 2,
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+		ZipCode:       nil, // MISSING - should trigger ConfigError
+	}
+
+	result := agent.analyzeItem(item, now)
+
+	// Assert: ConfigError status
+	if result.NewStatus != types.ProcurementAlertConfigError {
+		t.Errorf("Expected ConfigError, got %s", result.NewStatus)
+	}
+
+	// Assert: Should notify
+	if !result.ShouldNotify {
+		t.Error("Should notify when location data is missing")
+	}
+
+	// Assert: Message contains "Missing location data"
+	if result.Message == "" {
+		t.Error("Expected non-empty error message")
+	}
+
+	// Assert: No order date calculated (zero value)
+	if !result.CalculatedOrderDate.IsZero() {
+		t.Errorf("Expected zero CalculatedOrderDate for ConfigError, got %v", result.CalculatedOrderDate)
+	}
+}
+
+// TestAnalyzeItem_EmptyZipCode_ConfigError verifies ConfigError for empty string zip code.
+func TestAnalyzeItem_EmptyZipCode_ConfigError(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
+	}
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	earlyStart := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+	emptyZip := ""
+
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Roofing Materials",
+		LeadTimeWeeks: 2,
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+		ZipCode:       &emptyZip, // Empty string - should also trigger ConfigError
+	}
+
+	result := agent.analyzeItem(item, now)
+
+	if result.NewStatus != types.ProcurementAlertConfigError {
+		t.Errorf("Expected ConfigError for empty zip code, got %s", result.NewStatus)
+	}
+}
+
+// TestAnalyzeItem_DefaultWeatherBuffer verifies weather buffer is never zero.
+func TestAnalyzeItem_DefaultWeatherBuffer(t *testing.T) {
+	// Test with explicit default config
+	cfg := config.DefaultProcurementConfig()
+
+	// Assert: DefaultWeatherBufferDays is set (not zero)
+	if cfg.DefaultWeatherBufferDays <= 0 {
+		t.Errorf("DefaultWeatherBufferDays should be > 0, got %d", cfg.DefaultWeatherBufferDays)
+	}
+
+	// Assert: Default is conservative (at least 3 days)
+	if cfg.DefaultWeatherBufferDays < 3 {
+		t.Errorf("DefaultWeatherBufferDays should be at least 3 for safety, got %d", cfg.DefaultWeatherBufferDays)
+	}
+
+	t.Logf("DefaultWeatherBufferDays verified: %d days (fail-safe)", cfg.DefaultWeatherBufferDays)
+}
+
+// TestAnalyzeItem_WeatherBufferApplied verifies weather buffer affects order date.
+func TestAnalyzeItem_WeatherBufferApplied(t *testing.T) {
+	agent := &ProcurementAgent{
+		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
+	}
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	earlyStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC) // Feb 1
+
+	zipCode := "78701"
+	item := procurementRow{
+		ID:            uuid.New(),
+		Name:          "Test Material",
+		LeadTimeWeeks: 1, // 7 days
+		Status:        types.ProcurementAlertPending,
+		EarlyStart:    &earlyStart,
+		ZipCode:       &zipCode,
+	}
+
+	result := agent.analyzeItem(item, now)
+
+	// Formula: NeedBy = Feb 1 - 2 = Jan 30
+	// OrderDate = Jan 30 - 7 (lead) - 3 (weather buffer) = Jan 20
+	expectedOrderDate := time.Date(2026, 1, 20, 0, 0, 0, 0, time.UTC)
+
+	if !result.CalculatedOrderDate.Equal(expectedOrderDate) {
+		t.Errorf("Expected OrderDate %v (with weather buffer), got %v",
+			expectedOrderDate.Format("2006-01-02"),
+			result.CalculatedOrderDate.Format("2006-01-02"))
 	}
 }

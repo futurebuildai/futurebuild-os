@@ -230,7 +230,18 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 
 	earlyStart := item.EarlyStart.Truncate(24 * time.Hour)
 	leadTimeDays := item.LeadTimeWeeks * 7
-	weatherBuffer := 0
+
+	// P1 Fix: Use conservative default weather buffer from config (NEVER zero)
+	// See PRODUCTION_PLAN.md Phase 49 Retrofit (Operation Ironclad Task 3)
+	weatherBuffer := a.config.DefaultWeatherBufferDays
+	if weatherBuffer <= 0 {
+		// Fail-safe: if config somehow has 0, use 3 days as absolute minimum
+		weatherBuffer = 3
+		slog.Warn("weather buffer was zero, using fail-safe default",
+			"item_id", item.ID,
+			"default_buffer", weatherBuffer,
+		)
+	}
 
 	// FAANG Standard: "Fail Loudly" for Location Data
 	// If location data is missing, schedule calculation is BLOCKED (ConfigError).
@@ -252,18 +263,18 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 
 	// Weather interaction (SWIM integration)
 	// See PRODUCTION_PLAN.md Step 46: Weather Buffer
-	// For MVP, we check if precipitation probability > 50% near the start date
+	// For MVP, we use the conservative config default.
 	// TODO: Inject GeocodingService and use item.ZipCode for location-specific weather.
 	if a.weather != nil {
 		// ZipCode is available but geocoding service is not yet wired.
 		// Log a metric indicating geocoding is needed for accurate weather data.
-		// FAIL SAFE: Skip weather buffer calculation until geocoding is implemented.
-		slog.Warn("weather buffer skipped: geocoding not implemented",
+		// Using conservative config default instead of location-specific buffer.
+		slog.Info("using config default weather buffer (geocoding not implemented)",
 			"item_id", item.ID,
 			"zip_code", *item.ZipCode,
-			"action", "using_zero_buffer",
+			"buffer_days", weatherBuffer,
+			"source", "config_default",
 		)
-		// weatherBuffer remains 0 - no incorrect location data will be used
 	}
 
 	// MRP Feedback Loop Calculations (PRODUCTION_PLAN.md Step 46):

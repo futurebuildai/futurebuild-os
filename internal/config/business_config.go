@@ -39,6 +39,12 @@ type ProcurementConfig struct {
 	// Default: 3 days
 	LeadTimeWarningThreshold int
 
+	// DefaultWeatherBufferDays is the conservative weather buffer when weather service
+	// is unavailable or geocoding is not implemented.
+	// P1 Fix: Default: 3 days (fail-safe, NEVER zero)
+	// See PRODUCTION_PLAN.md Phase 49 Retrofit (Operation Ironclad Task 3)
+	DefaultWeatherBufferDays int
+
 	// ConfigVersion for audit traceability.
 	ConfigVersion string
 }
@@ -59,6 +65,7 @@ func DefaultProcurementConfig() ProcurementConfig {
 	return ProcurementConfig{
 		StagingBufferDays:        2,
 		LeadTimeWarningThreshold: 3,
+		DefaultWeatherBufferDays: 3, // P1 Fix: Conservative default, NEVER zero
 		ConfigVersion:            "default-v1",
 	}
 }
@@ -86,6 +93,10 @@ func (c ProcurementConfig) WithDefaults() ProcurementConfig {
 	}
 	if c.LeadTimeWarningThreshold <= 0 {
 		c.LeadTimeWarningThreshold = defaults.LeadTimeWarningThreshold
+	}
+	// P1 Fix: Ensure weather buffer is never zero (fail-safe)
+	if c.DefaultWeatherBufferDays <= 0 {
+		c.DefaultWeatherBufferDays = defaults.DefaultWeatherBufferDays
 	}
 	if c.ConfigVersion == "" {
 		c.ConfigVersion = defaults.ConfigVersion
