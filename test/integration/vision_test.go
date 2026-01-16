@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genai"
 
-	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
 )
@@ -77,7 +76,7 @@ func contains(s, substr string) bool {
 func TestVisionService_VerifyTask(t *testing.T) {
 	// 1. Setup Client (Real or Mock)
 	var client ai.Client
-	cfg, _ := config.LoadConfig()
+	cfg := getTestConfig()
 
 	if cfg.VertexProjectID != "" {
 		// Try to use Real Client

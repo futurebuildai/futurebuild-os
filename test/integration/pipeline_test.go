@@ -14,24 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
-	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
-	"google.golang.org/genai"
 )
 
-// noOpClient implements ai.Client but does nothing
-type noOpClient struct{}
-
-func (m *noOpClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...*genai.Part) (string, error) {
-	return "", nil
-}
-func (m *noOpClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, nil
-}
-func (m *noOpClient) Close() error { return nil }
+// noOpClient is defined in chat_test.go (same package)
 
 func TestPipeline_MockIngestion(t *testing.T) {
 	if os.Getenv("CI") != "" {
@@ -39,19 +27,23 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	}
 
 	// 1. Setup DB Connection
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
+	cfg := getTestConfig()
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
 	}
-	db, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
-	require.NoError(t, err)
 	defer db.Close()
+
+	// Verify database is reachable
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	// 2. Setup Service (with no-op client as we won't call AI)
 	invoiceService := service.NewInvoiceService(db, &noOpClient{})
 
 	// 3. Prepare Database State (Org & Project)
-	ctx := context.Background()
 	orgID := uuid.New()
 	randomSlug := fmt.Sprintf("pipeline-test-org-%s", uuid.New().String())
 	_, err = db.Exec(ctx, "INSERT INTO organizations (id, name, slug) VALUES ($1, 'Pipeline Test Org', $2)", orgID, randomSlug)

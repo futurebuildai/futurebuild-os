@@ -70,9 +70,12 @@ func WithTaskStatus(status types.TaskStatus) TaskOption {
 
 // NewTestOrganization creates a test organization and returns its ID.
 // The organization is persisted to the database immediately.
+// A unique slug is generated from the name to satisfy the NOT NULL constraint.
 func NewTestOrganization(ctx context.Context, db *pgxpool.Pool, name string) (uuid.UUID, error) {
 	id := uuid.New()
-	_, err := db.Exec(ctx, `INSERT INTO organizations (id, name) VALUES ($1, $2)`, id, name)
+	// Generate a unique slug by appending a short UUID suffix
+	slug := fmt.Sprintf("%s-%s", name, id.String()[:8])
+	_, err := db.Exec(ctx, `INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $3)`, id, name, slug)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to create test organization: %w", err)
 	}
@@ -132,6 +135,20 @@ func NewTestTask(ctx context.Context, db *pgxpool.Pool, projectID uuid.UUID, wbs
 	return task, nil
 }
 
+// NewTestProjectContext creates a project context with location and weather settings.
+// Required for Procurement Agent to calculate weather-adjusted lead times.
+func NewTestProjectContext(ctx context.Context, db *pgxpool.Pool, projectID uuid.UUID, zipCode string) error {
+	query := `
+		INSERT INTO project_context (id, project_id, zip_code, climate_zone)
+		VALUES ($1, $2, $3, 'Mixed-Humid')
+	`
+	_, err := db.Exec(ctx, query, uuid.New(), projectID, zipCode)
+	if err != nil {
+		return fmt.Errorf("failed to create test project context: %w", err)
+	}
+	return nil
+}
+
 // NewTestProcurementItem creates a test procurement item linked to a task.
 func NewTestProcurementItem(ctx context.Context, db *pgxpool.Pool, taskID uuid.UUID, name string, leadTimeWeeks int) (uuid.UUID, error) {
 	id := uuid.New()
@@ -147,13 +164,14 @@ func NewTestProcurementItem(ctx context.Context, db *pgxpool.Pool, taskID uuid.U
 }
 
 // NewTestContact creates a test contact with the given details.
-func NewTestContact(ctx context.Context, db *pgxpool.Pool, name, phone, email, role, preference string) (uuid.UUID, error) {
+// Requires an orgID since contacts are scoped to organizations.
+func NewTestContact(ctx context.Context, db *pgxpool.Pool, orgID uuid.UUID, name, phone, email, role, preference string) (uuid.UUID, error) {
 	id := uuid.New()
 	query := `
-		INSERT INTO contacts (id, name, phone, email, role, contact_preference)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO contacts (id, org_id, name, phone, email, role, contact_preference)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := db.Exec(ctx, query, id, name, phone, email, role, preference)
+	_, err := db.Exec(ctx, query, id, orgID, name, phone, email, role, preference)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to create test contact: %w", err)
 	}

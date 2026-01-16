@@ -55,7 +55,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// P0 FIX: DLQ is now MANDATORY for compliance audit trails.
 	messageStore := chat.NewPgxMessageStore(db)
 	dlq := chat.NewAsynqDLQ(cfg.RedisURL)
-	chatOrchestrator := chat.NewOrchestrator(messageStore, scheduleService, scheduleService, invoiceService, dlq)
+	chatOrchestrator := chat.NewOrchestrator(messageStore, scheduleService, scheduleService, invoiceService, dlq, nil, nil)
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()

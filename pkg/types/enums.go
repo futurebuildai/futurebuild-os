@@ -134,10 +134,11 @@ const (
 type ProcurementAlertStatus string
 
 const (
-	ProcurementAlertPending  ProcurementAlertStatus = "pending"
-	ProcurementAlertOK       ProcurementAlertStatus = "ok"
-	ProcurementAlertWarning  ProcurementAlertStatus = "warning"
-	ProcurementAlertCritical ProcurementAlertStatus = "critical"
+	ProcurementAlertPending     ProcurementAlertStatus = "pending"
+	ProcurementAlertOK          ProcurementAlertStatus = "ok"
+	ProcurementAlertWarning     ProcurementAlertStatus = "warning"
+	ProcurementAlertCritical    ProcurementAlertStatus = "critical"
+	ProcurementAlertConfigError ProcurementAlertStatus = "config_error" // Missing location/configuration data
 )
 
 // ChatRole defines the participants in an agent session.

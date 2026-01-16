@@ -85,6 +85,8 @@ func newTestOrchestrator() *chat.Orchestrator {
 		&mockScheduleService{},
 		&mockInvoiceService{},
 		&mockDLQPersister{},
+		nil, // AuditWAL
+		nil, // AuditCircuitBreaker
 	)
 }
 
@@ -249,6 +251,8 @@ func TestHandleChat_OrchestratorError(t *testing.T) {
 		&mockScheduleService{},
 		&mockInvoiceService{},
 		&mockDLQPersister{},
+		nil, // AuditWAL
+		nil, // AuditCircuitBreaker
 	)
 	handler := NewChatHandler(failingOrch)
 

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -23,15 +22,19 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
+	cfg := getTestConfig()
+	ctx := context.Background()
 
 	// 1. Setup DB Connection
-	db, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
-	require.NoError(t, err)
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	// 2. Setup Vertex Client
 	var client ai.Client
@@ -53,7 +56,6 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 	invoiceService := service.NewInvoiceService(db, client)
 
 	// 4. Test Data Setup
-	ctx := context.Background()
 	orgID := uuid.New()
 	randomSlug := fmt.Sprintf("invoice-test-org-%s", uuid.New().String())
 	_, err = db.Exec(ctx, "INSERT INTO organizations (id, name, slug) VALUES ($1, 'Invoice Test Org', $2)", orgID, randomSlug)

@@ -13,13 +13,46 @@ import (
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/server"
+	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genai"
 )
+
+// noOpClient implements ai.Client for testing without real AI calls.
+type noOpClient struct{}
+
+func (m *noOpClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...*genai.Part) (string, error) {
+	// Return a mock response for chat tests
+	return `{"reply": "Mock reply for testing", "intent": "process_invoice"}`, nil
+}
+func (m *noOpClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+	return nil, nil
+}
+func (m *noOpClient) Close() error { return nil }
+
+// getTestConfig creates configuration suitable for integration tests.
+// Uses defaults if environment variables are not set.
+func getTestConfig() *config.Config {
+	cfg, err := config.LoadConfig()
+	if err == nil {
+		return cfg
+	}
+
+	// Create a test config with sensible defaults
+	return &config.Config{
+		DatabaseURL:   "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable",
+		RedisURL:      "localhost:6379",
+		AppPort:       8080,
+		JWTSecret:     "test-secret-for-integration-tests",
+		JWTExpiry:     24 * time.Hour,
+		WebhookSecret: "test-webhook-secret",
+	}
+}
 
 func TestChat_EndToEnd(t *testing.T) {
 	if testing.Short() {
@@ -27,14 +60,18 @@ func TestChat_EndToEnd(t *testing.T) {
 	}
 
 	// 1. Setup DB Connection
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
+	cfg := getTestConfig()
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	// Verify database is reachable
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	// 2. Create Test Fixtures (Org, User, Project)
 	orgID := uuid.New()
@@ -132,14 +169,17 @@ func TestChat_NoToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
+	cfg := getTestConfig()
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)
@@ -173,14 +213,17 @@ func TestChat_InvalidToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
+	cfg := getTestConfig()
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)
@@ -214,14 +257,17 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 	}
 
 	// Setup
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
+	cfg := getTestConfig()
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)

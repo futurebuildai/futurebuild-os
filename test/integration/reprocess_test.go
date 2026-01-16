@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/google/uuid"
@@ -20,15 +19,17 @@ func TestDocument_Reprocess(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg, _ := config.LoadConfig()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable"
-	}
-
+	cfg := getTestConfig()
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("Skipping test: cannot connect to database: %v", err)
+	}
 	defer db.Close()
+
+	if err := db.Ping(ctx); err != nil {
+		t.Skipf("Skipping test: database not reachable: %v", err)
+	}
 
 	// 1. Setup Services (Mock Client for consistent AI response)
 	mockClient := &MockVertexClient{}

@@ -50,13 +50,16 @@ type MessagePersister interface {
 // See PRODUCTION_PLAN.md Step 43.3
 // Critical Blocker C Remediation: Added dlq for async retry of failed messages
 // P0 FIX (Blocker B): DLQ is now MANDATORY for compliance audit trails.
+// Audit Trail Durability: Added WAL and circuit breaker for ACID compliance.
 type Orchestrator struct {
 	db              MessagePersister
 	classifier      IntentClassifier
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
-	dlq             DLQPersister // REQUIRED - must never be nil
+	dlq             DLQPersister        // REQUIRED - must never be nil
+	wal             AuditWAL            // Local fallback for DLQ failures (optional)
+	circuitBreaker  AuditCircuitBreaker // Controls read-only mode (optional)
 }
 
 // --- Command Pattern (The "Actions") ---
@@ -134,12 +137,15 @@ func (c *PlaceholderCommand) Execute(_ context.Context) (string, *Artifact, erro
 // ENGINEERING STANDARD: Accepts MessagePersister interface, not *pgxpool.Pool,
 // to enable strict dependency injection and testability.
 // P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
+// Audit Trail Durability: WAL and circuit breaker are optional but recommended.
 func NewOrchestrator(
 	persister MessagePersister,
 	taskService TaskService,
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
 	dlq DLQPersister,
+	wal AuditWAL,
+	circuitBreaker AuditCircuitBreaker,
 ) *Orchestrator {
 	if dlq == nil {
 		panic("chat: DLQPersister is required for compliance audit trails")
@@ -151,6 +157,8 @@ func NewOrchestrator(
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
 		dlq:             dlq,
+		wal:             wal,
+		circuitBreaker:  circuitBreaker,
 	}
 }
 
@@ -158,6 +166,7 @@ func NewOrchestrator(
 // This is primarily used for testing to inject mock dependencies.
 // See PRODUCTION_PLAN.md Step 43.4
 // P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
+// Audit Trail Durability: WAL and circuit breaker are optional but recommended.
 func NewOrchestratorWithPersister(
 	persister MessagePersister,
 	classifier IntentClassifier,
@@ -165,6 +174,8 @@ func NewOrchestratorWithPersister(
 	scheduleService ScheduleService,
 	invoiceService InvoiceService,
 	dlq DLQPersister,
+	wal AuditWAL,
+	circuitBreaker AuditCircuitBreaker,
 ) *Orchestrator {
 	if dlq == nil {
 		panic("chat: DLQPersister is required for compliance audit trails")
@@ -176,6 +187,8 @@ func NewOrchestratorWithPersister(
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
 		dlq:             dlq,
+		wal:             wal,
+		circuitBreaker:  circuitBreaker,
 	}
 }
 
@@ -239,30 +252,74 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 		// Lane A (Slow/External): AI operations succeed, persistence failure is non-fatal
 		// Lane B (Fast/Internal): DB operations require strict consistency
 		if isSlowExternalIntent(intent) {
+			// Audit Trail Durability: Check circuit breaker first
+			// If open, reject new Lane A writes (read-only mode)
+			if o.circuitBreaker != nil && o.circuitBreaker.IsOpen() {
+				slog.Error("AUDIT SYSTEM UNAVAILABLE: Degrading to read-only mode",
+					"intent", intent,
+					"project_id", req.ProjectID,
+					"user_id", userID,
+				)
+				return nil, fmt.Errorf("system temporarily unavailable: audit system degraded")
+			}
+
 			// Lane A: Action succeeded but chat history save failed
-			// CRITICAL: Log ERROR but return SUCCESS to user
-			// The expensive AI operation completed - user must see the result
+			// CRITICAL: Log ERROR but attempt fallback persistence
+			// The expensive AI operation completed - we must persist the audit trail
 			slog.Error("CRITICAL: Action succeeded but chat history save failed",
 				"intent", intent,
 				"project_id", req.ProjectID,
 				"user_id", userID,
 				"error", err,
 			)
-			// P0 FIX (Blocker B): DLQ is MANDATORY - no nil check needed.
-			// If DLQ enqueue fails, we have a critical compliance issue.
+
+			// Fallback 1: Try DLQ (Redis-backed async retry)
 			if dlqErr := o.dlq.EnqueueRetry(ctx, modelMsg); dlqErr != nil {
-				slog.Error("CRITICAL COMPLIANCE FAILURE: DLQ enqueue failed - audit trail incomplete",
+				slog.Error("CRITICAL COMPLIANCE FAILURE: DLQ enqueue failed - trying WAL",
 					"message_id", modelMsg.ID,
 					"error", dlqErr,
 				)
-				// Even on DLQ failure, return success to user since AI action completed.
-				// The compliance team must be alerted via monitoring on this error log.
-			} else {
-				slog.Info("Message enqueued to DLQ for retry",
-					"message_id", modelMsg.ID,
-				)
+
+				// Fallback 2: Try local WAL (disk-based last resort)
+				if o.wal != nil {
+					walErr := o.wal.AppendRecord(ctx, modelMsg)
+					if walErr == nil {
+						slog.Warn("Audit record written to local WAL for recovery",
+							"message_id", modelMsg.ID,
+						)
+						if o.circuitBreaker != nil {
+							o.circuitBreaker.RecordSuccess()
+						}
+						// WAL succeeded - return success to user
+						return &ChatResponse{
+							Reply:    reply,
+							Intent:   intent,
+							Artifact: artifact,
+						}, nil
+					}
+					slog.Error("CATASTROPHIC: WAL write also failed",
+						"message_id", modelMsg.ID,
+						"error", walErr,
+					)
+				}
+
+				// All audit systems failed - trip circuit breaker and return error
+				if o.circuitBreaker != nil {
+					o.circuitBreaker.RecordFailure()
+				}
+				// Return error to user - unaudited action cannot proceed
+				// See Audit Trail Durability remediation
+				return nil, fmt.Errorf("audit system unavailable: please try again later")
 			}
-			// Return success - user sees the result despite persistence failure
+
+			// DLQ succeeded
+			slog.Info("Message enqueued to DLQ for retry",
+				"message_id", modelMsg.ID,
+			)
+			if o.circuitBreaker != nil {
+				o.circuitBreaker.RecordSuccess()
+			}
+			// Return success - user sees the result, audit will be retried async
 			return &ChatResponse{
 				Reply:    reply,
 				Intent:   intent,

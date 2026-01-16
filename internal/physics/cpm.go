@@ -15,6 +15,10 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 )
 
+// ErrInvalidTaskDuration indicates a task has no valid duration for CPM calculation.
+// See PRODUCTION_PLAN.md: Fail-loudly approach prevents silent schedule corruption.
+var ErrInvalidTaskDuration = fmt.Errorf("invalid task duration")
+
 // DependencyGraph encapsulates the topology and edge metadata for CPM.
 // See BACKEND_SCOPE.md Section 6.3
 type DependencyGraph struct {
@@ -297,19 +301,22 @@ func (g *DependencyGraph) GetPredecessors(taskID uuid.UUID) []uuid.UUID {
 
 // getTaskDuration resolves the effective duration for a task.
 // Precedence: ManualOverrideDays > WeatherAdjustedDuration > CalculatedDuration
+// Returns ErrInvalidTaskDuration if no valid duration exists (fail-loudly approach).
 // See CPM_RES_MODEL_SPEC.md Section 11.2.5
-func getTaskDuration(task models.ProjectTask) float64 {
+func getTaskDuration(task models.ProjectTask) (float64, error) {
 	if task.ManualOverrideDays != nil && *task.ManualOverrideDays > 0 {
-		return *task.ManualOverrideDays
+		return *task.ManualOverrideDays, nil
 	}
 	if task.WeatherAdjustedDuration > 0 {
-		return task.WeatherAdjustedDuration
+		return task.WeatherAdjustedDuration, nil
 	}
 	if task.CalculatedDuration > 0 {
-		return task.CalculatedDuration
+		return task.CalculatedDuration, nil
 	}
-	// Default to 1 day if no duration is set
-	return 1.0
+	// Fail-loudly: do NOT silently default to 1.0 day.
+	// Invalid durations must halt CPM calculation to prevent invisible schedule corruption.
+	return 0, fmt.Errorf("%w: task %q (ID: %s) has no valid duration (ManualOverride=nil, WeatherAdjusted=0, Calculated=0)",
+		ErrInvalidTaskDuration, task.WBSCode, task.ID)
 }
 
 // ForwardPass calculates Early Start (ES) and Early Finish (EF) for all tasks.
@@ -331,7 +338,10 @@ func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar, mater
 			continue
 		}
 
-		duration := getTaskDuration(task)
+		duration, err := getTaskDuration(task)
+		if err != nil {
+			return nil, fmt.Errorf("forward pass failed: %w", err)
+		}
 		predecessors := g.GetPredecessors(taskID)
 
 		var earlyStart time.Time
@@ -515,7 +525,10 @@ func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal C
 			continue
 		}
 
-		duration := getTaskDuration(task)
+		duration, err := getTaskDuration(task)
+		if err != nil {
+			return nil, fmt.Errorf("backward pass failed: %w", err)
+		}
 		successors := g.GetSuccessors(taskID)
 
 		var lateFinish time.Time

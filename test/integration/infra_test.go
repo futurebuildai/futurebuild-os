@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genai"
 
-	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/storage"
 )
@@ -19,7 +18,7 @@ import (
 // TestInfra_S3_Vertex verifies the connection to external infrastructure.
 // It requires specific environment variables to be set.
 func TestInfra_S3_Vertex(t *testing.T) {
-	cfg, _ := config.LoadConfig()
+	cfg := getTestConfig()
 
 	t.Run("S3_Upload_And_Sign", func(t *testing.T) {
 		if cfg.S3Endpoint == "" || cfg.S3AccessKey == "" {

@@ -9,7 +9,6 @@ import (
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,7 +23,7 @@ type NotificationEnqueuer interface {
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 // P1 Performance Fix: Uses batching and async notifications to reduce DB round-trips
 type ProcurementAgent struct {
-	db        *pgxpool.Pool
+	repo      ProcurementRepository
 	weather   types.WeatherService
 	clock     clock.Clock
 	notifier  NotificationEnqueuer
@@ -35,17 +34,24 @@ type ProcurementAgent struct {
 // Tunable based on workload (100-500 recommended for production).
 const DefaultBatchSize = 100
 
-// NewProcurementAgent creates a new agent instance.
+// NewProcurementAgent creates a new agent instance with repository abstraction.
 // Clock is required for deterministic time simulation (Step 49).
 // notifier is optional - if nil, notifications are logged but not queued.
-func NewProcurementAgent(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
+// See PRODUCTION_PLAN.md: Testing Strategy remediation (Repository Pattern).
+func NewProcurementAgent(repo ProcurementRepository, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
 	return &ProcurementAgent{
-		db:        db,
+		repo:      repo,
 		weather:   weather,
 		clock:     clk,
 		notifier:  nil, // Default: no async notifications
 		batchSize: DefaultBatchSize,
 	}
+}
+
+// NewProcurementAgentWithDB is a convenience constructor using the default PostgreSQL repository.
+// Maintains backward compatibility with existing callers.
+func NewProcurementAgentWithDB(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
+	return NewProcurementAgent(NewPgProcurementRepository(db), weather, clk)
 }
 
 // WithNotificationEnqueuer sets the notification enqueuer for async delivery.
@@ -72,8 +78,8 @@ type procurementRow struct {
 	Status        types.ProcurementAlertStatus
 	EarlyStart    *time.Time
 	// IsExterior could be derived from WBS Phase, but for MVP we assume all long-lead are exterior-related.
-	// ZipCode for weather lookup (stubbed for MVP)
-	ZipCode       string
+	// ZipCode for weather lookup - nil indicates missing location data (requires ConfigurationError)
+	ZipCode       *string
 	ProjectTaskID uuid.UUID
 }
 
@@ -142,26 +148,10 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 // P1 Performance Fix: Replaces cron-swept hydrateItems with project-scoped operation.
 // See User Amendment #2, Critical Blocker A.3 Remediation
 func (a *ProcurementAgent) HydrateProject(ctx context.Context, projectID uuid.UUID) error {
-	query := `
-		INSERT INTO procurement_items (project_task_id, name, lead_time_weeks)
-		SELECT pt.id, pt.name, COALESCE(wt.lead_time_weeks_min, 4)
-		FROM project_tasks pt
-		LEFT JOIN procurement_items pi ON pi.project_task_id = pt.id
-		JOIN wbs_tasks wt ON pt.wbs_code = wt.code
-		WHERE wt.is_long_lead = true 
-		  AND pi.id IS NULL
-		  AND pt.project_id = $1
-		ON CONFLICT DO NOTHING
-	`
-	_, err := a.db.Exec(ctx, query, projectID)
-	if err != nil {
-		return fmt.Errorf("hydrate project %s: %w", projectID, err)
-	}
-	slog.Info("Project hydration completed", "project_id", projectID)
-	return nil
+	return a.repo.HydrateProject(ctx, projectID)
 }
 
-// flushBatch sends all UPDATE queries in a single pgx Batch round-trip.
+// flushBatch sends all UPDATE queries via repository.
 // P1 Performance Fix: Reduces N database round-trips to 1 per batch.
 // Notifications are enqueued asynchronously via NotificationEnqueuer (sidecar pattern).
 func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) error {
@@ -171,36 +161,34 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 
 	now := a.clock.Now()
 
-	// Build pgx Batch for all UPDATE operations
-	b := &pgx.Batch{}
-	updateQuery := `
-		UPDATE procurement_items
-		SET status = $1, calculated_order_date = $2, last_checked_at = $3
-		WHERE id = $4
-	`
-	for _, result := range batch {
-		b.Queue(updateQuery, string(result.NewStatus), result.CalculatedOrderDate, now, result.ID)
+	// Delegate batch update to repository
+	if err := a.repo.UpdateBatch(ctx, now, batch); err != nil {
+		return err
 	}
 
-	// Send all UPDATEs in a single round-trip
-	br := a.db.SendBatch(ctx, b)
-	defer br.Close()
-
-	// Process all batch results
-	for i := 0; i < len(batch); i++ {
-		if _, err := br.Exec(); err != nil {
-			slog.Error("batch update failed", "index", i, "id", batch[i].ID, "error", err)
-			// Continue - don't fail entire batch for one item
-		}
-	}
-
-	// Enqueue notifications asynchronously (sidecar pattern)
-	// This moves notification logic out of the hot path
+	// Process notifications: log to communication_logs and optionally enqueue async
 	for _, result := range batch {
-		if result.ShouldNotify && a.notifier != nil {
-			if err := a.notifier.EnqueueNotification(ctx, result.ID, result.Message, now); err != nil {
-				slog.Error("failed to enqueue notification", "id", result.ID, "error", err)
-				// Continue - notifications are best-effort
+		if result.ShouldNotify {
+			// Check dampening window (72 hours) before sending
+			shouldSend, err := a.shouldSendNotification(ctx, result.ID)
+			if err != nil {
+				slog.Error("failed to check notification dampening", "id", result.ID, "error", err)
+				continue
+			}
+			if !shouldSend {
+				slog.Debug("notification dampened", "id", result.ID)
+				continue
+			}
+
+			// Log to communication_logs for audit trail
+			a.logNotification(ctx, result)
+
+			// Enqueue async notification if sidecar is configured
+			if a.notifier != nil {
+				if err := a.notifier.EnqueueNotification(ctx, result.ID, result.Message, now); err != nil {
+					slog.Error("failed to enqueue notification", "id", result.ID, "error", err)
+					// Continue - notifications are best-effort
+				}
 			}
 		}
 	}
@@ -209,43 +197,11 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 	return nil
 }
 
-// streamItems iterates through procurement items one-by-one via callback.
+// streamItems iterates through procurement items via repository callback.
 // P1 Scalability Fix: Uses cursor-based iteration to prevent OOM at scale.
 // See User Amendment #3, BACKEND_SCOPE.md Section 2.5
 func (a *ProcurementAgent) streamItems(ctx context.Context, process ItemProcessor) error {
-	// Single optimized query per L7 performance standard
-	query := `
-		SELECT 
-			pi.id,
-			pi.name,
-			pi.lead_time_weeks,
-			pi.status,
-			pt.early_start,
-			COALESCE(pc.zip_code, '78701') as zip_code,
-			pi.project_task_id
-		FROM procurement_items pi
-		JOIN project_tasks pt ON pi.project_task_id = pt.id
-		JOIN projects p ON pt.project_id = p.id
-		LEFT JOIN project_context pc ON pc.project_id = p.id
-		WHERE p.status = 'Active'
-		  AND pi.status NOT IN ('ok')
-	`
-	rows, err := a.db.Query(ctx, query)
-	if err != nil {
-		return fmt.Errorf("query items: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var r procurementRow
-		if err := rows.Scan(&r.ID, &r.Name, &r.LeadTimeWeeks, &r.Status, &r.EarlyStart, &r.ZipCode, &r.ProjectTaskID); err != nil {
-			return fmt.Errorf("scan row: %w", err)
-		}
-		if err := process(r); err != nil {
-			return fmt.Errorf("process item %s: %w", r.ID, err)
-		}
-	}
-	return rows.Err()
+	return a.repo.StreamItems(ctx, process)
 }
 
 // analyzeItem calculates the order date and determines the alert status.
@@ -271,19 +227,35 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	leadTimeDays := item.LeadTimeWeeks * 7
 	weatherBuffer := 0
 
+	// FAANG Standard: "Fail Loudly" for Location Data
+	// If location data is missing, schedule calculation is BLOCKED (ConfigError).
+	// No data is better than wrong data - an Alaskan project using Texas weather
+	// could cause weeks of schedule drift and financial damages.
+	// See User Amendment: Data Integrity & "Physics" Accuracy
+	if item.ZipCode == nil || *item.ZipCode == "" {
+		result.NewStatus = types.ProcurementAlertConfigError
+		result.ShouldNotify = true
+		result.Message = fmt.Sprintf("⚠️ CONFIGURATION REQUIRED: %s is missing location data. "+
+			"Please add a zip code to the project to enable accurate schedule calculation.", item.Name)
+		slog.Warn("config error: missing zip code for procurement item",
+			"item_id", item.ID,
+			"item_name", item.Name,
+			"action", "blocking_schedule_calculation",
+		)
+		return result
+	}
+
 	// Weather interaction (SWIM integration)
 	// See PRODUCTION_PLAN.md Step 46: Weather Buffer
 	// For MVP, we check if precipitation probability > 50% near the start date
-	// P0 FIX: Do NOT use hardcoded fallback coordinates. If geocoding is unavailable,
-	// we default to 0 weather buffer rather than use incorrect location data.
 	// TODO: Inject GeocodingService and use item.ZipCode for location-specific weather.
-	if a.weather != nil && item.ZipCode != "" {
+	if a.weather != nil {
 		// ZipCode is available but geocoding service is not yet wired.
 		// Log a metric indicating geocoding is needed for accurate weather data.
 		// FAIL SAFE: Skip weather buffer calculation until geocoding is implemented.
 		slog.Warn("weather buffer skipped: geocoding not implemented",
 			"item_id", item.ID,
-			"zip_code", item.ZipCode,
+			"zip_code", *item.ZipCode,
 			"action", "using_zero_buffer",
 		)
 		// weatherBuffer remains 0 - no incorrect location data will be used
@@ -327,58 +299,17 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	return result
 }
 
-// updateItem persists the calculated status and order date.
-// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
-func (a *ProcurementAgent) updateItem(ctx context.Context, result alertResult) error {
-	query := `
-		UPDATE procurement_items
-		SET status = $1, calculated_order_date = $2, last_checked_at = $3
-		WHERE id = $4
-	`
-	_, err := a.db.Exec(ctx, query, string(result.NewStatus), result.CalculatedOrderDate, a.clock.Now(), result.ID)
-	return err
-}
-
-// shouldSendNotification checks communication_logs for recent alerts.
+// shouldSendNotification checks communication_logs for recent alerts via repository.
 // See User Amendment #4: 72-hour dampening, Optimized via Migration 000046
 // See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *ProcurementAgent) shouldSendNotification(ctx context.Context, itemID uuid.UUID) (bool, error) {
-	// Check for alerts in the last 72 hours linked to this specific entity
-	// Uses 'related_entity_id' column added in migration 000046
-	query := `
-		SELECT COUNT(*) FROM communication_logs
-		WHERE related_entity_id = $1
-		  AND timestamp > $2 - INTERVAL '72 hours'
-		  AND direction = 'Outbound'
-	`
-	var count int
-	err := a.db.QueryRow(ctx, query, itemID, a.clock.Now()).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count == 0, nil
+	return a.repo.ShouldSendNotification(ctx, itemID, a.clock.Now())
 }
 
-// logNotification persists the alert to communication_logs.
+// logNotification persists the alert to communication_logs via repository.
 // See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 func (a *ProcurementAgent) logNotification(ctx context.Context, result alertResult) {
-	// Insert into communication_logs with structured entity data
-	query := `
-		INSERT INTO communication_logs (
-			project_id, direction, content, channel, timestamp, 
-			related_entity_id, related_entity_type
-		)
-		SELECT p.id, 'Outbound', $1, 'Chat', $2, $3, 'procurement_item'
-		FROM procurement_items pi
-		JOIN project_tasks pt ON pi.project_task_id = pt.id
-		JOIN projects p ON pt.project_id = p.id
-		WHERE pi.id = $4
-	`
-	content := fmt.Sprintf("[PROCUREMENT ALERT] %s", result.Message)
-	_, err := a.db.Exec(ctx, query, content, a.clock.Now(), result.ID, result.ID)
-	if err != nil {
+	if err := a.repo.LogNotification(ctx, result, a.clock.Now()); err != nil {
 		slog.Error("failed to log notification", "id", result.ID, "error", err)
-	} else {
-		slog.Info("Notification logged", "item_id", result.ID, "message", result.Message)
 	}
 }

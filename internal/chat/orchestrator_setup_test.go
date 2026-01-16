@@ -28,7 +28,7 @@ func TestNewOrchestrator_InitializesCorrectly(t *testing.T) {
 
 	// Act
 	// P0 FIX: DLQ is now mandatory
-	orch := NewOrchestrator(mockPersister, mockTask, mockSchedule, mockInvoice, mockDlq)
+	orch := NewOrchestrator(mockPersister, mockTask, mockSchedule, mockInvoice, mockDlq, nil, nil)
 
 	// Assert
 	assert.NotNil(t, orch)

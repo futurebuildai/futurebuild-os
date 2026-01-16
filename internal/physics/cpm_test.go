@@ -1054,3 +1054,169 @@ func TestCalendar_HolidayOnWeekday(t *testing.T) {
 		"Adding 1 working day from Dec 24 should skip Christmas (Dec 25), landing on Dec 26 (Friday)")
 	assert.Equal(t, time.Friday, result.Weekday(), "Result should be Friday")
 }
+
+// ============================================================================
+// Task Duration Validation Tests (Fail-Loudly Approach)
+// See PRODUCTION_PLAN.md: Data Quality Enforcement
+// ============================================================================
+
+// TestForwardPass_RejectsZeroDuration verifies CPM halts when task has no valid duration.
+func TestForwardPass_RejectsZeroDuration(t *testing.T) {
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
+
+	// Create task with NO valid duration (all zero/nil)
+	taskA := models.ProjectTask{
+		ID:                      uuid.New(),
+		WBSCode:                 "INVALID.1",
+		Name:                    "Zero Duration Task",
+		CalculatedDuration:      0,   // Zero
+		WeatherAdjustedDuration: 0,   // Zero
+		ManualOverrideDays:      nil, // Nil
+	}
+
+	tasks := []models.ProjectTask{taskA}
+	deps := []models.TaskDependency{}
+
+	g := BuildDependencyGraph(tasks, deps)
+	_, err := ForwardPass(g, projectStart, &StandardCalendar{}, nil)
+
+	require.Error(t, err, "ForwardPass should error on zero-duration task")
+	assert.ErrorIs(t, err, ErrInvalidTaskDuration, "Error should wrap ErrInvalidTaskDuration")
+	assert.Contains(t, err.Error(), "INVALID.1", "Error should contain WBS code")
+}
+
+// TestBackwardPass_RejectsZeroDuration verifies CPM backward pass also validates duration.
+func TestBackwardPass_RejectsZeroDuration(t *testing.T) {
+	projectID := uuid.New()
+	projectStart := time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC)
+
+	// Create valid task A and invalid task B (zero duration)
+	taskA := makeTaskWithDuration("BP.1", 5.0)
+	taskB := models.ProjectTask{
+		ID:                      uuid.New(),
+		WBSCode:                 "BP.2",
+		Name:                    "Zero Duration B",
+		CalculatedDuration:      0,
+		WeatherAdjustedDuration: 0,
+		ManualOverrideDays:      nil,
+	}
+
+	tasks := []models.ProjectTask{taskA, taskB}
+	deps := []models.TaskDependency{
+		makeDep(projectID, taskA.ID, taskB.ID, types.DependencyTypeFS, 0),
+	}
+
+	g := BuildDependencyGraph(tasks, deps)
+
+	// Build schedule manually to bypass ForwardPass validation
+	schedule := map[uuid.UUID]TaskSchedule{
+		taskA.ID: {
+			TaskID:      taskA.ID,
+			WBSCode:     taskA.WBSCode,
+			EarlyStart:  projectStart,
+			EarlyFinish: projectStart.AddDate(0, 0, 5),
+		},
+		taskB.ID: {
+			TaskID:      taskB.ID,
+			WBSCode:     taskB.WBSCode,
+			EarlyStart:  projectStart.AddDate(0, 0, 5),
+			EarlyFinish: projectStart.AddDate(0, 0, 5), // Zero duration EF=ES
+		},
+	}
+
+	_, err := BackwardPass(g, schedule, &StandardCalendar{}, nil)
+
+	require.Error(t, err, "BackwardPass should error on zero-duration task")
+	assert.ErrorIs(t, err, ErrInvalidTaskDuration, "Error should wrap ErrInvalidTaskDuration")
+	assert.Contains(t, err.Error(), "BP.2", "Error should contain WBS code")
+}
+
+// TestGetTaskDuration_ValidPrecedence verifies duration resolution priority.
+func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
+	tests := []struct {
+		name             string
+		task             models.ProjectTask
+		expectedDuration float64
+		expectError      bool
+	}{
+		{
+			name: "ManualOverride takes precedence",
+			task: func() models.ProjectTask {
+				override := 10.0
+				return models.ProjectTask{
+					ID:                      uuid.New(),
+					WBSCode:                 "PREC.1",
+					CalculatedDuration:      2.0,
+					WeatherAdjustedDuration: 5.0,
+					ManualOverrideDays:      &override,
+				}
+			}(),
+			expectedDuration: 10.0,
+			expectError:      false,
+		},
+		{
+			name: "WeatherAdjusted when no override",
+			task: models.ProjectTask{
+				ID:                      uuid.New(),
+				WBSCode:                 "PREC.2",
+				CalculatedDuration:      2.0,
+				WeatherAdjustedDuration: 5.0,
+				ManualOverrideDays:      nil,
+			},
+			expectedDuration: 5.0,
+			expectError:      false,
+		},
+		{
+			name: "Calculated when no higher priority",
+			task: models.ProjectTask{
+				ID:                      uuid.New(),
+				WBSCode:                 "PREC.3",
+				CalculatedDuration:      3.0,
+				WeatherAdjustedDuration: 0,
+				ManualOverrideDays:      nil,
+			},
+			expectedDuration: 3.0,
+			expectError:      false,
+		},
+		{
+			name: "Error when all zero/nil",
+			task: models.ProjectTask{
+				ID:                      uuid.New(),
+				WBSCode:                 "PREC.4",
+				CalculatedDuration:      0,
+				WeatherAdjustedDuration: 0,
+				ManualOverrideDays:      nil,
+			},
+			expectedDuration: 0,
+			expectError:      true,
+		},
+		{
+			name: "Zero override is ignored",
+			task: func() models.ProjectTask {
+				zero := 0.0
+				return models.ProjectTask{
+					ID:                      uuid.New(),
+					WBSCode:                 "PREC.5",
+					CalculatedDuration:      4.0,
+					WeatherAdjustedDuration: 0,
+					ManualOverrideDays:      &zero, // Zero override should be ignored
+				}
+			}(),
+			expectedDuration: 4.0,
+			expectError:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			duration, err := getTaskDuration(tc.task)
+			if tc.expectError {
+				require.Error(t, err, "Expected error for %s", tc.name)
+				assert.ErrorIs(t, err, ErrInvalidTaskDuration)
+			} else {
+				require.NoError(t, err, "Unexpected error for %s", tc.name)
+				assert.Equal(t, tc.expectedDuration, duration, "Duration mismatch for %s", tc.name)
+			}
+		})
+	}
+}

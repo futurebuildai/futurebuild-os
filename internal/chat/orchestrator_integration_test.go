@@ -65,6 +65,9 @@ func newTestOrchestrator(persister MessagePersister) *Orchestrator {
 			},
 		},
 		InvoiceService: &MockInvoiceService{},
+		dlq:            &mockDLQ{}, // REQUIRED for Lane A fallback
+		wal:            nil,        // Optional: not tested here
+		circuitBreaker: nil,        // Optional: not tested here
 	}
 }
 

@@ -317,10 +317,10 @@ func (a *SubLiaisonAgent) hasRecentCommunication(ctx context.Context, contactID,
 		SELECT COUNT(*) FROM communication_logs
 		WHERE contact_id = $1
 		  AND related_entity_id = $2
-		  AND timestamp > $4 - ($3 || ' hours')::interval
+		  AND timestamp > ($4::timestamptz - ($3 || ' hours')::interval)
 		  AND direction = 'Outbound'
 	`
-	hours := int(window.Hours())
+	hours := fmt.Sprintf("%d", int(window.Hours()))
 	var count int
 	err := a.db.QueryRow(ctx, query, contactID, taskID, hours, a.clock.Now()).Scan(&count)
 	if err != nil {
@@ -413,11 +413,11 @@ func (a *SubLiaisonAgent) findRecentOutboundTask(ctx context.Context, contactID 
 		WHERE contact_id = $1
 		  AND direction = 'Outbound'
 		  AND related_entity_type = 'project_task'
-		  AND timestamp > $3 - ($2 || ' hours')::interval
+		  AND timestamp > ($3::timestamptz - ($2 || ' hours')::interval)
 		ORDER BY timestamp DESC
 		LIMIT 1
 	`
-	hours := int(window.Hours())
+	hours := fmt.Sprintf("%d", int(window.Hours()))
 	var taskID uuid.UUID
 	err := a.db.QueryRow(ctx, query, contactID, hours, a.clock.Now()).Scan(&taskID)
 	if err != nil {

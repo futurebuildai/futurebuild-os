@@ -90,7 +90,7 @@ func main() {
 
 	// Procurement Agent for long-lead item monitoring
 	// See PRODUCTION_PLAN.md Step 46, 49
-	procurementAgent := agents.NewProcurementAgent(dbPool, weatherService, realClock)
+	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock)
 
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler

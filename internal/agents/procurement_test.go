@@ -28,12 +28,14 @@ func TestAnalyzeItem_ScenarioA(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	earlyStart := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC) // 30 days away
 
+	zipCode := "78701"
 	item := procurementRow{
 		ID:            uuid.New(),
 		Name:          "Roof Trusses",
 		LeadTimeWeeks: 1, // 7 days
 		Status:        types.ProcurementAlertPending,
 		EarlyStart:    &earlyStart,
+		ZipCode:       &zipCode,
 	}
 
 	// Lead time = 7 days, buffer = 5 days, total = 12 days needed.
@@ -58,12 +60,14 @@ func TestAnalyzeItem_ScenarioB(t *testing.T) {
 	now := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)        // Day 16
 	earlyStart := time.Date(2026, 1, 30, 0, 0, 0, 0, time.UTC) // 14 days away
 
+	zipCode := "78701"
 	item := procurementRow{
 		ID:            uuid.New(),
 		Name:          "Windows",
 		LeadTimeWeeks: 2, // 14 days
 		Status:        types.ProcurementAlertPending,
 		EarlyStart:    &earlyStart,
+		ZipCode:       &zipCode,
 	}
 
 	// Lead time = 14 days, buffer = 5 days, total = 19 days needed.
@@ -94,12 +98,14 @@ func TestAnalyzeItem_ScenarioC(t *testing.T) {
 	now := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)         // Day 5
 	earlyStart := time.Date(2026, 1, 21, 0, 0, 0, 0, time.UTC) // 16 days away
 
+	zipCode := "78701"
 	item := procurementRow{
 		ID:            uuid.New(),
 		Name:          "HVAC Unit",
 		LeadTimeWeeks: 2, // 14 days
 		Status:        types.ProcurementAlertPending,
 		EarlyStart:    &earlyStart,
+		ZipCode:       &zipCode,
 	}
 
 	// P0 Fix: Weather buffer is 0 because geocoding is unavailable.
@@ -132,12 +138,14 @@ func TestAnalyzeItem_Warning(t *testing.T) {
 	now := time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC)        // Day 13
 	earlyStart := time.Date(2026, 1, 24, 0, 0, 0, 0, time.UTC) // 11 days away
 
+	zipCode := "78701"
 	item := procurementRow{
 		ID:            uuid.New(),
 		Name:          "Exterior Doors",
 		LeadTimeWeeks: 1, // 7 days
 		Status:        types.ProcurementAlertPending,
 		EarlyStart:    &earlyStart,
+		ZipCode:       &zipCode,
 	}
 
 	// New formula: NeedBy = EarlyStart - 2 = Jan 22

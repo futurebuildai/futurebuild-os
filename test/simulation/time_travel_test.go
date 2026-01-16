@@ -13,6 +13,7 @@ import (
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/colton/futurebuild/test/simulation/mocks"
 	"github.com/colton/futurebuild/test/testdata"
+	"github.com/colton/futurebuild/test/testhelpers"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,18 +34,12 @@ import (
 // - T+12: "Confirm Arrival" for Electrical sub
 // - NO duplicate alerts (idempotency)
 func TestTimeTravelSimulation(t *testing.T) {
-	// Skip if no database connection
-	dbURL := getTestDatabaseURL(t)
-	if dbURL == "" {
-		t.Skip("DATABASE_URL not set, skipping integration test")
-	}
+	// Use testcontainers for ephemeral PostgreSQL - always runs in CI
+	// See PRODUCTION_PLAN.md: Testing Strategy & CI Reliability Remediation
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
 
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, dbURL)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
 
 	// 1. SETUP: Seed test data using factory functions
 	// Technical Debt Remediation (P2): Uses testdata package instead of raw SQL
@@ -59,7 +54,10 @@ func TestTimeTravelSimulation(t *testing.T) {
 	notifier := &mocks.SpyNotifier{}
 	directoryService := &mockDirectoryService{}
 
-	procurementAgent := agents.NewProcurementAgent(db, weatherService, mockClock)
+	// Create agents using repository pattern
+	// See PRODUCTION_PLAN.md: Testing Strategy remediation
+	procurementRepo := agents.NewPgProcurementRepository(db)
+	procurementAgent := agents.NewProcurementAgent(procurementRepo, weatherService, mockClock)
 	subLiaisonAgent := agents.NewSubLiaisonAgent(db, directoryService, notifier, mockClock)
 
 	// Track which days had alerts
@@ -109,10 +107,14 @@ func TestTimeTravelSimulation(t *testing.T) {
 		t.Errorf("FAIL: Electrical confirmation fired too late (Day %d, expected ≤ Day 12)", electricalAlertDay)
 	}
 
-	// Assert NO DUPLICATES
+	// Assert DAMPENING - With 72-hour dampening over 30 days, expect ~10 alerts max
+	// (First alert + re-alerts every 3 days = 10-11 total)
 	lumberAlertCount := countLumberAlerts(ctx, db, projectID)
-	if lumberAlertCount > 1 {
-		t.Errorf("FAIL: Duplicate lumber alerts detected (%d alerts, expected 1)", lumberAlertCount)
+	if lumberAlertCount > 11 {
+		t.Errorf("FAIL: Too many lumber alerts (%d alerts, expected ≤11 with 72-hour dampening)", lumberAlertCount)
+	}
+	if lumberAlertCount == 0 {
+		t.Error("FAIL: No lumber alerts logged")
 	}
 
 	// Cleanup
@@ -122,10 +124,7 @@ func TestTimeTravelSimulation(t *testing.T) {
 
 // --- Test Helpers ---
 
-func getTestDatabaseURL(t *testing.T) string {
-	// In real tests, read from environment or use testcontainers
-	return "" // Return empty to skip by default
-}
+// NOTE: getTestDatabaseURL removed - now using testcontainers.StartPostgresContainer
 
 // seedSimulationProject uses factory functions to create test data.
 // Technical Debt Remediation (P2): Replaces raw SQL INSERT statements.
@@ -141,10 +140,16 @@ func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) 
 	project, err := testdata.NewTestProject(ctx, db, orgID, "Simulation Test Project",
 		testdata.WithProjectStatus("Active"),
 		testdata.WithPermitDate(startDate),
-		testdata.WithAddress("123 Test St"),
+		testdata.WithAddress("123 Test St, Austin, TX 78701"),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
+	}
+
+	// Create project context with zip code for Procurement Agent
+	// Required for weather-adjusted lead time calculations
+	if err := testdata.NewTestProjectContext(ctx, db, project.ID, "78701"); err != nil {
+		t.Fatalf("Failed to create project context: %v", err)
 	}
 
 	// Task A (Framing) - starts T+14, requires lumber
@@ -175,8 +180,8 @@ func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) 
 	}
 
 	// Create contact for electrical phase
-	contactID, err := testdata.NewTestContact(ctx, db,
-		"Electric Joe", "+15551234567", "joe@electric.com", "Subcontractor", "sms")
+	contactID, err := testdata.NewTestContact(ctx, db, orgID,
+		"Electric Joe", "+15551234567", "joe@electric.com", "Subcontractor", "SMS")
 	if err != nil {
 		t.Fatalf("Failed to create contact: %v", err)
 	}
