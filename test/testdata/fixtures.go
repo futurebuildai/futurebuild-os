@@ -179,14 +179,13 @@ func NewTestContact(ctx context.Context, db *pgxpool.Pool, orgID uuid.UUID, name
 }
 
 // NewTestProjectAssignment assigns a contact to a project phase.
-// Returns nil error if wbs_phases table is not seeded (non-fatal for tests).
+// Uses wbs_phase_id (VARCHAR) to store the phase code directly.
 func NewTestProjectAssignment(ctx context.Context, db *pgxpool.Pool, projectID, contactID uuid.UUID, phaseCode string) error {
 	query := `
-		INSERT INTO project_assignments (project_id, contact_id, assigned_phase_id)
-		SELECT $1, $2, wp.id FROM wbs_phases wp WHERE wp.code = $3 LIMIT 1
+		INSERT INTO project_assignments (project_id, contact_id, wbs_phase_id)
+		VALUES ($1, $2, $3)
 	`
 	_, err := db.Exec(ctx, query, projectID, contactID, phaseCode)
-	// Assignment may fail if wbs_phases not seeded - this is tolerable in some tests
 	return err
 }
 

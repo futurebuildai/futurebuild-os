@@ -44,7 +44,7 @@ func TestTimeTravelSimulation(t *testing.T) {
 
 	// 1. SETUP: Seed test data using factory functions
 	// Technical Debt Remediation (P2): Uses testdata package instead of raw SQL
-	projectID, taskAID, taskBID := seedSimulationProject(t, ctx, db)
+	projectID, taskAID, taskBID, contactID := seedSimulationProject(t, ctx, db)
 
 	// 2. Initialize agents with MockClock
 	// Canonical simulation start: 2026-01-01 08:00:00 UTC
@@ -53,7 +53,8 @@ func TestTimeTravelSimulation(t *testing.T) {
 
 	weatherService := &mocks.MockWeatherService{}
 	notifier := &mocks.SpyNotifier{}
-	directoryService := &mockDirectoryService{}
+	// Use the seeded contact ID to avoid FK violations
+	directoryService := &mockDirectoryService{contactID: contactID}
 
 	// Create agents using repository pattern
 	// See PRODUCTION_PLAN.md: Testing Strategy remediation
@@ -131,7 +132,7 @@ func TestTimeTravelSimulation(t *testing.T) {
 
 // seedSimulationProject uses factory functions to create test data.
 // Technical Debt Remediation (P2): Replaces raw SQL INSERT statements.
-func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) (projectID, taskAID, taskBID uuid.UUID) {
+func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) (projectID, taskAID, taskBID, contactID uuid.UUID) {
 	// Create organization
 	orgID, err := testdata.NewTestOrganization(ctx, db, "Sim Test Org")
 	if err != nil {
@@ -183,19 +184,18 @@ func seedSimulationProject(t *testing.T, ctx context.Context, db *pgxpool.Pool) 
 	}
 
 	// Create contact for electrical phase
-	contactID, err := testdata.NewTestContact(ctx, db, orgID,
+	contact, err := testdata.NewTestContact(ctx, db, orgID,
 		"Electric Joe", "+15551234567", "joe@electric.com", "Subcontractor", "SMS")
 	if err != nil {
 		t.Fatalf("Failed to create contact: %v", err)
 	}
 
 	// Assign contact to electrical phase (phase 10)
-	// This may fail if wbs_phases isn't seeded, which is fine for now
-	if err := testdata.NewTestProjectAssignment(ctx, db, project.ID, contactID, "10"); err != nil {
-		t.Logf("Note: Could not create phase assignment (expected if wbs_phases not seeded): %v", err)
+	if err := testdata.NewTestProjectAssignment(ctx, db, project.ID, contact, "10"); err != nil {
+		t.Logf("Note: Could not create phase assignment: %v", err)
 	}
 
-	return project.ID, taskA.ID, taskB.ID
+	return project.ID, taskA.ID, taskB.ID, contact
 }
 
 func hasLumberAlert(ctx context.Context, db *pgxpool.Pool, projectID uuid.UUID) bool {
@@ -235,11 +235,13 @@ func hasElectricalConfirmation(notifier *mocks.SpyNotifier) bool {
 }
 
 // mockDirectoryService implements agents.DirectoryService for testing
-type mockDirectoryService struct{}
+type mockDirectoryService struct {
+	contactID uuid.UUID
+}
 
 func (m *mockDirectoryService) GetContactForPhase(ctx context.Context, projectID, orgID uuid.UUID, phaseCode string) (*types.Contact, error) {
 	return &types.Contact{
-		ID:                uuid.New(),
+		ID:                m.contactID, // Use the seeded contact ID
 		Name:              "Test Sub",
 		Company:           "Test Company",
 		Phone:             "+15551234567",

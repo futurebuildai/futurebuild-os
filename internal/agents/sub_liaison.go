@@ -115,17 +115,29 @@ const (
 	CommLogInboundReply        CommunicationLogType = "INBOUND_REPLY"
 )
 
+// SendStatus defines the delivery status for the Transactional Outbox pattern.
+// See P0 Fix: Non-Atomic Side Effects - ensures at-most-once delivery.
+type SendStatus string
+
+const (
+	SendStatusPending SendStatus = "PENDING"
+	SendStatusSent    SendStatus = "SENT"
+	SendStatusFailed  SendStatus = "FAILED"
+)
+
 // ConfirmArrival sends a confirmation request to the subcontractor assigned to a task's phase.
 // See PRODUCTION_PLAN.md Step 47
 //
+// TRANSACTIONAL OUTBOX PATTERN (P0 Fix: At-Most-Once Delivery)
 // Logic Flow:
 // 1. Fetch task to get project_id, wbs_code, early_start
 // 2. Extract phase code (e.g., "9.1" -> "9")
 // 3. Call DirectoryService.GetContactForPhase
 // 4. Guard: If no contact, log WARN and return nil (expected state)
-// 5. Idempotency: Check communication_logs for recent request (24h)
-// 6. Send notification based on contact preference
-// 7. Audit: Insert into communication_logs
+// 5. Idempotency: Check communication_logs for recent SENT request (24h)
+// 6. OUTBOX: Insert PENDING record (durable before side effect)
+// 7. Send notification based on contact preference
+// 8. Update record to SENT or FAILED
 func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) error {
 	// Step 1: Fetch task details
 	// See DATA_SPINE_SPEC.md Section 3.3
@@ -153,7 +165,7 @@ func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) 
 	}
 
 	// Step 4: Idempotency check (24h dampening)
-	// See User Amendment #4 from Procurement Agent
+	// Only considers SENT records - FAILED can be retried, PENDING handled by outbox processor
 	recentExists, err := a.hasRecentCommunication(ctx, contact.ID, taskID, 24*time.Hour)
 	if err != nil {
 		slog.Error("Failed to check communication log", "error", err)
@@ -167,31 +179,46 @@ func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) 
 		return nil
 	}
 
-	// Step 5: Build and send notification
+	// Step 5: Build message
 	message := fmt.Sprintf(
 		"FutureBuild: Please confirm arrival for '%s' scheduled %s. Reply YES to confirm or provide status update.",
 		task.Name,
 		formatDate(task.EarlyStart),
 	)
 
-	if err := a.sendNotification(contact, message); err != nil {
+	// Step 6: TRANSACTIONAL OUTBOX - Insert PENDING record BEFORE external call
+	// This ensures durability: if we crash after send, the record exists for retry detection
+	logID, err := a.logCommunicationWithStatus(ctx, task.ProjectID, contact.ID, &taskID, CommLogConfirmationRequest, message, SendStatusPending)
+	if err != nil {
+		// Failed to create log - don't send SMS (preserves at-most-once guarantee)
+		return fmt.Errorf("failed to create pending log: %w", err)
+	}
+
+	// Step 7: Send notification (record is now durable)
+	sendErr := a.sendNotification(contact, message)
+
+	// Step 8: Update status based on send result
+	finalStatus := SendStatusSent
+	if sendErr != nil {
+		finalStatus = SendStatusFailed
 		slog.Error("Failed to send confirmation notification",
 			"contact_id", contact.ID,
-			"error", err,
+			"log_id", logID,
+			"error", sendErr,
 		)
-		return nil // Non-fatal
+	}
+	if err := a.updateCommunicationStatus(ctx, logID, finalStatus); err != nil {
+		slog.Error("Failed to update log status", "log_id", logID, "status", finalStatus, "error", err)
 	}
 
-	// Step 6: Audit log
-	if err := a.logCommunication(ctx, task.ProjectID, contact.ID, &taskID, CommLogConfirmationRequest, message); err != nil {
-		slog.Error("Failed to log communication", "error", err)
+	if sendErr == nil {
+		slog.Info("Confirmation request sent",
+			"task_id", taskID,
+			"contact_id", contact.ID,
+			"phase_code", phaseCode,
+			"log_id", logID,
+		)
 	}
-
-	slog.Info("Confirmation request sent",
-		"task_id", taskID,
-		"contact_id", contact.ID,
-		"phase_code", phaseCode,
-	)
 
 	return nil
 }
@@ -309,8 +336,9 @@ func extractPhaseCode(wbsCode string) string {
 }
 
 func (a *SubLiaisonAgent) hasRecentCommunication(ctx context.Context, contactID, taskID uuid.UUID, window time.Duration) (bool, error) {
-	// Check communication_logs for recent outbound to this contact for this task
+	// Check communication_logs for recent SENT outbound to this contact for this task
 	// Uses 'related_entity_id' column added in migration 000046
+	// Only considers SENT records - FAILED can be retried, PENDING handled by outbox processor
 	// ENGINEERING STANDARD: Use explicit hours for PostgreSQL interval (Code Review WARN #2)
 	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
@@ -319,6 +347,7 @@ func (a *SubLiaisonAgent) hasRecentCommunication(ctx context.Context, contactID,
 		  AND related_entity_id = $2
 		  AND timestamp > ($4::timestamptz - ($3 || ' hours')::interval)
 		  AND direction = 'Outbound'
+		  AND send_status = 'SENT'
 	`
 	hours := fmt.Sprintf("%d", int(window.Hours()))
 	var count int
@@ -348,13 +377,22 @@ func (a *SubLiaisonAgent) sendNotification(contact *types.Contact, message strin
 }
 
 func (a *SubLiaisonAgent) logCommunication(ctx context.Context, projectID, contactID uuid.UUID, taskID *uuid.UUID, logType CommunicationLogType, content string) error {
+	// Wrapper for backwards compatibility - defaults to SENT status
+	_, err := a.logCommunicationWithStatus(ctx, projectID, contactID, taskID, logType, content, SendStatusSent)
+	return err
+}
+
+// logCommunicationWithStatus inserts a communication log with explicit status and returns the log ID.
+// This is the core of the Transactional Outbox pattern - insert PENDING before external call.
+func (a *SubLiaisonAgent) logCommunicationWithStatus(ctx context.Context, projectID, contactID uuid.UUID, taskID *uuid.UUID, logType CommunicationLogType, content string, status SendStatus) (uuid.UUID, error) {
 	// See PRODUCTION_PLAN.md Step 49: Uses injected clock for deterministic simulation.
 	query := `
 		INSERT INTO communication_logs (
-			project_id, contact_id, direction, content, channel, timestamp,
-			related_entity_id, related_entity_type
+			id, project_id, contact_id, direction, content, channel, timestamp,
+			related_entity_id, related_entity_type, send_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id
 	`
 	direction := "Outbound"
 	if logType == CommLogInboundReply {
@@ -374,10 +412,22 @@ func (a *SubLiaisonAgent) logCommunication(ctx context.Context, projectID, conta
 		}
 	}
 
-	_, err := a.db.Exec(ctx, query,
-		projectID, contactID, direction, content, "SMS", a.clock.Now(),
-		relatedID, "project_task",
-	)
+	logID := uuid.New()
+	err := a.db.QueryRow(ctx, query,
+		logID, projectID, contactID, direction, content, "SMS", a.clock.Now(),
+		relatedID, "project_task", string(status),
+	).Scan(&logID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return logID, nil
+}
+
+// updateCommunicationStatus updates the send_status of a communication log by ID.
+// Used to transition PENDING -> SENT or PENDING -> FAILED after external call.
+func (a *SubLiaisonAgent) updateCommunicationStatus(ctx context.Context, logID uuid.UUID, status SendStatus) error {
+	query := `UPDATE communication_logs SET send_status = $1 WHERE id = $2`
+	_, err := a.db.Exec(ctx, query, string(status), logID)
 	return err
 }
 
