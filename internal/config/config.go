@@ -27,6 +27,9 @@ type Config struct {
 	S3AccessKey            string
 	S3SecretKey            string
 	WebhookSecret          string // See PRODUCTION_PLAN.md Step 48 (Signature Verification)
+	// Environment specifies the runtime environment (development, staging, production).
+	// Used for safety checks like NoOp implementations. See Code Review Issue 3B.
+	Environment string
 }
 
 // LoadConfig loads configuration from environment variables.
@@ -65,6 +68,7 @@ func LoadConfig() (*Config, error) {
 		S3AccessKey:            os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:            os.Getenv("S3_SECRET_KEY"),
 		WebhookSecret:          os.Getenv("WEBHOOK_SECRET"),
+		Environment:            getEnvOrDefault("APP_ENV", "development"),
 	}
 
 	// Fail Fast: Validate critical configuration

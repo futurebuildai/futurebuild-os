@@ -67,6 +67,18 @@ type Calendar interface {
 // WorkDay is the standard duration of a working day (8 hours).
 // All scheduling calculations should use this as the atomic unit.
 // P1 Correctness Fix: Integer math prevents floating-point drift.
+//
+// ⚠️ DESIGN DECISION (Code Review Issue 2A - Work Day Semantics):
+// The current AddWorkDuration implementation uses 24-hour CALENDAR days
+// (skipping weekends), not 8-hour work days. This is standard practice
+// for construction scheduling where:
+// - Tasks are estimated in workdays (Mon-Fri)
+// - Duration represents calendar days, not labor hours
+// - A "5-day task" spans Mon-Fri (5 calendar days, not 40 hours)
+//
+// TODO: Per code review, this should be made configurable per project.
+// Future enhancement: Add WorkHoursPerDay to PhysicsConfig or ProjectSettings
+// to support hour-level precision for labor scheduling.
 const WorkDay = 8 * time.Hour
 
 // StandardCalendar implements a configurable work week calendar.

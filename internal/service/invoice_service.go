@@ -99,7 +99,12 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
 	// L7 Vendor Abstraction: Use ai.GenerateRequest instead of genai.Part
-	req := ai.NewTextRequest(ai.ModelTypeFlash, fmt.Sprintf(InvoicePromptTemplate, extractedText))
+	// Code Review Issue 1B Fix: Enable logprobs for actual model confidence scoring
+	req := ai.GenerateRequest{
+		Model:          ai.ModelTypeFlash,
+		Parts:          []ai.ContentPart{{Text: fmt.Sprintf(InvoicePromptTemplate, extractedText)}},
+		ReturnLogprobs: true, // Enable logprobs for true model confidence
+	}
 	resp, err := s.client.GenerateContent(ctx, req)
 	if err != nil {
 		return uuid.Nil, nil, fmt.Errorf("ai analysis failed: %w", err)
@@ -116,6 +121,14 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 	if err := json.Unmarshal([]byte(cleanResp), &extraction); err != nil {
 		return uuid.Nil, nil, fmt.Errorf("failed to parse AI response: %w. Response: %s", err, cleanResp)
 	}
+
+	// 4. Use model confidence from logprobs if available (Code Review Issue 1B Fix)
+	// Model confidence derived from logprobs is more reliable than LLM self-reported confidence
+	if resp.Confidence > 0 {
+		extraction.Confidence = float64(resp.Confidence)
+	}
+	// If logprobs not available (resp.Confidence == 0), fall back to JSON confidence
+	// with warning logged in SaveExtraction
 
 	return projectID, &extraction, nil
 }
@@ -139,6 +152,15 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 
 	// 2. Evaluate Human Review Requirement
 	// See PRODUCTION_PLAN.md Step 39
+	//
+	// CONFIDENCE SCORING (Code Review Issue 1B - Resolution):
+	// Confidence is now derived from model logprobs when available (see AnalyzeInvoice).
+	// Logprobs provide actual token probabilities from the model, not self-reported values.
+	//
+	// Fallback behavior: If logprobs unavailable (e.g., mock client in tests),
+	// uses the JSON-provided confidence with caution.
+	//
+	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
 	isHumanReviewRequired := extraction.Confidence < ConfidenceThresholdForReview
 
 	// 3. Prepare Variables

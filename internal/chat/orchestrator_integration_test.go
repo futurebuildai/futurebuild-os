@@ -288,27 +288,28 @@ func TestObservability_CommandExecutionDuration(t *testing.T) {
 }
 
 // =============================================================================
-// HELPER TESTS
+// CONSISTENCY LEVEL TESTS
 // =============================================================================
 
-// TestIsSlowExternalIntent verifies the lane classification helper
-func TestIsSlowExternalIntent(t *testing.T) {
+// TestCommandConsistencyLevel verifies the lane classification via ConsistencyLevel method.
+// This replaces the old isSlowExternalIntent helper function test.
+// Consistency logic is now encapsulated in each ChatCommand implementation.
+func TestCommandConsistencyLevel(t *testing.T) {
 	tests := []struct {
-		intent   types.Intent
-		expected bool
-		lane     string
+		name          string
+		command       ChatCommand
+		expectedLevel types.ConsistencyType
+		lane          string
 	}{
-		{types.IntentProcessInvoice, true, "Lane A"},
-		{types.IntentExplainDelay, true, "Lane A"},
-		{types.IntentUnknown, true, "Lane A"},
-		{types.IntentGetSchedule, false, "Lane B"},
-		{types.IntentUpdateTaskStatus, false, "Lane B"},
+		{"GetScheduleCommand", &GetScheduleCommand{}, types.ConsistencyStrict, "Lane B"},
+		{"StrictPlaceholderCommand", &StrictPlaceholderCommand{}, types.ConsistencyStrict, "Lane B"},
+		{"PlaceholderCommand", &PlaceholderCommand{}, types.ConsistencyBestEffort, "Lane A"},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.intent), func(t *testing.T) {
-			got := isSlowExternalIntent(tt.intent)
-			assert.Equal(t, tt.expected, got, "%s: isSlowExternalIntent(%s) should be %v", tt.lane, tt.intent, tt.expected)
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.command.ConsistencyLevel()
+			assert.Equal(t, tt.expectedLevel, got, "%s: ConsistencyLevel() should be %v", tt.lane, tt.expectedLevel)
 		})
 	}
 }

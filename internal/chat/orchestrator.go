@@ -256,29 +256,6 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 	})
 }
 
-// isSlowExternalIntent returns true for intents that involve slow/external operations
-// (AI, Vision, LLM calls) where at-least-once execution with best-effort persistence is acceptable.
-// Returns false for fast/internal intents (DB operations) that require strict consistency.
-// See Step 2: Two-Lane Consistency Strategy
-func isSlowExternalIntent(intent types.Intent) bool {
-	switch intent {
-	case types.IntentProcessInvoice,
-		types.IntentExplainDelay,
-		types.IntentUnknown:
-		// Lane A: Slow/External - AI/Vision operations
-		// These are expensive; if they succeed, we must return success to user
-		return true
-	case types.IntentGetSchedule,
-		types.IntentUpdateTaskStatus:
-		// Lane B: Fast/Internal - DB operations
-		// These are idempotent or read-only; retry is safe, strict consistency required
-		return false
-	default:
-		// Unknown intents default to Lane A (graceful degradation)
-		return true
-	}
-}
-
 // routeIntent creates and executes the appropriate command for the given intent.
 // See PRODUCTION_PLAN.md Step 43 (Command Pattern)
 // See PRODUCTION_PLAN.md Step 44 (Artifact return for Rich UI)

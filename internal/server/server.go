@@ -55,10 +55,24 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// P0 FIX: DLQ is now MANDATORY for compliance audit trails.
 	messageStore := chat.NewPgxMessageStore(db)
 	dlq := chat.NewAsynqDLQ(cfg.RedisURL)
+
+	// PRODUCTION SAFETY CHECK (Code Review Issue 3B)
+	// NoOp implementations are placeholders that skip critical functionality.
+	// They MUST be replaced before production deployment.
+	if cfg.Environment == "production" {
+		// Log CRITICAL warning - do not panic to allow graceful degradation
+		// but make this extremely visible in production logs
+		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		fmt.Println("CRITICAL SECURITY WARNING: NoOpAuditWAL and NoOpCircuitBreaker in use!")
+		fmt.Println("These MUST be replaced with production implementations before launch.")
+		fmt.Println("See PRODUCTION_PLAN.md for WAL and circuit breaker configuration.")
+		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	}
+
 	chatOrchestrator := chat.NewOrchestrator(
 		messageStore, scheduleService, scheduleService, invoiceService, dlq,
-		&chat.NoOpAuditWAL{},       // P0 Fix: Safe fallback until WAL is production-ready
-		&chat.NoOpCircuitBreaker{}, // P0 Fix: Safe fallback until circuit breaker is configured
+		&chat.NoOpAuditWAL{},       // TODO: Replace with production WAL - See Code Review Issue 3B
+		&chat.NoOpCircuitBreaker{}, // TODO: Replace with production circuit breaker - See Code Review Issue 3B
 	)
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 

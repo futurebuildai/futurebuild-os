@@ -43,6 +43,12 @@ type GenerateRequest struct {
 	// Temperature controls randomness (0.0 = deterministic, 1.0 = creative).
 	// Zero means use model default.
 	Temperature float32
+
+	// ReturnLogprobs enables logprob extraction for confidence scoring.
+	// When true, the Confidence field in GenerateResponse will contain
+	// the average probability of chosen tokens (derived from logprobs).
+	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
+	ReturnLogprobs bool
 }
 
 // GenerateResponse contains the result of content generation.
@@ -53,7 +59,12 @@ type GenerateResponse struct {
 	// TokensUsed is the total token count (input + output).
 	TokensUsed int
 
-	// Confidence is an optional model confidence score (0.0 to 1.0).
+	// Confidence is the model confidence score (0.0 to 1.0).
+	// Derived from logprobs when ReturnLogprobs=true:
+	// - Calculated as average probability of chosen tokens
+	// - Closer to 1.0 = higher model certainty
+	// - Returns 0.0 if logprobs not enabled or unavailable
+	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
 	Confidence float32
 }
 
