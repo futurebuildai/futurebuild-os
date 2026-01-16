@@ -55,8 +55,19 @@ type Calendar interface {
 	// AddWorkingDays adds the specified number of working days to a date.
 	// Positive days move forward, negative days move backward.
 	// Non-working days (weekends) are skipped.
+	// DEPRECATED: Use AddWorkDuration for deterministic integer math.
 	AddWorkingDays(date time.Time, days float64) time.Time
+
+	// AddWorkDuration adds work duration using integer math for determinism.
+	// Duration is expressed in nanoseconds (use WorkDay constant for convenience).
+	// P1 Correctness Fix: Eliminates IEEE 754 floating-point drift.
+	AddWorkDuration(date time.Time, duration time.Duration) time.Time
 }
+
+// WorkDay is the standard duration of a working day (8 hours).
+// All scheduling calculations should use this as the atomic unit.
+// P1 Correctness Fix: Integer math prevents floating-point drift.
+const WorkDay = 8 * time.Hour
 
 // StandardCalendar implements a configurable work week calendar.
 // Weekends and specified Holidays are skipped when calculating working days.
@@ -120,9 +131,55 @@ func (c *StandardCalendar) isNonWorkingDay(date time.Time) bool {
 	return c.isHoliday(date)
 }
 
+// AddWorkDuration adds work duration using integer nanosecond math.
+// This is the deterministic alternative to AddWorkingDays.
+// Duration should be a multiple of WorkDay for best results.
+// P1 Correctness Fix: Eliminates IEEE 754 floating-point drift.
+func (c *StandardCalendar) AddWorkDuration(date time.Time, duration time.Duration) time.Time {
+	if duration == 0 {
+		return date
+	}
+
+	// Integer math only - no float64!
+	wholeDays := duration / (24 * time.Hour)
+	remainder := duration % (24 * time.Hour)
+
+	result := date
+
+	if wholeDays > 0 {
+		// Forward: add working days
+		for i := time.Duration(0); i < wholeDays; i++ {
+			result = result.Add(24 * time.Hour)
+			// Skip non-working days (weekends and holidays)
+			for c.isNonWorkingDay(result) {
+				result = result.Add(24 * time.Hour)
+			}
+		}
+	} else if wholeDays < 0 {
+		// Backward: subtract working days
+		for i := time.Duration(0); i > wholeDays; i-- {
+			result = result.Add(-24 * time.Hour)
+			// Skip non-working days (weekends and holidays)
+			for c.isNonWorkingDay(result) {
+				result = result.Add(-24 * time.Hour)
+			}
+		}
+	}
+
+	// Add remainder within the work day (already in nanoseconds - integer math)
+	if remainder != 0 {
+		result = result.Add(remainder)
+	}
+
+	// P1 Fix: Truncate to minute precision for cross-architecture determinism
+	return result.Truncate(time.Minute)
+}
+
 // AddWorkingDays adds fractional working days to a date, skipping weekends and holidays.
 // For positive days (forward pass), if the result lands on a non-working day, it advances.
 // For negative days (backward pass), if the result lands on a non-working day, it retreats.
+// P1 Correctness Fix: Results are truncated to minute precision for determinism.
+// DEPRECATED: Use AddWorkDuration for guaranteed deterministic integer math.
 func (c *StandardCalendar) AddWorkingDays(date time.Time, days float64) time.Time {
 	if days == 0 {
 		return date
@@ -159,7 +216,9 @@ func (c *StandardCalendar) AddWorkingDays(date time.Time, days float64) time.Tim
 		result = result.Add(time.Duration(fraction * 24 * float64(time.Hour)))
 	}
 
-	return result
+	// P1 Correctness Fix: Truncate to minute precision to eliminate nanosecond drift.
+	// This ensures 1 + 1 always equals 2, regardless of x86 vs ARM architecture.
+	return result.Truncate(time.Minute)
 }
 
 // CPMResult represents the output of CPM scheduling.

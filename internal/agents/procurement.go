@@ -2,12 +2,14 @@ package agents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/clock"
+	pkgsync "github.com/colton/futurebuild/pkg/sync"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,11 +33,19 @@ type ProcurementAgent struct {
 	notifier  NotificationEnqueuer
 	batchSize int
 	config    config.ProcurementConfig // Config decoupling: tunable business rules
+	mutex     pkgsync.DistributedMutex // P0 Reliability Fix: Prevents duplicate execution across replicas
 }
 
 // DefaultBatchSize is the number of items to batch before flushing.
 // Tunable based on workload (100-500 recommended for production).
 const DefaultBatchSize = 100
+
+// Distributed lock constants for Blue/Green deployment safety.
+// P0 Reliability Fix: Prevents duplicate execution across application replicas.
+const (
+	procurementLockKey = "futurebuild:agent:procurement:lock"
+	procurementLockTTL = 5 * time.Minute
+)
 
 // NewProcurementAgent creates a new agent instance with repository abstraction.
 // Clock is required for deterministic time simulation (Step 49).
@@ -74,6 +84,13 @@ func (a *ProcurementAgent) WithBatchSize(size int) *ProcurementAgent {
 	return a
 }
 
+// WithDistributedMutex sets the distributed mutex for Blue/Green deployment safety.
+// P0 Reliability Fix: Required for production multi-replica deployments.
+func (a *ProcurementAgent) WithDistributedMutex(mutex pkgsync.DistributedMutex) *ProcurementAgent {
+	a.mutex = mutex
+	return a
+}
+
 // procurementRow represents the joined data for a single procurement item.
 // See BACKEND_SCOPE.md Section 2.5 (Long-Lead Items)
 type procurementRow struct {
@@ -103,9 +120,23 @@ type ItemProcessor func(item procurementRow) error
 
 // Execute runs the procurement analysis for all active projects.
 // See PRODUCTION_PLAN.md Step 46
+// P0 Reliability Fix: Uses distributed lock to prevent duplicate execution in Blue/Green deployments.
 // P1 Scalability Fix: Uses streaming iteration instead of loading all items into memory.
 // P1 Performance Fix: Uses batched updates and async notifications to reduce DB round-trips.
 func (a *ProcurementAgent) Execute(ctx context.Context) error {
+	// P0 Reliability Fix: Distributed lock prevents duplicate execution
+	if a.mutex != nil {
+		unlock, err := a.mutex.TryLock(ctx, procurementLockKey, procurementLockTTL)
+		if errors.Is(err, pkgsync.ErrLockHeld) {
+			slog.Info("agent locked by another instance, skipping execution")
+			return nil // Graceful exit, NOT an error
+		}
+		if err != nil {
+			return fmt.Errorf("acquiring distributed lock: %w", err)
+		}
+		defer unlock() // SAFETY: Always release lock
+	}
+
 	slog.Info("Starting Procurement Agent...")
 
 	// NOTE: Hydration is now event-driven via HandleHydrateProject task.
@@ -157,7 +188,7 @@ func (a *ProcurementAgent) HydrateProject(ctx context.Context, projectID uuid.UU
 }
 
 // flushBatch sends all UPDATE queries via repository.
-// P1 Performance Fix: Reduces N database round-trips to 1 per batch.
+// P0 Performance Fix: Reduces N+1 database round-trips to O(1) per batch.
 // Notifications are enqueued asynchronously via NotificationEnqueuer (sidecar pattern).
 func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) error {
 	if len(batch) == 0 {
@@ -171,16 +202,33 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 		return err
 	}
 
+	// P0 Performance Fix: Collect IDs for batch dampening check
+	// This replaces O(N) individual queries with O(1) batch query
+	var notifyIDs []uuid.UUID
+	for _, result := range batch {
+		if result.ShouldNotify {
+			notifyIDs = append(notifyIDs, result.ID)
+		}
+	}
+
+	// Single batch query instead of N individual queries
+	var dampenedMap map[uuid.UUID]bool
+	if len(notifyIDs) > 0 {
+		var err error
+		dampenedMap, err = a.repo.GetNotificationHistoryForBatch(ctx, notifyIDs, now)
+		if err != nil {
+			slog.Error("failed to fetch notification history batch", "error", err)
+			// Graceful degradation: skip dampening check, allow all notifications
+			// This maintains correctness (might over-notify, but won't lose notifications)
+			dampenedMap = nil
+		}
+	}
+
 	// Process notifications: log to communication_logs and optionally enqueue async
 	for _, result := range batch {
 		if result.ShouldNotify {
-			// Check dampening window (72 hours) before sending
-			shouldSend, err := a.shouldSendNotification(ctx, result.ID)
-			if err != nil {
-				slog.Error("failed to check notification dampening", "id", result.ID, "error", err)
-				continue
-			}
-			if !shouldSend {
+			// O(1) map lookup instead of O(N) database queries
+			if dampenedMap != nil && dampenedMap[result.ID] {
 				slog.Debug("notification dampened", "id", result.ID)
 				continue
 			}

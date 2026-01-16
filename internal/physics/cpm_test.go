@@ -889,7 +889,12 @@ func (c *SevenDayCalendar) AddWorkingDays(date time.Time, days float64) time.Tim
 	hoursToAdd := fractionalDays * 24
 	result = result.Add(time.Duration(hoursToAdd * float64(time.Hour)))
 
-	return result
+	return result.Truncate(time.Minute) // Match StandardCalendar truncation
+}
+
+// AddWorkDuration adds work duration using integer math (7-day work week).
+func (c *SevenDayCalendar) AddWorkDuration(date time.Time, duration time.Duration) time.Time {
+	return date.Add(duration).Truncate(time.Minute)
 }
 
 // TestFloatPrecision_LongChain proves the CPM engine doesn't suffer from

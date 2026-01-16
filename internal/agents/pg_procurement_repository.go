@@ -154,3 +154,45 @@ func (r *PgProcurementRepository) LogNotification(ctx context.Context, result al
 	slog.Info("Notification logged", "item_id", result.ID, "message", result.Message)
 	return nil
 }
+
+// GetNotificationHistoryForBatch retrieves dampening status for multiple items in one query.
+// Returns a map where true = notification was sent in last 72 hours (should dampen).
+// P0 Performance Fix: Reduces N database round-trips to 1.
+func (r *PgProcurementRepository) GetNotificationHistoryForBatch(ctx context.Context, itemIDs []uuid.UUID, now time.Time) (map[uuid.UUID]bool, error) {
+	if len(itemIDs) == 0 {
+		return make(map[uuid.UUID]bool), nil
+	}
+
+	// PostgreSQL ANY() with array parameter for batch lookup
+	query := `
+		SELECT related_entity_id
+		FROM communication_logs
+		WHERE related_entity_id = ANY($1)
+		  AND timestamp > ($2::timestamptz - INTERVAL '72 hours')
+		  AND direction = 'Outbound'
+		GROUP BY related_entity_id
+	`
+
+	rows, err := r.db.Query(ctx, query, itemIDs, now)
+	if err != nil {
+		return nil, fmt.Errorf("batch notification history query: %w", err)
+	}
+	defer rows.Close()
+
+	// Build result map: true = should dampen (recent notification exists)
+	result := make(map[uuid.UUID]bool, len(itemIDs))
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan notification entity id: %w", err)
+		}
+		result[id] = true // Mark as dampened
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate notification history rows: %w", err)
+	}
+
+	slog.Debug("batch dampening check completed", "items_checked", len(itemIDs), "dampened", len(result))
+	return result, nil
+}

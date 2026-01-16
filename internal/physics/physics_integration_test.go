@@ -275,7 +275,12 @@ type ContinuousCalendar struct{}
 // Since this is a continuous calendar, it simply adds 24 hours per day
 // without skipping weekends or holidays.
 func (c *ContinuousCalendar) AddWorkingDays(date time.Time, days float64) time.Time {
-	return date.Add(time.Duration(days*24) * time.Hour)
+	return date.Add(time.Duration(days*24) * time.Hour).Truncate(time.Minute)
+}
+
+// AddWorkDuration adds work duration using integer math (continuous 7-day week).
+func (c *ContinuousCalendar) AddWorkDuration(date time.Time, duration time.Duration) time.Time {
+	return date.Add(duration).Truncate(time.Minute)
 }
 
 func TestGoldenMasterPhysics(t *testing.T) {
