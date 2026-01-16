@@ -1,22 +1,56 @@
-# Handoff: Phase 6 Step 49
+# Handoff
 
-**Previous Step:** 48 (Inbound Message Processing) - **COMPLETED** ✅
-**Current Step:** 49 (Time-Travel Agent Simulation)
+**Current Phase:** Phase 7: Frontend - Lit + TypeScript
+**Completed Step:** 51.2: Reactive State Engine (Signals Store)
+**Next Step:** 51.3: App Shell & Layout Structure
 
-## Status
-- **Inbound Processor**: Live. Webhooks at `/api/v1/webhooks/sms` and `/api/v1/webhooks/email` process subcontractor replies.
-- **State Machine**: 100% progress triggers automatic CPM recalculation.
-- **Idempotency**: Database-level via `external_id` unique index on `communication_logs`.
-- **Security**: HMAC-SHA256 signature verification via `X-FutureBuild-Signature`.
+---
 
-## Context for Step 49
-We are implementing the **Time-Travel Agent Simulation**. This is a testing/demo tool that simulates the passage of time to show how the system responds to schedule changes, delays, and updates over the project lifecycle.
+## ✅ Recent Achievements
 
-## Key Objectives
-1.  **Simulation Engine**: Allow fast-forwarding project timelines for demos.
-2.  **Event Injection**: Simulate weather delays, material arrivals, progress updates.
-3.  **Dashboard Integration**: Visual replay of project state changes.
+### 1. Reactive State Engine (Step 51.2)
+- **Global Store (`src/store/store.ts`)**: Implemented Signals-based state management using `@preact/signals-core`.
+  - Readonly signals: `user$`, `projects$`, `isAuthenticated$`, etc.
+  - Actions: Typed mutations for auth, projects, chat, and UI.
+  - Effects: Automatic persistence to `localStorage` (token, theme).
+- **Network Layer (`src/services/`)**:
+  - `http.ts`: Strongly-typed fetch wrapper with automatic auth injection and 401 handling.
+  - `api.ts`: Domain-specific API bindings for Auth, Projects, Chat, Schedule, Tasks, and Contacts.
+- **Verification**:
+  - `store.test.ts`: Node-based test script passing 31/31 tests.
+  - All code strictly typed (no `any`), build and lint clean.
 
-## Spec References
--   `PRODUCTION_PLAN.md` Step 49.
--   `BACKEND_SCOPE.md` Section 6 (Simulation Layer).
+### 2. Frontend Core Architecture (Step 51.1)
+- **Base Component**: `RedactedElement` (renamed `FBElement`) implemented with shared styles and event emitter.
+- **Design System**: CSS variables for colors, typography, and spacing defined in `index.css`.
+- **Component Registry**: `src/index.ts` setup for global component registration.
+
+---
+
+## 📋 Next Step: App Shell & Layout (Step 51.3)
+
+**Objective**: Build the main application scaffolding that hosts the views.
+
+### Checklist
+1. **Layout Components**:
+   - `src/components/layout/fb-header.ts`: Top navigation bar (branding, user profile, theme toggle).
+   - `src/components/layout/fb-sidebar.ts`: Collapsible navigation menu (Projects, Chat, Schedule, etc.).
+   - `src/components/layout/fb-layout.ts`: Main grid container managing Header, Sidebar, and Content areas.
+2. **Integration**:
+   - Connect layout components to `store.ui` signals (`sidebarOpen$`, `theme$`, `isMobile$`).
+   - Implement responsive behavior (sidebar auto-close on mobile).
+3. **Routing (Lite)**:
+   - Basic view switching in `fb-layout` based on `store.activeView$`.
+
+### Context
+- The `http.ts` service injects the `tokenGetter` and `onUnauthorized` handler at bootstrap.
+- The Store is a singleton that can be imported directly into components.
+- Components should subscribe to signals in their `render()` method or using `SignalWatcher` (to be implemented/verified in `FBElement`).
+
+---
+
+## 📦 System State
+- **Frontend Path**: `frontend/`
+- **Build Status**: Passing (`npm run build`)
+- **Lint Status**: Passing (`npm run lint`)
+- **Test Status**: Passing (`npx tsx src/store/store.test.ts`)
