@@ -10,50 +10,56 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/genai"
 
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
 )
 
 // MockVertexClient simulates Vertex AI interactions
+// L7 Vendor Abstraction: Updated to use vendor-agnostic types
 type MockVertexClient struct {
 	ShouldFail bool
 }
 
-func (m *MockVertexClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...*genai.Part) (string, error) {
+func (m *MockVertexClient) GenerateContent(ctx context.Context, req ai.GenerateRequest) (ai.GenerateResponse, error) {
 	if m.ShouldFail {
-		return "", fmt.Errorf("mock ai failure")
+		return ai.GenerateResponse{}, fmt.Errorf("mock ai failure")
 	}
 
 	// Detect prompt type based on text content
 	var promptText string
-	for _, p := range parts {
-		if p.Text != "" {
-			promptText = p.Text
+	for _, part := range req.Parts {
+		if part.Text != "" {
+			promptText = part.Text
 			break
 		}
 	}
 
-	// Invoice Response
+	// Invoice Response - MONETARY PRECISION: All amounts in cents
 	if len(promptText) > 0 && (contains(promptText, "invoice") || contains(promptText, "Invoice")) {
-		return `{
+		return ai.GenerateResponse{
+			Text: `{
 			"vendor": "ACME Concrete Supplies",
 			"date": "2026-01-15",
 			"invoice_number": "INV-2026-001",
-			"total_amount": 1400.00,
+			"total_amount_cents": 140000,
 			"line_items": [
-				{"description": "3000 PSI Ready Mix Concrete", "quantity": 10, "unit_price": 120.00, "total": 1200.00},
-				{"description": "Delivery Fee", "quantity": 1, "unit_price": 150.00, "total": 150.00},
-				{"description": "Environmental Surcharge", "quantity": 1, "unit_price": 50.00, "total": 50.00}
+				{"description": "3000 PSI Ready Mix Concrete", "quantity": 10, "unit_price_cents": 12000, "total_cents": 120000},
+				{"description": "Delivery Fee", "quantity": 1, "unit_price_cents": 15000, "total_cents": 15000},
+				{"description": "Environmental Surcharge", "quantity": 1, "unit_price_cents": 5000, "total_cents": 5000}
 			],
 			"suggested_wbs_code": "6.2",
 			"confidence": 0.98
-		}`, nil
+		}`,
+			Confidence: 0.98,
+		}, nil
 	}
 
 	// Default Vision Response
-	return `{"is_verified": true, "confidence": 0.95, "reasoning": "Mock verification passed"}`, nil
+	return ai.GenerateResponse{
+		Text:       `{"is_verified": true, "confidence": 0.95, "reasoning": "Mock verification passed"}`,
+		Confidence: 0.95,
+	}, nil
 }
 
 func (m *MockVertexClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {

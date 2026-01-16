@@ -22,6 +22,9 @@ import (
 // noOpClient is defined in chat_test.go (same package)
 
 func TestPipeline_MockIngestion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping integration test in CI environment")
 	}

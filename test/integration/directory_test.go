@@ -63,7 +63,7 @@ func TestDirectory_GetContactForPhase(t *testing.T) {
 	t.Run("Success_ValidPhase", func(t *testing.T) {
 		contact, err := directoryService.GetContactForPhase(ctx, projectID, orgID, phaseCode)
 		require.NoError(t, err)
-		assert.Equal(t, contactID.String(), contact.ID)
+		assert.Equal(t, contactID, contact.ID)
 		assert.Equal(t, "John Plumber", contact.Name)
 		assert.Equal(t, "JP Plumbing", contact.Company)
 		assert.Equal(t, "Subcontractor", string(contact.Role))

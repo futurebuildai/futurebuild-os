@@ -358,24 +358,28 @@ func (g *DependencyGraph) GetPredecessors(taskID uuid.UUID) []uuid.UUID {
 	return predecessors
 }
 
-// getTaskDuration resolves the effective duration for a task.
+// getTaskDuration resolves the effective duration for a task as time.Duration.
 // Precedence: ManualOverrideDays > WeatherAdjustedDuration > CalculatedDuration
 // Returns ErrInvalidTaskDuration if no valid duration exists (fail-loudly approach).
+// P1 Correctness Fix: Returns time.Duration for deterministic integer math.
 // See CPM_RES_MODEL_SPEC.md Section 11.2.5
-func getTaskDuration(task models.ProjectTask) (float64, error) {
+func getTaskDuration(task models.ProjectTask) (time.Duration, error) {
+	var durationDays float64
 	if task.ManualOverrideDays != nil && *task.ManualOverrideDays > 0 {
-		return *task.ManualOverrideDays, nil
+		durationDays = *task.ManualOverrideDays
+	} else if task.WeatherAdjustedDuration > 0 {
+		durationDays = task.WeatherAdjustedDuration
+	} else if task.CalculatedDuration > 0 {
+		durationDays = task.CalculatedDuration
+	} else {
+		// Fail-loudly: do NOT silently default to 1.0 day.
+		// Invalid durations must halt CPM calculation to prevent invisible schedule corruption.
+		return 0, fmt.Errorf("%w: task %q (ID: %s) has no valid duration (ManualOverride=nil, WeatherAdjusted=0, Calculated=0)",
+			ErrInvalidTaskDuration, task.WBSCode, task.ID)
 	}
-	if task.WeatherAdjustedDuration > 0 {
-		return task.WeatherAdjustedDuration, nil
-	}
-	if task.CalculatedDuration > 0 {
-		return task.CalculatedDuration, nil
-	}
-	// Fail-loudly: do NOT silently default to 1.0 day.
-	// Invalid durations must halt CPM calculation to prevent invisible schedule corruption.
-	return 0, fmt.Errorf("%w: task %q (ID: %s) has no valid duration (ManualOverride=nil, WeatherAdjusted=0, Calculated=0)",
-		ErrInvalidTaskDuration, task.WBSCode, task.ID)
+	// Convert float64 days to time.Duration using integer multiplication
+	// This preserves determinism: 1.5 days = 1.5 * 24 hours = 36 hours
+	return time.Duration(durationDays * float64(24*time.Hour)), nil
 }
 
 // ForwardPass calculates Early Start (ES) and Early Finish (EF) for all tasks.
@@ -459,7 +463,7 @@ func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar, mater
 			}
 		}
 
-		earlyFinish = cal.AddWorkingDays(earlyStart, duration)
+		earlyFinish = cal.AddWorkDuration(earlyStart, duration)
 
 		schedule[taskID] = TaskSchedule{
 			TaskID:      taskID,
@@ -475,43 +479,44 @@ func ForwardPass(g *DependencyGraph, projectStart time.Time, cal Calendar, mater
 
 // calculateConstraintDate determines the earliest start date for a successor
 // based on the predecessor's schedule and the dependency type.
-// Uses the provided Calendar for working day calculations.
+// P1 Correctness Fix: Uses time.Duration and AddWorkDuration for deterministic math.
 // See DATA_SPINE_SPEC.md Section 3.4 for dependency types.
 func calculateConstraintDate(
 	cal Calendar,
 	predSchedule TaskSchedule,
-	successorDuration float64,
+	successorDuration time.Duration,
 	depType types.DependencyType,
 	lagDays int,
 ) time.Time {
-	lag := float64(lagDays)
+	// Convert lag days to time.Duration for deterministic math
+	lag := time.Duration(lagDays) * 24 * time.Hour
 
 	switch depType {
 	case types.DependencyTypeFS:
 		// Finish-to-Start: Successor starts after predecessor finishes
 		// ES(successor) = EF(predecessor) + lag
-		return cal.AddWorkingDays(predSchedule.EarlyFinish, lag)
+		return cal.AddWorkDuration(predSchedule.EarlyFinish, lag)
 
 	case types.DependencyTypeSS:
 		// Start-to-Start: Successor starts after predecessor starts
 		// ES(successor) = ES(predecessor) + lag
-		return cal.AddWorkingDays(predSchedule.EarlyStart, lag)
+		return cal.AddWorkDuration(predSchedule.EarlyStart, lag)
 
 	case types.DependencyTypeFF:
 		// Finish-to-Finish: Successor finishes after predecessor finishes
 		// EF(successor) = EF(predecessor) + lag
 		// ES(successor) = EF(successor) - duration = EF(predecessor) + lag - duration
-		return cal.AddWorkingDays(predSchedule.EarlyFinish, lag-successorDuration)
+		return cal.AddWorkDuration(predSchedule.EarlyFinish, lag-successorDuration)
 
 	case types.DependencyTypeSF:
 		// Start-to-Finish: Successor finishes after predecessor starts
 		// EF(successor) = ES(predecessor) + lag
 		// ES(successor) = EF(successor) - duration = ES(predecessor) + lag - duration
-		return cal.AddWorkingDays(predSchedule.EarlyStart, lag-successorDuration)
+		return cal.AddWorkDuration(predSchedule.EarlyStart, lag-successorDuration)
 
 	default:
 		// Default to FS behavior
-		return cal.AddWorkingDays(predSchedule.EarlyFinish, lag)
+		return cal.AddWorkDuration(predSchedule.EarlyFinish, lag)
 	}
 }
 
@@ -630,7 +635,7 @@ func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal C
 			}
 		}
 
-		lateStart := cal.AddWorkingDays(lateFinish, -duration)
+		lateStart := cal.AddWorkDuration(lateFinish, -duration)
 
 		// Calculate total float: LS - ES (or equivalently LF - EF)
 		// Float is measured in days
@@ -661,22 +666,23 @@ func BackwardPass(g *DependencyGraph, schedule map[uuid.UUID]TaskSchedule, cal C
 // calculateBackwardConstraintDate determines the latest finish date for a predecessor
 // based on the successor's schedule and the dependency type.
 // For SS and SF types, predecessorDuration is used to convert the LS constraint to LF.
-// Uses the provided Calendar for working day calculations.
+// P1 Correctness Fix: Uses time.Duration and AddWorkDuration for deterministic math.
 // See DATA_SPINE_SPEC.md Section 3.4 for dependency types.
 func calculateBackwardConstraintDate(
 	cal Calendar,
 	succSchedule TaskSchedule,
-	predecessorDuration float64,
+	predecessorDuration time.Duration,
 	depType types.DependencyType,
 	lagDays int,
 ) time.Time {
-	lag := float64(lagDays)
+	// Convert lag days to time.Duration for deterministic math
+	lag := time.Duration(lagDays) * 24 * time.Hour
 
 	switch depType {
 	case types.DependencyTypeFS:
 		// Finish-to-Start: Predecessor finishes before successor starts
 		// LF(predecessor) = LS(successor) - lag
-		return cal.AddWorkingDays(succSchedule.LateStart, -lag)
+		return cal.AddWorkDuration(succSchedule.LateStart, -lag)
 
 	case types.DependencyTypeSS:
 		// Start-to-Start: Predecessor starts before successor starts
@@ -684,12 +690,12 @@ func calculateBackwardConstraintDate(
 		// Since caller computes LS = LF - duration, we need:
 		// LF - duration = LS(succ) - lag
 		// LF = LS(succ) - lag + duration
-		return cal.AddWorkingDays(succSchedule.LateStart, -lag+predecessorDuration)
+		return cal.AddWorkDuration(succSchedule.LateStart, -lag+predecessorDuration)
 
 	case types.DependencyTypeFF:
 		// Finish-to-Finish: Predecessor finishes before successor finishes
 		// LF(predecessor) = LF(successor) - lag
-		return cal.AddWorkingDays(succSchedule.LateFinish, -lag)
+		return cal.AddWorkDuration(succSchedule.LateFinish, -lag)
 
 	case types.DependencyTypeSF:
 		// Start-to-Finish: Predecessor starts before successor finishes
@@ -697,10 +703,10 @@ func calculateBackwardConstraintDate(
 		// Since caller computes LS = LF - duration, we need:
 		// LF - duration = LF(succ) - lag
 		// LF = LF(succ) - lag + duration
-		return cal.AddWorkingDays(succSchedule.LateFinish, -lag+predecessorDuration)
+		return cal.AddWorkDuration(succSchedule.LateFinish, -lag+predecessorDuration)
 
 	default:
 		// Default to FS behavior
-		return cal.AddWorkingDays(succSchedule.LateStart, -lag)
+		return cal.AddWorkDuration(succSchedule.LateStart, -lag)
 	}
 }

@@ -6,16 +6,20 @@ import (
 	"context"
 
 	"github.com/colton/futurebuild/pkg/ai"
-	"google.golang.org/genai"
 )
 
 // MockAIClient returns static content to avoid real AI calls.
 // This speeds up simulation from ~2s/iteration to <1ms.
+// L7 Vendor Abstraction: Updated to use vendor-agnostic types.
 type MockAIClient struct{}
 
-// GenerateContent returns a static mock briefing.
-func (m *MockAIClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...*genai.Part) (string, error) {
-	return "Mock Daily Briefing Content - Simulation Mode", nil
+// GenerateContent returns a static mock response.
+func (m *MockAIClient) GenerateContent(ctx context.Context, req ai.GenerateRequest) (ai.GenerateResponse, error) {
+	return ai.GenerateResponse{
+		Text:       "Mock AI Response - Simulation Mode",
+		TokensUsed: 100,
+		Confidence: 0.95,
+	}, nil
 }
 
 // GenerateEmbedding returns a mock embedding vector.

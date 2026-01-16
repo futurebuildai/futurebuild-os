@@ -12,7 +12,6 @@ import (
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
-	"google.golang.org/genai"
 )
 
 // MaxConcurrentProjects limits concurrent AI/DB calls to prevent thundering herds.
@@ -183,11 +182,13 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 	// Graceful degradation: if AI client is unavailable, log warning and skip generation
 	var briefing string
 	if a.aiClient != nil {
-		part := &genai.Part{Text: prompt}
-		briefing, err = a.aiClient.GenerateContent(ctx, ai.ModelTypeFlash, part)
+		// L7 Vendor Abstraction: Use ai.NewTextRequest instead of genai.Part
+		req := ai.NewTextRequest(ai.ModelTypeFlash, prompt)
+		resp, err := a.aiClient.GenerateContent(ctx, req)
 		if err != nil {
 			return fmt.Errorf("AI generation failed: %w", err)
 		}
+		briefing = resp.Text
 	} else {
 		slog.Warn("AI client not available for project, skipping briefing generation", "project_id", p.ID)
 		briefing = "[AI Unavailable] Manual briefing required. Please review project schedule and weather conditions."

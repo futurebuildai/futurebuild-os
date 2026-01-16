@@ -20,15 +20,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/genai"
 )
 
 // noOpClient implements ai.Client for testing without real AI calls.
+// L7 Vendor Abstraction: Updated to use vendor-agnostic types.
 type noOpClient struct{}
 
-func (m *noOpClient) GenerateContent(ctx context.Context, modelType ai.ModelType, parts ...*genai.Part) (string, error) {
+func (m *noOpClient) GenerateContent(ctx context.Context, req ai.GenerateRequest) (ai.GenerateResponse, error) {
 	// Return a mock response for chat tests
-	return `{"reply": "Mock reply for testing", "intent": "process_invoice"}`, nil
+	return ai.GenerateResponse{
+		Text: `{"reply": "Mock reply for testing", "intent": "process_invoice"}`,
+	}, nil
 }
 func (m *noOpClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	return nil, nil

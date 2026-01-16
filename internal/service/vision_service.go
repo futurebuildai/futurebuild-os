@@ -12,7 +12,6 @@ import (
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"google.golang.org/genai"
 )
 
 // VisionService implements AI-powered site photo analysis.
@@ -55,23 +54,23 @@ func (s *VisionService) VerifyTask(ctx context.Context, imageURL string, taskDes
 		return false, 0, fmt.Errorf("failed to download image: %w", err)
 	}
 
-	// 2. Prepare AI Parts
-	promptPart := &genai.Part{Text: fmt.Sprintf(visionPromptTemplate, taskDescription)}
-	imgPart := &genai.Part{
-		InlineData: &genai.Blob{
-			MIMEType: mimeType,
-			Data:     imageBytes,
-		},
-	}
+	// 2. Prepare AI Request using vendor-agnostic types
+	// L7 Vendor Abstraction: Use ai.NewMultimodalRequest instead of genai.Part
+	req := ai.NewMultimodalRequest(
+		ai.ModelTypeFlash,
+		fmt.Sprintf(visionPromptTemplate, taskDescription),
+		imageBytes,
+		mimeType,
+	)
 
-	// 3. Call Vertex AI
-	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, promptPart, imgPart)
+	// 3. Call AI (vendor-agnostic)
+	resp, err := s.client.GenerateContent(ctx, req)
 	if err != nil {
 		return false, 0, fmt.Errorf("ai vision analysis failed: %w", err)
 	}
 
 	// Clean response
-	cleanResp := strings.TrimSpace(resp)
+	cleanResp := strings.TrimSpace(resp.Text)
 	cleanResp = strings.TrimPrefix(cleanResp, "```json")
 	cleanResp = strings.TrimSuffix(cleanResp, "```")
 	cleanResp = strings.TrimSpace(cleanResp)

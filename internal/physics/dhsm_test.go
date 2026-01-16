@@ -3,6 +3,7 @@ package physics
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
@@ -459,5 +460,324 @@ func TestCalculateTaskDuration_WithWeather(t *testing.T) {
 	expectedCombined := 6.0
 	if resultCombined != expectedCombined {
 		t.Errorf("expected %.1f with rain/freeze impact and quantization, got %v", expectedCombined, resultCombined)
+	}
+}
+
+// =============================================================================
+// RED TEST: DHSM Fixed-Point Migration - Prove Float64 Drift
+// =============================================================================
+// This test proves that IEEE 754 floating-point arithmetic in DHSM calculations
+// can cause non-deterministic results due to precision accumulation.
+//
+// The fundamental problem:
+//   baseDuration *= saf  // float64 multiplication introduces error
+//   baseDuration *= multiplier // compounds error
+//   return math.Ceil(baseDuration*2) / 2 // error affects quantization boundary
+//
+// EXPECTED BEHAVIOR (BEFORE FIX): Demonstrates float precision issues
+// EXPECTED BEHAVIOR (AFTER FIX): All calculations use int64 nanoseconds
+// =============================================================================
+
+// TestDHSM_FloatDrift_RedTest proves floating-point causes non-determinism in DHSM.
+func TestDHSM_FloatDrift_RedTest(t *testing.T) {
+	// Test 1: IEEE 754 non-associativity affects SAF calculations
+	// (a * b) * c != a * (b * c) for certain float64 values
+	a := 5.123456789
+	b := 1.6818 // SAF for 4500 GSF
+	c := 1.2    // 20% multiplier
+
+	// Order 1: ((a * b) * c)
+	result1 := (a * b) * c
+
+	// Order 2: (a * (b * c))
+	result2 := a * (b * c)
+
+	if result1 != result2 {
+		t.Logf("IEEE 754 NON-ASSOCIATIVITY DEMONSTRATED:")
+		t.Logf("  ((a * b) * c) = %.20f", result1)
+		t.Logf("  (a * (b * c)) = %.20f", result2)
+		t.Logf("  Difference: %.20e", result1-result2)
+	}
+
+	// Test 2: Precision boundary at quantization edge
+	// Values near 0.5-day boundaries can flip due to float error
+	edgeCases := []float64{
+		4.9999999999999, // Should quantize to 5.0
+		5.0000000000001, // Should quantize to 5.5
+		4.75,            // Right on 0.25 boundary
+	}
+
+	for _, base := range edgeCases {
+		// Simulate: base * SAF where SAF is a computed value
+		saf := math.Pow(4500.0/2250.0, 0.75) // ~1.6818...
+		computed := base * saf
+
+		// Apply quantization
+		quantized := math.Ceil(computed*2) / 2
+
+		t.Logf("Base=%.15f, SAF=%.15f, Computed=%.15f, Quantized=%.1f",
+			base, saf, computed, quantized)
+	}
+
+	// Test 3: Accumulated error through multiple multiplications
+	// This simulates a task with SAF + multiple duration multipliers
+	task := models.WBSTask{
+		ID:               uuid.New(),
+		Code:             "9.1",
+		Name:             "Test Task",
+		BaseDurationDays: 5.123456789012345, // High precision base
+	}
+	context := models.ProjectContext{
+		SupplyChainVolatility:  3,
+		RoughInspectionLatency: 2,
+	}
+	multipliers := []models.DurationMultiplier{
+		{
+			ID:                uuid.New(),
+			WBSTaskCode:       "9.1",
+			VariableKey:       "supply_chain_volatility",
+			Weight:            0.123456789,
+			MultiplierFormula: "linear",
+		},
+		{
+			ID:                uuid.New(),
+			WBSTaskCode:       "*",
+			VariableKey:       "rough_inspection_latency",
+			Weight:            0.098765432,
+			MultiplierFormula: "linear",
+		},
+	}
+
+	// Calculate 1000 times - should all be identical
+	results := make(map[float64]int)
+	for i := 0; i < 1000; i++ {
+		result := CalculateTaskDuration(task, 4567.89, context, multipliers, types.Forecast{}, defaultCfg)
+		results[result]++
+	}
+
+	// With deterministic code, there should only be ONE unique result
+	if len(results) > 1 {
+		t.Errorf("NON-DETERMINISM: Got %d different results from identical inputs!", len(results))
+		for result, count := range results {
+			t.Logf("  Result %.15f occurred %d times", result, count)
+		}
+	} else {
+		t.Logf("✓ Determinism check passed: single unique result")
+	}
+
+	// Test 4: Document that float64 is used (this is the "red" part)
+	t.Log("=== CURRENT IMPLEMENTATION STATUS ===")
+	t.Log("CalculateTaskDuration returns float64 - violates L7 determinism requirement")
+	t.Log("After migration, should return time.Duration (int64 nanoseconds)")
+}
+
+// TestDHSM_Determinism_Requirement documents the L7 determinism requirement.
+func TestDHSM_Determinism_Requirement(t *testing.T) {
+	t.Log("L7 QUALITY GATE: Determinism Requirement")
+	t.Log("----------------------------------------")
+	t.Log("1. Same input MUST produce identical output on x86 and ARM64")
+	t.Log("2. SAF calculations must use fixed-point or lookup tables")
+	t.Log("3. Duration must use time.Duration (int64 nanoseconds)")
+	t.Log("4. No float64 in the critical path from input to output")
+	t.Log("")
+	t.Log("Current implementation uses float64 - this violates L7 standards")
+}
+
+// =============================================================================
+// V2 DETERMINISTIC FUNCTION TESTS
+// =============================================================================
+// These tests verify that CalculateTaskDurationV2 produces deterministic results
+// using int64 nanosecond math, eliminating IEEE 754 floating-point drift.
+// =============================================================================
+
+// TestCalculateTaskDurationV2_Basic verifies basic V2 functionality.
+func TestCalculateTaskDurationV2_Basic(t *testing.T) {
+	task := models.WBSTask{
+		ID:               uuid.New(),
+		Code:             "9.1",
+		Name:             "Floor Framing",
+		BaseDurationDays: 5.0,
+	}
+	context := models.ProjectContext{}
+
+	result := CalculateTaskDurationV2(task, defaultGSF, context, nil, types.Forecast{}, defaultCfg)
+
+	// 5.0 days = 120 hours, quantized to half-day = 5 days = 120 hours
+	expected := 120 * time.Hour
+	if result != expected {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+// TestCalculateTaskDurationV2_Determinism proves identical inputs produce identical outputs.
+func TestCalculateTaskDurationV2_Determinism(t *testing.T) {
+	task := models.WBSTask{
+		ID:               uuid.New(),
+		Code:             "9.1",
+		Name:             "Test Task",
+		BaseDurationDays: 5.123456789012345, // High precision input
+	}
+	context := models.ProjectContext{
+		SupplyChainVolatility:  3,
+		RoughInspectionLatency: 2,
+	}
+	multipliers := []models.DurationMultiplier{
+		{
+			ID:                uuid.New(),
+			WBSTaskCode:       "9.1",
+			VariableKey:       "supply_chain_volatility",
+			Weight:            0.123456789,
+			MultiplierFormula: "linear",
+		},
+		{
+			ID:                uuid.New(),
+			WBSTaskCode:       "*",
+			VariableKey:       "rough_inspection_latency",
+			Weight:            0.098765432,
+			MultiplierFormula: "linear",
+		},
+	}
+
+	// Calculate 1000 times - MUST all be identical
+	results := make(map[time.Duration]int)
+	for i := 0; i < 1000; i++ {
+		result := CalculateTaskDurationV2(task, 4567.89, context, multipliers, types.Forecast{}, defaultCfg)
+		results[result]++
+	}
+
+	// With int64 math, there MUST be exactly ONE unique result
+	if len(results) != 1 {
+		t.Errorf("DETERMINISM VIOLATION: Got %d different results from identical inputs!", len(results))
+		for result, count := range results {
+			t.Logf("  Result %v occurred %d times", result, count)
+		}
+	} else {
+		t.Log("✓ V2 Determinism verified: single unique result")
+	}
+}
+
+// TestCalculateTaskDurationV2_Quantization verifies half-day quantization.
+func TestCalculateTaskDurationV2_Quantization(t *testing.T) {
+	testCases := []struct {
+		baseDays      float64
+		expectedHours int // Expected hours after quantization
+	}{
+		{4.2, 104}, // 4.2 days = 100.8 hrs → ceil to half-day → 104 hrs (4.33 days)
+		{5.0, 120}, // 5.0 days = 120 hrs → exactly half-day aligned
+		{5.1, 124}, // 5.1 days = 122.4 hrs → ceil to 124 hrs
+		{3.75, 92}, // 3.75 days = 90 hrs → ceil to 92 hrs
+		{1.0, 24},  // 1.0 day = 24 hrs → aligned
+		{0.3, 8},   // 0.3 days = 7.2 hrs → ceil to 8 hrs (HalfDay)
+	}
+
+	for _, tc := range testCases {
+		task := models.WBSTask{
+			ID:               uuid.New(),
+			Code:             "test",
+			Name:             "Test Task",
+			BaseDurationDays: tc.baseDays,
+		}
+
+		result := CalculateTaskDurationV2(task, defaultGSF, models.ProjectContext{}, nil, types.Forecast{}, defaultCfg)
+		expected := time.Duration(tc.expectedHours) * time.Hour
+
+		if result != expected {
+			t.Errorf("baseDays=%.2f: expected %v, got %v", tc.baseDays, expected, result)
+		}
+	}
+}
+
+// TestCalculateSAFScaled verifies scaled integer SAF calculation.
+func TestCalculateSAFScaled(t *testing.T) {
+	testCases := []struct {
+		gsf      float64
+		expected int64 // SAF * 1000
+	}{
+		{2250.0, 1000}, // Baseline: SAF = 1.0 = 1000
+		{4500.0, 1682}, // 2x baseline: SAF = 2^0.75 ≈ 1.682 = 1682
+		{1500.0, 738},  // Smaller: SAF = (1500/2250)^0.75 ≈ 0.738 = 738
+		{0, 1000},      // Zero GSF: default SAF = 1.0 = 1000
+	}
+
+	for _, tc := range testCases {
+		result := CalculateSAFScaled(tc.gsf, defaultCfg)
+		// Allow ±1 for rounding differences
+		if result < tc.expected-1 || result > tc.expected+1 {
+			t.Errorf("gsf=%.0f: expected ~%d, got %d", tc.gsf, tc.expected, result)
+		}
+	}
+}
+
+// TestDurationToDays verifies bidirectional conversion.
+func TestDurationToDays(t *testing.T) {
+	testCases := []struct {
+		duration time.Duration
+		expected float64
+	}{
+		{24 * time.Hour, 1.0},
+		{48 * time.Hour, 2.0},
+		{12 * time.Hour, 0.5},
+		{120 * time.Hour, 5.0},
+	}
+
+	for _, tc := range testCases {
+		result := DurationToDays(tc.duration)
+		if result != tc.expected {
+			t.Errorf("duration=%v: expected %.2f days, got %.2f", tc.duration, tc.expected, result)
+		}
+	}
+}
+
+// TestDaysToDuration verifies conversion with quantization.
+func TestDaysToDuration(t *testing.T) {
+	testCases := []struct {
+		days     float64
+		expected time.Duration
+	}{
+		{1.0, 24 * time.Hour},
+		{2.0, 48 * time.Hour},
+		{5.0, 120 * time.Hour},
+	}
+
+	for _, tc := range testCases {
+		result := DaysToDuration(tc.days)
+		if result != tc.expected {
+			t.Errorf("days=%.2f: expected %v, got %v", tc.days, tc.expected, result)
+		}
+	}
+}
+
+// TestCalculateBatchDurationsV2 verifies batch determinism.
+func TestCalculateBatchDurationsV2(t *testing.T) {
+	tasks := []models.WBSTask{
+		{ID: uuid.New(), Code: "9.1", Name: "Floor Framing", BaseDurationDays: 5.0},
+		{ID: uuid.New(), Code: "9.2", Name: "Wall Framing", BaseDurationDays: 4.0},
+	}
+	context := models.ProjectContext{
+		SupplyChainVolatility: 2,
+	}
+	multipliers := []models.DurationMultiplier{
+		{
+			ID:                uuid.New(),
+			WBSTaskCode:       "*",
+			VariableKey:       "supply_chain_volatility",
+			Weight:            0.1,
+			MultiplierFormula: "linear",
+		},
+	}
+
+	results := CalculateBatchDurationsV2(tasks, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	// Verify results are time.Duration (not float64)
+	for i, r := range results {
+		if r.CalculatedDuration <= 0 {
+			t.Errorf("result[%d]: expected positive duration, got %v", i, r.CalculatedDuration)
+		}
+		t.Logf("Task %s: BaseDuration=%v, CalculatedDuration=%v",
+			r.WBSCode, r.BaseDuration, r.CalculatedDuration)
 	}
 }

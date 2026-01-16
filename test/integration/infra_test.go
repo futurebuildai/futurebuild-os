@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/genai"
 
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/storage"
@@ -76,8 +75,9 @@ func TestInfra_S3_Vertex(t *testing.T) {
 		}
 		defer client.Close()
 
-		// Simple prompt
-		resp, err := client.GenerateContent(ctx, ai.ModelTypeFlash, &genai.Part{Text: "Say 'Hello Integration Test'"})
+		// Simple prompt - L7 Vendor Abstraction: Use vendor-agnostic types
+		req := ai.NewTextRequest(ai.ModelTypeFlash, "Say 'Hello Integration Test'")
+		resp, err := client.GenerateContent(ctx, req)
 		if err != nil {
 			// If quota exceeded or auth fails, we might fail here.
 			// skipping as this depends on external cloud configuration
@@ -85,7 +85,7 @@ func TestInfra_S3_Vertex(t *testing.T) {
 			return
 		}
 
-		assert.NotEmpty(t, resp)
-		t.Logf("Vertex Response: %s", resp)
+		assert.NotEmpty(t, resp.Text)
+		t.Logf("Vertex Response: %s", resp.Text)
 	})
 }

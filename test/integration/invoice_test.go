@@ -18,6 +18,9 @@ import (
 )
 
 func TestInvoice_AnalyzeAndSave(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping integration test in CI environment")
 	}

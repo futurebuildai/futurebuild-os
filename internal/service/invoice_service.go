@@ -12,7 +12,6 @@ import (
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
-	"google.golang.org/genai"
 )
 
 // ConfidenceThresholdForReview defines the minimum AI confidence
@@ -99,15 +98,15 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 	}
 
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
-	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
-	promptPart := &genai.Part{Text: fmt.Sprintf(InvoicePromptTemplate, extractedText)}
-	resp, err := s.client.GenerateContent(ctx, ai.ModelTypeFlash, promptPart)
+	// L7 Vendor Abstraction: Use ai.GenerateRequest instead of genai.Part
+	req := ai.NewTextRequest(ai.ModelTypeFlash, fmt.Sprintf(InvoicePromptTemplate, extractedText))
+	resp, err := s.client.GenerateContent(ctx, req)
 	if err != nil {
 		return uuid.Nil, nil, fmt.Errorf("ai analysis failed: %w", err)
 	}
 
 	// Clean response (remove markdown if any)
-	cleanResp := strings.TrimSpace(resp)
+	cleanResp := strings.TrimSpace(resp.Text)
 	cleanResp = strings.TrimPrefix(cleanResp, "```json")
 	cleanResp = strings.TrimSuffix(cleanResp, "```")
 	cleanResp = strings.TrimSpace(cleanResp)
@@ -157,7 +156,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 	// - Re-processed invoices with sourceDocID either INSERT or UPDATE atomically
 	query := `
 		INSERT INTO invoices (
-			id, project_id, vendor_name, amount, line_items, 
+			id, project_id, vendor_name, amount_cents, line_items, 
 			detected_wbs_code, status, confidence, invoice_date, 
 			invoice_number, is_human_review_required, source_document_id
 		)
@@ -166,7 +165,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		WHERE source_document_id IS NOT NULL
 		DO UPDATE SET
 			vendor_name = EXCLUDED.vendor_name,
-			amount = EXCLUDED.amount,
+			amount_cents = EXCLUDED.amount_cents,
 			line_items = EXCLUDED.line_items,
 			detected_wbs_code = EXCLUDED.detected_wbs_code,
 			confidence = EXCLUDED.confidence,

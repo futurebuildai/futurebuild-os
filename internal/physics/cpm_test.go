@@ -1137,11 +1137,12 @@ func TestBackwardPass_RejectsZeroDuration(t *testing.T) {
 }
 
 // TestGetTaskDuration_ValidPrecedence verifies duration resolution priority.
+// P1 Correctness Fix: Updated to expect time.Duration (deterministic integer math).
 func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
 	tests := []struct {
 		name             string
 		task             models.ProjectTask
-		expectedDuration float64
+		expectedDuration time.Duration // Now time.Duration, not float64
 		expectError      bool
 	}{
 		{
@@ -1156,7 +1157,7 @@ func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
 					ManualOverrideDays:      &override,
 				}
 			}(),
-			expectedDuration: 10.0,
+			expectedDuration: 10 * 24 * time.Hour, // 10 days in duration
 			expectError:      false,
 		},
 		{
@@ -1168,7 +1169,7 @@ func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
 				WeatherAdjustedDuration: 5.0,
 				ManualOverrideDays:      nil,
 			},
-			expectedDuration: 5.0,
+			expectedDuration: 5 * 24 * time.Hour, // 5 days in duration
 			expectError:      false,
 		},
 		{
@@ -1180,7 +1181,7 @@ func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
 				WeatherAdjustedDuration: 0,
 				ManualOverrideDays:      nil,
 			},
-			expectedDuration: 3.0,
+			expectedDuration: 3 * 24 * time.Hour, // 3 days in duration
 			expectError:      false,
 		},
 		{
@@ -1207,7 +1208,7 @@ func TestGetTaskDuration_ValidPrecedence(t *testing.T) {
 					ManualOverrideDays:      &zero, // Zero override should be ignored
 				}
 			}(),
-			expectedDuration: 4.0,
+			expectedDuration: 4 * 24 * time.Hour, // 4 days in duration
 			expectError:      false,
 		},
 	}

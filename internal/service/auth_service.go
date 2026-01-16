@@ -119,7 +119,7 @@ func (s *AuthService) VerifyToken(ctx context.Context, plaintextToken string) (m
 
 	// Mark token as used
 	updateQuery := fmt.Sprintf("UPDATE %s SET used = true WHERE token_hash = $1", tokenTable)
-	_, err = s.db.Exec(ctx, updateQuery)
+	_, err = s.db.Exec(ctx, updateQuery, tokenHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to invalidate token: %w", err)
 	}

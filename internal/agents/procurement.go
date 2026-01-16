@@ -123,6 +123,7 @@ type ItemProcessor func(item procurementRow) error
 // P0 Reliability Fix: Uses distributed lock to prevent duplicate execution in Blue/Green deployments.
 // P1 Scalability Fix: Uses streaming iteration instead of loading all items into memory.
 // P1 Performance Fix: Uses batched updates and async notifications to reduce DB round-trips.
+// P1 Reliability Fix: Now tracks and reports batch failures instead of silently swallowing errors.
 func (a *ProcurementAgent) Execute(ctx context.Context) error {
 	// P0 Reliability Fix: Distributed lock prevents duplicate execution
 	if a.mutex != nil {
@@ -144,6 +145,7 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 
 	now := a.clock.Now().Truncate(24 * time.Hour)
 	var processed int
+	var batchErrors []error // P1 Reliability Fix: Track batch failures
 	batch := make([]alertResult, 0, a.batchSize)
 
 	// Stream items one-by-one to avoid unbounded memory allocation
@@ -155,7 +157,8 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 		if len(batch) >= a.batchSize {
 			if err := a.flushBatch(ctx, batch); err != nil {
 				slog.Error("failed to flush batch", "error", err)
-				// Continue processing - don't fail entire run
+				// P1 Reliability Fix: Track failure instead of silently continuing
+				batchErrors = append(batchErrors, fmt.Errorf("batch at item %d: %w", processed, err))
 			}
 			processed += len(batch)
 			batch = batch[:0] // Reset slice, keep capacity
@@ -171,8 +174,21 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 	if len(batch) > 0 {
 		if err := a.flushBatch(ctx, batch); err != nil {
 			slog.Error("failed to flush final batch", "error", err)
+			// P1 Reliability Fix: Track failure for final batch too
+			batchErrors = append(batchErrors, fmt.Errorf("final batch: %w", err))
 		}
 		processed += len(batch)
+	}
+
+	// P1 Reliability Fix: Signal partial failure to caller/scheduler
+	// This ensures upstream monitoring knows the job was incomplete
+	if len(batchErrors) > 0 {
+		slog.Warn("Procurement Agent completed with partial failures",
+			"items_processed", processed,
+			"batch_errors", len(batchErrors),
+		)
+		return fmt.Errorf("procurement agent completed with %d batch failures (processed %d items): first error: %w",
+			len(batchErrors), processed, batchErrors[0])
 	}
 
 	slog.Info("Procurement Agent completed", "items_processed", processed)

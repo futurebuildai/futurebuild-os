@@ -15,6 +15,9 @@ import (
 )
 
 func TestDocument_Reprocess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping integration test in CI environment")
 	}
@@ -94,8 +97,8 @@ func TestDocument_Reprocess(t *testing.T) {
 	assert.Equal(t, initialInvoiceID, reProcessedInvoiceID, "Invoice ID should remain the same (UPSERT)")
 
 	var vendorName string
-	var amount float64
-	err = db.QueryRow(ctx, "SELECT vendor_name, amount FROM invoices WHERE id = $1", initialInvoiceID).Scan(&vendorName, &amount)
+	var amountCents int64
+	err = db.QueryRow(ctx, "SELECT vendor_name, amount_cents FROM invoices WHERE id = $1", initialInvoiceID).Scan(&vendorName, &amountCents)
 	require.NoError(t, err)
 
 	// Mock Client returns static "Mock Vendor", so we can't assert on vendor change unless we configure the mock per call.
