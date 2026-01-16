@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
@@ -50,16 +49,14 @@ type MessagePersister interface {
 // See PRODUCTION_PLAN.md Step 43.3
 // Critical Blocker C Remediation: Added dlq for async retry of failed messages
 // P0 FIX (Blocker B): DLQ is now MANDATORY for compliance audit trails.
-// Audit Trail Durability: Added WAL and circuit breaker for ACID compliance.
+// SRP Refactoring: Persistence logic moved to CommandExecutor and PersistenceStrategy.
 type Orchestrator struct {
 	db              MessagePersister
 	classifier      IntentClassifier
 	TaskService     TaskService
 	ScheduleService ScheduleService
 	InvoiceService  InvoiceService
-	dlq             DLQPersister        // REQUIRED - must never be nil
-	wal             AuditWAL            // Local fallback for DLQ failures (optional)
-	circuitBreaker  AuditCircuitBreaker // Controls read-only mode (optional)
+	executor        *CommandExecutor // SRP: Handles command execution + persistence
 }
 
 // --- Command Pattern (The "Actions") ---
@@ -68,8 +65,12 @@ type Orchestrator struct {
 
 // ChatCommand defines the interface for intent-specific execution.
 // Returns text reply, optional artifact for Rich UI, and error.
+// SRP Refactoring: Added ConsistencyLevel for strategy pattern selection.
 type ChatCommand interface {
 	Execute(ctx context.Context) (string, *Artifact, error)
+	// ConsistencyLevel returns the persistence guarantee required by this command.
+	// Used by CommandExecutor to select the appropriate PersistenceStrategy.
+	ConsistencyLevel() types.ConsistencyType
 }
 
 // GetScheduleCommand retrieves project schedule summary from ScheduleService.
@@ -120,6 +121,11 @@ func (c *GetScheduleCommand) Execute(ctx context.Context) (string, *Artifact, er
 	return reply, artifact, nil
 }
 
+// ConsistencyLevel returns Strict for GetSchedule (Lane B: fast, internal operation).
+func (c *GetScheduleCommand) ConsistencyLevel() types.ConsistencyType {
+	return types.ConsistencyStrict
+}
+
 // PlaceholderCommand returns a static message for unimplemented intents.
 type PlaceholderCommand struct {
 	message string
@@ -131,13 +137,35 @@ func (c *PlaceholderCommand) Execute(_ context.Context) (string, *Artifact, erro
 	return c.message, nil, nil
 }
 
+// ConsistencyLevel returns BestEffort for placeholder commands.
+// Most placeholders map to Lane A intents (AI operations).
+func (c *PlaceholderCommand) ConsistencyLevel() types.ConsistencyType {
+	return types.ConsistencyBestEffort
+}
+
+// StrictPlaceholderCommand returns a static message for Lane B intents.
+// Like PlaceholderCommand but with Strict consistency requirement.
+type StrictPlaceholderCommand struct {
+	message string
+}
+
+// Execute returns the placeholder message with no artifact.
+func (c *StrictPlaceholderCommand) Execute(_ context.Context) (string, *Artifact, error) {
+	return c.message, nil, nil
+}
+
+// ConsistencyLevel returns Strict for Lane B placeholder commands.
+func (c *StrictPlaceholderCommand) ConsistencyLevel() types.ConsistencyType {
+	return types.ConsistencyStrict
+}
+
 // NewOrchestrator creates a new Orchestrator with injected dependencies.
 // Uses the default RegexClassifier for intent classification.
 // See PRODUCTION_PLAN.md Step 43.3
 // ENGINEERING STANDARD: Accepts MessagePersister interface, not *pgxpool.Pool,
 // to enable strict dependency injection and testability.
 // P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
-// Audit Trail Durability: WAL and circuit breaker are optional but recommended.
+// SRP Refactoring: Persistence strategy selection moved to CommandExecutor.
 func NewOrchestrator(
 	persister MessagePersister,
 	taskService TaskService,
@@ -150,15 +178,15 @@ func NewOrchestrator(
 	if dlq == nil {
 		panic("chat: DLQPersister is required for compliance audit trails")
 	}
+	// Build strategy registry (Strategy Pattern)
+	registry := NewPersistenceStrategyRegistry(persister, dlq, wal, circuitBreaker)
 	return &Orchestrator{
 		db:              persister,
 		classifier:      NewDefaultRegexClassifier(),
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
-		dlq:             dlq,
-		wal:             wal,
-		circuitBreaker:  circuitBreaker,
+		executor:        NewCommandExecutor(registry),
 	}
 }
 
@@ -166,7 +194,7 @@ func NewOrchestrator(
 // This is primarily used for testing to inject mock dependencies.
 // See PRODUCTION_PLAN.md Step 43.4
 // P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
-// Audit Trail Durability: WAL and circuit breaker are optional but recommended.
+// SRP Refactoring: Persistence strategy selection moved to CommandExecutor.
 func NewOrchestratorWithPersister(
 	persister MessagePersister,
 	classifier IntentClassifier,
@@ -180,27 +208,28 @@ func NewOrchestratorWithPersister(
 	if dlq == nil {
 		panic("chat: DLQPersister is required for compliance audit trails")
 	}
+	// Build strategy registry (Strategy Pattern)
+	registry := NewPersistenceStrategyRegistry(persister, dlq, wal, circuitBreaker)
 	return &Orchestrator{
 		db:              persister,
 		classifier:      classifier,
 		TaskService:     taskService,
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
-		dlq:             dlq,
-		wal:             wal,
-		circuitBreaker:  circuitBreaker,
+		executor:        NewCommandExecutor(registry),
 	}
 }
 
 // ProcessRequest is the main entry point for handling a user's chat message.
-// Implements a Two-Lane Consistency Strategy:
-//   - Lane A (Slow/External): AI operations with best-effort persistence
-//   - Lane B (Fast/Internal): DB operations with strict consistency
+// SRP Refactoring: This function now has a single responsibility:
+//  1. Persist user message
+//  2. Classify intent
+//  3. Create command
+//  4. Delegate to executor (which handles persistence strategy selection)
 //
-// See PRODUCTION_PLAN.md Step 43.3, 43.4, Step 2 (Hybrid Consistency)
+// See PRODUCTION_PLAN.md Step 43.3, 43.4, Orchestrator SRP Refactoring
 func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, orgID uuid.UUID, req ChatRequest) (*ChatResponse, error) {
-	// 1. Inbound Persistence: Save User Message (ALWAYS required)
-	// See DATA_SPINE_SPEC.md Section 5.3
+	// 1. Persist User Message (always strict - required for audit trail)
 	userMsg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: req.ProjectID,
@@ -213,137 +242,18 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 		return nil, fmt.Errorf("failed to persist user message: %w", err)
 	}
 
-	// 2. Classify Intent (using injected classifier)
-	// See PRODUCTION_PLAN.md Step 43.2 (Weighted Regex Router)
+	// 2. Classify Intent
 	intent := o.classifier.Classify(req.Message)
 
-	// 3. Route & Execute Command with Observability
-	// See PRODUCTION_PLAN.md Step 43 (Command Pattern)
-	// See PRODUCTION_PLAN.md Step 44 (Artifact return for Rich UI)
-	cmdStart := time.Now()
-	reply, artifact, err := o.routeIntent(ctx, intent, req.ProjectID, orgID)
-	cmdDurationMs := time.Since(cmdStart).Milliseconds()
+	// 3. Create Command
+	cmd := o.createCommand(intent, req.ProjectID, orgID)
 
-	// Log command execution (Lane C: Observability)
-	slog.Info("chat: command executed",
-		"intent", intent,
-		"project_id", req.ProjectID,
-		"duration_ms", cmdDurationMs,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("command execution failed: %w", err)
-	}
-
-	// 4. Outbound Persistence: Save Model Response
-	// Two-Lane Strategy: Differentiate error handling by intent type
-	// See DATA_SPINE_SPEC.md Section 5.3, Step 2 (Hybrid Consistency)
-	modelMsg := models.ChatMessage{
-		ID:        uuid.New(),
-		ProjectID: req.ProjectID,
+	// 4. Execute via CommandExecutor (handles persistence strategy selection)
+	return o.executor.Execute(ctx, cmd, ExecutionContext{
 		UserID:    userID,
-		Role:      types.ChatRoleModel,
-		Content:   reply,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if err := o.db.SaveMessage(ctx, modelMsg); err != nil {
-		// Two-Lane Decision Point:
-		// Lane A (Slow/External): AI operations succeed, persistence failure is non-fatal
-		// Lane B (Fast/Internal): DB operations require strict consistency
-		if isSlowExternalIntent(intent) {
-			// Audit Trail Durability: Check circuit breaker first
-			// If open, reject new Lane A writes (read-only mode)
-			if o.circuitBreaker != nil && o.circuitBreaker.IsOpen() {
-				slog.Error("AUDIT SYSTEM UNAVAILABLE: Degrading to read-only mode",
-					"intent", intent,
-					"project_id", req.ProjectID,
-					"user_id", userID,
-				)
-				return nil, fmt.Errorf("system temporarily unavailable: audit system degraded")
-			}
-
-			// Lane A: Action succeeded but chat history save failed
-			// CRITICAL: Log ERROR but attempt fallback persistence
-			// The expensive AI operation completed - we must persist the audit trail
-			slog.Error("CRITICAL: Action succeeded but chat history save failed",
-				"intent", intent,
-				"project_id", req.ProjectID,
-				"user_id", userID,
-				"error", err,
-			)
-
-			// Fallback 1: Try DLQ (Redis-backed async retry)
-			if dlqErr := o.dlq.EnqueueRetry(ctx, modelMsg); dlqErr != nil {
-				slog.Error("CRITICAL COMPLIANCE FAILURE: DLQ enqueue failed - trying WAL",
-					"message_id", modelMsg.ID,
-					"error", dlqErr,
-				)
-
-				// Fallback 2: Try local WAL (disk-based last resort)
-				if o.wal != nil {
-					walErr := o.wal.AppendRecord(ctx, modelMsg)
-					if walErr == nil {
-						slog.Warn("Audit record written to local WAL for recovery",
-							"message_id", modelMsg.ID,
-						)
-						if o.circuitBreaker != nil {
-							o.circuitBreaker.RecordSuccess()
-						}
-						// WAL succeeded - return success to user
-						return &ChatResponse{
-							Reply:    reply,
-							Intent:   intent,
-							Artifact: artifact,
-						}, nil
-					}
-					slog.Error("CATASTROPHIC: WAL write also failed",
-						"message_id", modelMsg.ID,
-						"error", walErr,
-					)
-				}
-
-				// All audit systems failed - trip circuit breaker and return error
-				if o.circuitBreaker != nil {
-					o.circuitBreaker.RecordFailure()
-				}
-				// Return error to user - unaudited action cannot proceed
-				// See Audit Trail Durability remediation
-				return nil, fmt.Errorf("audit system unavailable: please try again later")
-			}
-
-			// DLQ succeeded
-			slog.Info("Message enqueued to DLQ for retry",
-				"message_id", modelMsg.ID,
-			)
-			if o.circuitBreaker != nil {
-				o.circuitBreaker.RecordSuccess()
-			}
-			// Return success - user sees the result, audit will be retried async
-			return &ChatResponse{
-				Reply:    reply,
-				Intent:   intent,
-				Artifact: artifact,
-			}, nil
-		}
-
-		// Lane B: Strict consistency - propagate error for fast/internal ops
-		slog.Error("chat: model persistence failed (strict mode)",
-			"intent", intent,
-			"project_id", req.ProjectID,
-			"user_id", userID,
-			"error", err,
-		)
-		return nil, fmt.Errorf("failed to persist model message: %w", err)
-	}
-
-	// 5. Return Response (with optional artifact for Rich UI)
-	// See PRODUCTION_PLAN.md Step 44
-	return &ChatResponse{
-		Reply:    reply,
-		Intent:   intent,
-		Artifact: artifact,
-	}, nil
+		ProjectID: req.ProjectID,
+		Intent:    intent,
+	})
 }
 
 // isSlowExternalIntent returns true for intents that involve slow/external operations
@@ -391,7 +301,8 @@ func (o *Orchestrator) createCommand(intent types.Intent, projectID, orgID uuid.
 	case types.IntentExplainDelay:
 		return &PlaceholderCommand{message: "I'm analyzing the current schedule to explain potential delays."}
 	case types.IntentUpdateTaskStatus:
-		return &PlaceholderCommand{message: "Ready to update the task status. Please confirm the task and new status."}
+		// Lane B: Uses strict consistency for DB operations
+		return &StrictPlaceholderCommand{message: "Ready to update the task status. Please confirm the task and new status."}
 	case types.IntentContactSubcontractor:
 		// See PRODUCTION_PLAN.md Step 47 (Sub Liaison Agent)
 		// Full SubLiaisonCommand implementation requires task parsing and agent injection.

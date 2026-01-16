@@ -88,7 +88,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	// 6. Verify Assertions
 	var (
 		vendorName            string
-		amount                float64
+		amountCents           int64
 		status                models.InvoiceStatus
 		confidence            float64
 		invoiceNumber         string
@@ -101,7 +101,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	err = db.QueryRow(ctx, `
 		SELECT 
 			vendor_name, 
-			amount, 
+			amount_cents, 
 			status, 
 			confidence, 
 			invoice_number, 
@@ -112,7 +112,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 		FROM invoices 
 		WHERE id = $1`, invoiceID).Scan(
 		&vendorName,
-		&amount,
+		&amountCents,
 		&status,
 		&confidence,
 		&invoiceNumber,
@@ -125,7 +125,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 
 	// Assertions based on "perfect_invoice.json"
 	assert.Equal(t, "Acme Supply Co.", vendorName)
-	assert.Equal(t, 1500.00, amount)
+	assert.Equal(t, int64(150000), amountCents) // $1500.00 in cents
 	assert.Equal(t, "INV-1001", invoiceNumber)
 	assert.Equal(t, "2026-01-12", invoiceDate.Format("2006-01-02"))
 	assert.Equal(t, "6.1.2", detectedWBSCode)
@@ -139,5 +139,5 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, lineItems, 2)
 	assert.Equal(t, "Lumber 2x4x10", lineItems[0].Description)
-	assert.Equal(t, 550.00, lineItems[0].Total)
+	assert.Equal(t, int64(55000), lineItems[0].TotalCents) // $550.00 in cents
 }

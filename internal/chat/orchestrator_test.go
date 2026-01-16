@@ -80,18 +80,48 @@ func (m *MockInvoiceService) SaveExtraction(_ context.Context, _ uuid.UUID, _ *t
 	return uuid.Nil, nil
 }
 
+// mockDLQTest is a mock DLQ for unit tests.
+type mockDLQTest struct{}
+
+func (m *mockDLQTest) EnqueueRetry(_ context.Context, _ models.ChatMessage) error {
+	return nil
+}
+
+// newTestOrchestratorWithPersister creates a test orchestrator with the given persister.
+// SRP Refactoring: Uses constructor to properly build executor and strategy registry.
+func newTestOrchestratorWithPersister(db MessagePersister) *Orchestrator {
+	return NewOrchestratorWithPersister(
+		db,
+		NewDefaultRegexClassifier(),
+		&MockTaskService{},
+		&MockScheduleService{},
+		&MockInvoiceService{},
+		&mockDLQTest{},
+		nil, // WAL
+		nil, // CircuitBreaker
+	)
+}
+
+// newTestOrchestratorWithSchedule creates a test orchestrator with a custom schedule service.
+func newTestOrchestratorWithSchedule(db MessagePersister, schedule ScheduleService) *Orchestrator {
+	return NewOrchestratorWithPersister(
+		db,
+		NewDefaultRegexClassifier(),
+		&MockTaskService{},
+		schedule,
+		&MockInvoiceService{},
+		&mockDLQTest{},
+		nil, // WAL
+		nil, // CircuitBreaker
+	)
+}
+
 // --- Tests ---
 
 func TestProcessRequest_PersistsUserAndModelMessages(t *testing.T) {
 	// Arrange
 	mockDB := &MockMessagePersister{}
-	orchestrator := &Orchestrator{
-		db:              mockDB,
-		classifier:      NewDefaultRegexClassifier(),
-		TaskService:     &MockTaskService{},
-		ScheduleService: &MockScheduleService{},
-		InvoiceService:  &MockInvoiceService{},
-	}
+	orchestrator := newTestOrchestratorWithPersister(mockDB)
 
 	userID := uuid.New()
 	projectID := uuid.New()
@@ -137,13 +167,7 @@ func TestProcessRequest_ClassifiesIntentCorrectly(t *testing.T) {
 		t.Run(tc.message, func(t *testing.T) {
 			// Arrange
 			mockDB := &MockMessagePersister{}
-			orchestrator := &Orchestrator{
-				db:              mockDB,
-				classifier:      NewDefaultRegexClassifier(),
-				TaskService:     &MockTaskService{},
-				ScheduleService: &MockScheduleService{},
-				InvoiceService:  &MockInvoiceService{},
-			}
+			orchestrator := newTestOrchestratorWithPersister(mockDB)
 
 			req := ChatRequest{
 				ProjectID: uuid.New(),
@@ -163,13 +187,7 @@ func TestProcessRequest_ClassifiesIntentCorrectly(t *testing.T) {
 func TestProcessRequest_ReturnsErrorOnUserMessagePersistFailure(t *testing.T) {
 	// Arrange
 	mockDB := &MockMessagePersister{Err: assert.AnError}
-	orchestrator := &Orchestrator{
-		db:              mockDB,
-		classifier:      NewDefaultRegexClassifier(),
-		TaskService:     &MockTaskService{},
-		ScheduleService: &MockScheduleService{},
-		InvoiceService:  &MockInvoiceService{},
-	}
+	orchestrator := newTestOrchestratorWithPersister(mockDB)
 
 	req := ChatRequest{
 		ProjectID: uuid.New(),
@@ -209,13 +227,7 @@ func TestProcessRequest_ModelPersistError(t *testing.T) {
 	// Lane A intents (ProcessInvoice, ExplainDelay) would return success on model persist failure.
 	// See orchestrator_integration_test.go for comprehensive Two-Lane tests.
 	mockDB := &FailOnSecondSavePersister{}
-	orchestrator := &Orchestrator{
-		db:              mockDB,
-		classifier:      NewDefaultRegexClassifier(),
-		TaskService:     &MockTaskService{},
-		ScheduleService: &MockScheduleService{},
-		InvoiceService:  &MockInvoiceService{},
-	}
+	orchestrator := newTestOrchestratorWithPersister(mockDB)
 
 	req := ChatRequest{
 		ProjectID: uuid.New(),
@@ -309,13 +321,7 @@ func TestProcessRequest_CallsScheduleServiceForGetScheduleIntent(t *testing.T) {
 		},
 	}
 
-	orchestrator := &Orchestrator{
-		db:              mockDB,
-		classifier:      NewDefaultRegexClassifier(),
-		TaskService:     &MockTaskService{},
-		ScheduleService: mockSchedule,
-		InvoiceService:  &MockInvoiceService{},
-	}
+	orchestrator := newTestOrchestratorWithSchedule(mockDB, mockSchedule)
 
 	req := ChatRequest{
 		ProjectID: uuid.New(),

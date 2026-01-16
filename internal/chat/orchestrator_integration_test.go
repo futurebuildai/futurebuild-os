@@ -52,11 +52,12 @@ func (m *AmnesiacPersister) Pool() Transactor {
 // --- Test Fixtures ---
 
 func newTestOrchestrator(persister MessagePersister) *Orchestrator {
-	return &Orchestrator{
-		db:          persister,
-		classifier:  NewDefaultRegexClassifier(),
-		TaskService: &MockTaskService{},
-		ScheduleService: &MockScheduleService{
+	// SRP Refactoring: Use constructor to properly build the executor and strategy registry
+	return NewOrchestratorWithPersister(
+		persister,
+		NewDefaultRegexClassifier(),
+		&MockTaskService{},
+		&MockScheduleService{
 			Summary: &service.ProjectScheduleSummary{
 				ProjectEnd:        time.Now().AddDate(0, 6, 0),
 				CriticalPathCount: 5,
@@ -64,11 +65,11 @@ func newTestOrchestrator(persister MessagePersister) *Orchestrator {
 				CompletedTasks:    10,
 			},
 		},
-		InvoiceService: &MockInvoiceService{},
-		dlq:            &mockDLQ{}, // REQUIRED for Lane A fallback
-		wal:            nil,        // Optional: not tested here
-		circuitBreaker: nil,        // Optional: not tested here
-	}
+		&MockInvoiceService{},
+		&mockDLQ{}, // REQUIRED for Lane A fallback
+		nil,        // Optional: WAL not tested here
+		nil,        // Optional: CircuitBreaker not tested here
+	)
 }
 
 // captureLog returns a buffer that captures slog output and restores the default logger after the test.

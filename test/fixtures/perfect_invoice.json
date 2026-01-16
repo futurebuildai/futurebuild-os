@@ -2,19 +2,19 @@
     "vendor": "Acme Supply Co.",
     "date": "2026-01-12",
     "invoice_number": "INV-1001",
-    "total_amount": 1500.00,
+    "total_amount_cents": 150000,
     "line_items": [
         {
             "description": "Lumber 2x4x10",
             "quantity": 100,
-            "unit_price": 5.50,
-            "total": 550.00
+            "unit_price_cents": 550,
+            "total_cents": 55000
         },
         {
             "description": "Plywood 4x8",
             "quantity": 50,
-            "unit_price": 19.00,
-            "total": 950.00
+            "unit_price_cents": 1900,
+            "total_cents": 95000
         }
     ],
     "suggested_wbs_code": "6.1.2",

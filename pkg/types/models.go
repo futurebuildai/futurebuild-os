@@ -29,22 +29,24 @@ type Contact struct {
 
 // InvoiceExtraction represents the output of document analysis.
 // See API_AND_TYPES_SPEC.md Section 3.1
+// MONETARY PRECISION: All amounts as int64 cents to prevent IEEE 754 float drift.
 type InvoiceExtraction struct {
 	Vendor           string                  `json:"vendor"`
 	Date             string                  `json:"date"`
 	InvoiceNumber    string                  `json:"invoice_number"`
-	TotalAmount      float64                 `json:"total_amount"`
+	TotalAmountCents int64                   `json:"total_amount_cents"`
 	LineItems        []InvoiceExtractionItem `json:"line_items"`
 	SuggestedWBSCode string                  `json:"suggested_wbs_code"`
-	Confidence       float64                 `json:"confidence"`
+	Confidence       float64                 `json:"confidence"` // Confidence remains float (0.0-1.0)
 }
 
 // InvoiceExtractionItem represents a single line item in an invoice.
+// MONETARY PRECISION: UnitPrice and Total as int64 cents.
 type InvoiceExtractionItem struct {
-	Description string  `json:"description"`
-	Quantity    float64 `json:"quantity"`
-	UnitPrice   float64 `json:"unit_price"`
-	Total       float64 `json:"total"`
+	Description    string  `json:"description"`
+	Quantity       float64 `json:"quantity"` // Kept as float - quantities can be fractional
+	UnitPriceCents int64   `json:"unit_price_cents"`
+	TotalCents     int64   `json:"total_cents"`
 }
 
 // GanttData represents the project schedule for the Gantt view.

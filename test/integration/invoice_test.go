@@ -97,7 +97,7 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 	assert.Equal(t, projectID, pID)
 
 	assert.Equal(t, "ACME Concrete Supplies", extraction.Vendor)
-	assert.Equal(t, 1400.0, extraction.TotalAmount)
+	assert.Equal(t, int64(140000), extraction.TotalAmountCents) // $1400.00 in cents
 	assert.Greater(t, extraction.Confidence, 0.5)
 	assert.Len(t, extraction.LineItems, 3)
 
@@ -109,16 +109,16 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 
 	// 7. Verify Persistence
 	var vendorName string
-	var amount float64
+	var amountCents int64
 	var status models.InvoiceStatus
 	var confidence float64
 	var invoiceDate time.Time
 	var invoiceNumber string
-	err = db.QueryRow(ctx, "SELECT vendor_name, amount, status, confidence, invoice_date, invoice_number FROM invoices WHERE id = $1", invoiceID).Scan(
-		&vendorName, &amount, &status, &confidence, &invoiceDate, &invoiceNumber)
+	err = db.QueryRow(ctx, "SELECT vendor_name, amount_cents, status, confidence, invoice_date, invoice_number FROM invoices WHERE id = $1", invoiceID).Scan(
+		&vendorName, &amountCents, &status, &confidence, &invoiceDate, &invoiceNumber)
 	assert.NoError(t, err)
 	assert.Equal(t, "ACME Concrete Supplies", vendorName)
-	assert.Equal(t, 1400.0, amount)
+	assert.Equal(t, int64(140000), amountCents) // $1400.00 in cents
 	assert.Equal(t, models.InvoiceStatusPending, status)
 	assert.Greater(t, confidence, 0.5)
 	assert.False(t, invoiceDate.IsZero())

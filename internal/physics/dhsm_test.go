@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -12,11 +13,14 @@ import (
 // defaultGSF is the baseline GSF where SAF = 1.0
 const defaultGSF = 2250.0
 
+// defaultCfg is the standard config for baseline tests
+var defaultCfg = config.DefaultPhysicsConfig()
+
 // === SAF CALCULATION TESTS ===
 
 func TestCalculateSAF_Baseline(t *testing.T) {
 	// At baseline 2250 GSF, SAF should be 1.0
-	saf := CalculateSAF(2250.0)
+	saf := CalculateSAF(2250.0, defaultCfg)
 	if saf != 1.0 {
 		t.Errorf("expected SAF=1.0 at baseline, got %v", saf)
 	}
@@ -24,7 +28,7 @@ func TestCalculateSAF_Baseline(t *testing.T) {
 
 func TestCalculateSAF_LargerHome(t *testing.T) {
 	// At 4500 GSF (2x baseline), SAF should be ~1.68 (2^0.75)
-	saf := CalculateSAF(4500.0)
+	saf := CalculateSAF(4500.0, defaultCfg)
 	expected := math.Pow(2.0, 0.75) // ~1.6818
 	if math.Abs(saf-expected) > 0.01 {
 		t.Errorf("expected SAF≈%.2f for 4500 GSF, got %.4f", expected, saf)
@@ -33,7 +37,7 @@ func TestCalculateSAF_LargerHome(t *testing.T) {
 
 func TestCalculateSAF_SmallerHome(t *testing.T) {
 	// At 1500 GSF (0.67x baseline), SAF should be < 1.0
-	saf := CalculateSAF(1500.0)
+	saf := CalculateSAF(1500.0, defaultCfg)
 	expected := math.Pow(1500.0/2250.0, 0.75) // ~0.742
 	if math.Abs(saf-expected) > 0.01 {
 		t.Errorf("expected SAF≈%.2f for 1500 GSF, got %.4f", expected, saf)
@@ -45,10 +49,63 @@ func TestCalculateSAF_SmallerHome(t *testing.T) {
 
 func TestCalculateSAF_ZeroGSF(t *testing.T) {
 	// Zero or negative GSF should return 1.0 (safe default)
-	saf := CalculateSAF(0)
+	saf := CalculateSAF(0, defaultCfg)
 	if saf != 1.0 {
 		t.Errorf("expected SAF=1.0 for zero GSF, got %v", saf)
 	}
+}
+
+// === FAANG THRESHOLD TESTS ===
+
+// TestFAANG_HotSwapConfig proves config changes immediately affect schedule duration.
+// FAANG Threshold #1: "Can you change the Standard House Size in a test setup
+// and immediately see the schedule duration change without recompiling?"
+func TestFAANG_HotSwapConfig(t *testing.T) {
+	// Config 1: Standard baseline (2250 SF)
+	cfg1 := config.PhysicsConfig{StandardHouseSizeSF: 2250.0, SizeAdjustmentExponent: 0.75}
+
+	// Config 2: Larger baseline (3000 SF) - same house appears smaller
+	cfg2 := config.PhysicsConfig{StandardHouseSizeSF: 3000.0, SizeAdjustmentExponent: 0.75}
+
+	// Calculate SAF for 4500 SF with both configs
+	saf1 := CalculateSAF(4500.0, cfg1) // (4500/2250)^0.75 ≈ 1.68
+	saf2 := CalculateSAF(4500.0, cfg2) // (4500/3000)^0.75 ≈ 1.36
+
+	// Verify different configs produce different results
+	if saf1 == saf2 {
+		t.Error("FAIL: Config change did not affect SAF calculation")
+	}
+
+	// Verify specific values
+	expected1 := math.Pow(4500.0/2250.0, 0.75) // ~1.68
+	expected2 := math.Pow(4500.0/3000.0, 0.75) // ~1.36
+
+	if math.Abs(saf1-expected1) > 0.01 {
+		t.Errorf("Config 1: expected SAF≈%.4f, got %.4f", expected1, saf1)
+	}
+	if math.Abs(saf2-expected2) > 0.01 {
+		t.Errorf("Config 2: expected SAF≈%.4f, got %.4f", expected2, saf2)
+	}
+
+	t.Logf("✓ Hot-Swap Test PASSED: cfg1 SAF=%.4f, cfg2 SAF=%.4f", saf1, saf2)
+}
+
+// TestFAANG_ZeroValueSafety proves the system falls back to safe defaults.
+// FAANG Threshold #2: "If the config is missing/zero, does the system panic
+// or fall back to safe defaults?"
+func TestFAANG_ZeroValueSafety(t *testing.T) {
+	// Zero config - all values unset
+	zeroCfg := config.PhysicsConfig{} // StandardHouseSizeSF=0, SizeAdjustmentExponent=0
+
+	// Should NOT panic, should fall back to defaults
+	saf := CalculateSAF(2250.0, zeroCfg)
+
+	// With default StandardHouseSizeSF=2250 and exponent=0.75, SAF should be 1.0
+	if saf != 1.0 {
+		t.Errorf("FAIL: Expected SAF=1.0 with zero config (defaults applied), got %v", saf)
+	}
+
+	t.Log("✓ Zero-Value Safety Test PASSED: System uses safe defaults")
 }
 
 // === EVENT DURATION LOCKING TESTS ===
@@ -65,7 +122,7 @@ func TestEventDurationLocking_InspectionBypassesSAF(t *testing.T) {
 	context := models.ProjectContext{}
 
 	// Use very large GSF - should NOT affect inspection duration
-	result := CalculateTaskDuration(task, 10000.0, context, nil, types.Forecast{})
+	result := CalculateTaskDuration(task, 10000.0, context, nil, types.Forecast{}, defaultCfg)
 
 	// Expected: 1.0 (no SAF applied) → quantized to 1.0
 	if result != 1.0 {
@@ -85,7 +142,7 @@ func TestEventDurationLocking_NonInspectionScalesBySAF(t *testing.T) {
 	context := models.ProjectContext{}
 
 	// Use 4500 GSF (2x baseline) → SAF ≈ 1.68
-	result := CalculateTaskDuration(task, 4500.0, context, nil, types.Forecast{})
+	result := CalculateTaskDuration(task, 4500.0, context, nil, types.Forecast{}, defaultCfg)
 
 	// Expected: 5.0 * 1.68 = 8.4 → quantized to 8.5
 	expected := 8.5
@@ -118,7 +175,7 @@ func TestQuantization_SnapsToHalfDay(t *testing.T) {
 		}
 
 		// Use baseline GSF so SAF = 1.0, no multipliers
-		result := CalculateTaskDuration(task, defaultGSF, models.ProjectContext{}, nil, types.Forecast{})
+		result := CalculateTaskDuration(task, defaultGSF, models.ProjectContext{}, nil, types.Forecast{}, defaultCfg)
 
 		if result != tc.expected {
 			t.Errorf("base=%.2f: expected %.1f, got %.1f", tc.base, tc.expected, result)
@@ -138,7 +195,7 @@ func TestCalculateTaskDuration_NoMultipliers(t *testing.T) {
 	context := models.ProjectContext{}
 
 	// Use baseline GSF so SAF = 1.0
-	result := CalculateTaskDuration(task, defaultGSF, context, nil, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, nil, types.Forecast{}, defaultCfg)
 
 	// 5.0 → quantized to 5.0
 	if result != 5.0 {
@@ -167,7 +224,7 @@ func TestCalculateTaskDuration_SingleLinearMultiplier(t *testing.T) {
 	}
 
 	// Expected: 5.0 * 1.0(SAF) * (1 + (2 * 0.1)) = 5.0 * 1.2 = 6.0
-	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 6.0 {
 		t.Errorf("expected 6.0, got %v", result)
@@ -195,7 +252,7 @@ func TestCalculateTaskDuration_WildcardMultiplier(t *testing.T) {
 	}
 
 	// Expected: 3.0 * (1 + (3 * 0.2)) = 3.0 * 1.6 = 4.8 → quantized to 5.0
-	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 5.0 {
 		t.Errorf("expected 5.0, got %v", result)
@@ -232,7 +289,7 @@ func TestCalculateTaskDuration_MultipleMultipliers(t *testing.T) {
 
 	// Expected: 5.0 * (1 + (2 * 0.1)) * (1 + (3 * 0.05))
 	//         = 5.0 * 1.2 * 1.15 = 6.9 → quantized to 7.0
-	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 7.0 {
 		t.Errorf("expected 7.0, got %v", result)
@@ -260,7 +317,7 @@ func TestCalculateTaskDuration_NonMatchingCode(t *testing.T) {
 	}
 
 	// Should return base duration since multiplier doesn't match
-	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 5.0 {
 		t.Errorf("expected 5.0 (no multiplier applied), got %v", result)
@@ -289,7 +346,7 @@ func TestCalculateTaskDuration_StepFormula(t *testing.T) {
 
 	// Step formula: 1 + (value - 1) * weight = 1 + (3 - 1) * 0.3 = 1.6
 	// Expected: 4.0 * 1.6 = 6.4 → quantized to 6.5
-	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 6.5 {
 		t.Errorf("expected 6.5, got %v", result)
@@ -314,7 +371,7 @@ func TestCalculateBatchDurations(t *testing.T) {
 		},
 	}
 
-	results := CalculateBatchDurations(tasks, defaultGSF, context, multipliers, types.Forecast{})
+	results := CalculateBatchDurations(tasks, defaultGSF, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
@@ -355,7 +412,7 @@ func TestCalculateTaskDuration_SAFWithMultiplier(t *testing.T) {
 
 	// GSF = 4500 → SAF = (4500/2250)^0.75 ≈ 1.68
 	// Expected: 5.0 * 1.68 * 1.2 = 10.08 → quantized to 10.5
-	result := CalculateTaskDuration(task, 4500.0, context, multipliers, types.Forecast{})
+	result := CalculateTaskDuration(task, 4500.0, context, multipliers, types.Forecast{}, defaultCfg)
 
 	if result != 10.5 {
 		t.Errorf("expected 10.5 with SAF + multiplier, got %v", result)
@@ -382,7 +439,7 @@ func TestCalculateTaskDuration_WithWeather(t *testing.T) {
 
 	// Calculation: 4.0 (Base) * 1.0 (SAF) * 1.15 (Weather) = 4.6
 	// Quantization: Ceiling(4.6 * 2) / 2 = Ceiling(9.2) / 2 = 10 / 2 = 5.0
-	result := CalculateTaskDuration(task, defaultGSF, context, nil, forecast)
+	result := CalculateTaskDuration(task, defaultGSF, context, nil, forecast, defaultCfg)
 
 	expected := 5.0
 	if result != expected {
@@ -397,7 +454,7 @@ func TestCalculateTaskDuration_WithWeather(t *testing.T) {
 
 	// Calculation: 4.0 * 1.4375 = 5.75
 	// Quantization: Ceiling(5.75 * 2) / 2 = Ceiling(11.5) / 2 = 6.0
-	resultCombined := CalculateTaskDuration(task, defaultGSF, context, nil, forecastCombined)
+	resultCombined := CalculateTaskDuration(task, defaultGSF, context, nil, forecastCombined, defaultCfg)
 
 	expectedCombined := 6.0
 	if resultCombined != expectedCombined {

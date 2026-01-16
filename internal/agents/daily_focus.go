@@ -3,7 +3,9 @@ package agents
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"sync"
+	"sync/atomic"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
@@ -13,12 +15,17 @@ import (
 	"google.golang.org/genai"
 )
 
+// MaxConcurrentProjects limits concurrent AI/DB calls to prevent thundering herds.
+// P1 Scalability Fix: Worker pool pattern.
+const MaxConcurrentProjects = 10
+
 // DailyFocusAgent orchestrates the morning briefing generation.
 // See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 // Critical Blocker A Remediation: Added geocoder and directory dependencies
+// P1 Scalability Fix: Uses streaming + worker pool for O(1) memory at scale
 type DailyFocusAgent struct {
-	projects  *service.ProjectService // Replaces *pgxpool.Pool
+	projects  ProjectRepository // Abstraction for streaming (replaces *service.ProjectService)
 	schedule  *service.ScheduleService
 	weather   types.WeatherService
 	notifier  types.NotificationService
@@ -31,8 +38,9 @@ type DailyFocusAgent struct {
 // NewDailyFocusAgent creates a new agent instance.
 // Clock is required for deterministic time simulation (Step 49).
 // Critical Blocker A Remediation: geocoder and directory are required
+// P1 Scalability Fix: uses ProjectRepository interface for streaming
 func NewDailyFocusAgent(
-	projects *service.ProjectService, // Replaces db
+	projects ProjectRepository, // Abstraction for streaming
 	schedule *service.ScheduleService,
 	weather types.WeatherService,
 	notifier types.NotificationService,
@@ -53,23 +61,83 @@ func NewDailyFocusAgent(
 	}
 }
 
+// NewDailyFocusAgentWithService is a convenience constructor using ProjectService directly.
+// Maintains backward compatibility with existing callers.
+func NewDailyFocusAgentWithService(
+	projectSvc *service.ProjectService,
+	schedule *service.ScheduleService,
+	weather types.WeatherService,
+	notifier types.NotificationService,
+	aiClient ai.Client,
+	clk clock.Clock,
+	geocoder types.GeocodingService,
+	directory types.DirectoryService,
+) *DailyFocusAgent {
+	return NewDailyFocusAgent(
+		NewPgProjectRepository(projectSvc),
+		schedule, weather, notifier, aiClient, clk, geocoder, directory,
+	)
+}
+
 // Execute runs the daily briefing logic for all active projects.
+// P1 Scalability Fix: Uses streaming + worker pool for O(1) memory at scale.
+// - Streams projects one-by-one (no unbounded slice allocation)
+// - Worker pool limits concurrent AI/DB calls (prevents thundering herd)
+// - Observability: logs projects_processed_count and batch_execution_duration
 func (a *DailyFocusAgent) Execute(ctx context.Context) error {
-	log.Println("Starting Daily Focus Agent...")
+	slog.Info("Starting Daily Focus Agent...")
+	start := a.clock.Now()
 
-	// 1. Fetch Active Projects via Service Layer
-	// Clean Service Call - enables mocking for Time-Travel simulation
-	projects, err := a.projects.ListActiveProjects(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch active projects: %w", err)
-	}
+	// Worker pool for concurrency control (semaphore pattern)
+	sem := make(chan struct{}, MaxConcurrentProjects)
+	var wg sync.WaitGroup
+	var processed int64
+	var errors int64
 
-	for _, p := range projects {
-		if err := a.processProject(ctx, p); err != nil {
-			log.Printf("ERROR processing project %s: %v", p.ID, err)
-			// Continue with other projects even if one fails
-			continue
+	// Stream projects one-by-one to avoid unbounded memory allocation
+	err := a.projects.StreamActiveProjects(ctx, func(p models.Project) error {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
+
+		// Acquire semaphore slot
+		sem <- struct{}{}
+		wg.Add(1)
+
+		// Process in goroutine with worker pool limiting
+		go func(project models.Project) {
+			defer func() {
+				<-sem // Release semaphore slot
+				wg.Done()
+			}()
+
+			if err := a.processProject(ctx, project); err != nil {
+				slog.Error("ERROR processing project", "project_id", project.ID, "error", err)
+				atomic.AddInt64(&errors, 1)
+				// Continue with other projects even if one fails
+			}
+			atomic.AddInt64(&processed, 1)
+		}(p)
+
+		return nil
+	})
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Observability: Log metrics
+	duration := a.clock.Now().Sub(start)
+	slog.Info("Daily Focus Agent completed",
+		"projects_processed_count", processed,
+		"projects_error_count", errors,
+		"batch_execution_duration", duration,
+	)
+
+	if err != nil {
+		return fmt.Errorf("streaming projects failed: %w", err)
 	}
 
 	return nil
@@ -84,12 +152,12 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 		if geoLat, geoLng, err := a.geocoder.Geocode(p.Address); err == nil {
 			lat, lng = geoLat, geoLng
 		} else {
-			log.Printf("WARN: geocoding failed for project %s, using default coords: %v", p.ID, err)
+			slog.Warn("geocoding failed for project, using default coords", "project_id", p.ID, "error", err)
 		}
 	}
 	forecast, err := a.weather.GetForecast(lat, lng)
 	if err != nil {
-		log.Printf("WARN: failed to get weather for project %s: %v", p.ID, err)
+		slog.Warn("failed to get weather for project", "project_id", p.ID, "error", err)
 		// Graceful degradation: proceed without weather data
 	}
 
@@ -121,12 +189,12 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 			return fmt.Errorf("AI generation failed: %w", err)
 		}
 	} else {
-		log.Printf("WARN: AI client not available for project %s, skipping briefing generation", p.ID)
+		slog.Warn("AI client not available for project, skipping briefing generation", "project_id", p.ID)
 		briefing = "[AI Unavailable] Manual briefing required. Please review project schedule and weather conditions."
 	}
 
 	// 5. Deliver - Critical Blocker A Remediation: Dynamic PM email lookup
-	log.Printf("--- DAILY BRIEFING FOR %s ---\n%s\n-----------------------------", p.Name, briefing)
+	slog.Info("DAILY BRIEFING generated", "project_name", p.Name)
 
 	// Look up Project Manager contact via DirectoryService (fallback to generic)
 	recipientEmail := "superintendent@futurebuild.sh"
@@ -134,11 +202,11 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 		if contact, err := a.directory.GetProjectManager(ctx, p.ID, p.OrgID); err == nil && contact.Email != "" {
 			recipientEmail = contact.Email
 		} else {
-			log.Printf("WARN: PM lookup failed for project %s, using fallback email: %v", p.ID, err)
+			slog.Warn("PM lookup failed for project, using fallback email", "project_id", p.ID, "error", err)
 		}
 	}
 	if err := a.notifier.SendEmail(recipientEmail, fmt.Sprintf("Daily Briefing: %s", p.Name), briefing); err != nil {
-		log.Printf("WARN: failed to send notification: %v", err)
+		slog.Warn("failed to send notification", "error", err)
 	}
 
 	return nil

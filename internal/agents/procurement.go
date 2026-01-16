@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -22,12 +23,14 @@ type NotificationEnqueuer interface {
 // See PRODUCTION_PLAN.md Step 46, BACKEND_SCOPE.md Section 2.5
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 // P1 Performance Fix: Uses batching and async notifications to reduce DB round-trips
+// Config Decoupling: Uses ProcurementConfig for tunable business rules.
 type ProcurementAgent struct {
 	repo      ProcurementRepository
 	weather   types.WeatherService
 	clock     clock.Clock
 	notifier  NotificationEnqueuer
 	batchSize int
+	config    config.ProcurementConfig // Config decoupling: tunable business rules
 }
 
 // DefaultBatchSize is the number of items to batch before flushing.
@@ -37,21 +40,23 @@ const DefaultBatchSize = 100
 // NewProcurementAgent creates a new agent instance with repository abstraction.
 // Clock is required for deterministic time simulation (Step 49).
 // notifier is optional - if nil, notifications are logged but not queued.
+// cfg is optional - defaults will be applied for zero values (FAANG Threshold: Zero-Value Safety).
 // See PRODUCTION_PLAN.md: Testing Strategy remediation (Repository Pattern).
-func NewProcurementAgent(repo ProcurementRepository, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
+func NewProcurementAgent(repo ProcurementRepository, weather types.WeatherService, clk clock.Clock, cfg config.ProcurementConfig) *ProcurementAgent {
 	return &ProcurementAgent{
 		repo:      repo,
 		weather:   weather,
 		clock:     clk,
 		notifier:  nil, // Default: no async notifications
 		batchSize: DefaultBatchSize,
+		config:    cfg.WithDefaults(), // Zero-value safety
 	}
 }
 
 // NewProcurementAgentWithDB is a convenience constructor using the default PostgreSQL repository.
 // Maintains backward compatibility with existing callers.
-func NewProcurementAgentWithDB(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock) *ProcurementAgent {
-	return NewProcurementAgent(NewPgProcurementRepository(db), weather, clk)
+func NewProcurementAgentWithDB(db *pgxpool.Pool, weather types.WeatherService, clk clock.Clock, cfg config.ProcurementConfig) *ProcurementAgent {
+	return NewProcurementAgent(NewPgProcurementRepository(db), weather, clk, cfg)
 }
 
 // WithNotificationEnqueuer sets the notification enqueuer for async delivery.
@@ -206,11 +211,11 @@ func (a *ProcurementAgent) streamItems(ctx context.Context, process ItemProcesso
 
 // analyzeItem calculates the order date and determines the alert status.
 // See PRODUCTION_PLAN.md Step 46 Requirements
+// Config decoupling: Uses a.config for tunable stagingBufferDays and warningThreshold.
 func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alertResult {
-	// stagingBufferDays: Time for jobsite staging before work can begin
-	// See PRODUCTION_PLAN.md Step 46: "Safety Buffer: 2 days for onsite staging"
-	const stagingBufferDays = 2
-	const warningThresholdDays = 3
+	// Config decoupling: Use configurable values instead of magic numbers
+	stagingBufferDays := a.config.StagingBufferDays
+	warningThresholdDays := a.config.LeadTimeWarningThreshold
 
 	result := alertResult{
 		ID:        item.ID,

@@ -9,22 +9,22 @@ import (
 
 func TestInvoiceJSON(t *testing.T) {
 	invoice := Invoice{
-		ID:         uuid.New(),
-		ProjectID:  uuid.New(),
-		VendorName: "Acme Concrete",
-		Amount:     1250.50,
+		ID:          uuid.New(),
+		ProjectID:   uuid.New(),
+		VendorName:  "Acme Concrete",
+		AmountCents: 125050, // $1250.50 in cents
 		LineItems: LineItems{
 			{
-				Description: "Foundation Pour",
-				Quantity:    1,
-				UnitPrice:   1000,
-				Total:       1000,
+				Description:    "Foundation Pour",
+				Quantity:       1,
+				UnitPriceCents: 100000, // $1000.00
+				TotalCents:     100000,
 			},
 			{
-				Description: "Delivery Fee",
-				Quantity:    1,
-				UnitPrice:   250.50,
-				Total:       250.50,
+				Description:    "Delivery Fee",
+				Quantity:       1,
+				UnitPriceCents: 25050, // $250.50
+				TotalCents:     25050,
 			},
 		},
 		DetectedWBSCode: "6.1",
@@ -49,19 +49,19 @@ func TestInvoiceJSON(t *testing.T) {
 		t.Errorf("expected 2 line items, got %d", len(parsed.LineItems))
 	}
 
-	if parsed.LineItems[0].Total != 1000 {
-		t.Errorf("expected first line item total 1000, got %f", parsed.LineItems[0].Total)
+	if parsed.LineItems[0].TotalCents != 100000 {
+		t.Errorf("expected first line item total 100000 cents, got %d", parsed.LineItems[0].TotalCents)
 	}
 }
 
 func TestProjectBudgetJSON(t *testing.T) {
 	budget := ProjectBudget{
-		ID:              uuid.New(),
-		ProjectID:       uuid.New(),
-		WBSPhaseID:      "9.x",
-		EstimatedAmount: 50000.00,
-		CommittedAmount: 45000.00,
-		ActualAmount:    10000.00,
+		ID:                   uuid.New(),
+		ProjectID:            uuid.New(),
+		WBSPhaseID:           "9.x",
+		EstimatedAmountCents: 5000000, // $50,000.00
+		CommittedAmountCents: 4500000, // $45,000.00
+		ActualAmountCents:    1000000, // $10,000.00
 	}
 
 	data, err := json.Marshal(budget)

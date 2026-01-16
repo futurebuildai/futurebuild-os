@@ -179,6 +179,20 @@ const (
 	IntentContactSubcontractor Intent = "CONTACT_SUBCONTRACTOR"
 )
 
+// ConsistencyType defines the persistence guarantee level for command execution.
+// See PRODUCTION_PLAN.md Orchestrator SRP Refactoring
+type ConsistencyType string
+
+const (
+	// ConsistencyStrict requires successful DB write or returns error (Lane B).
+	// Used for fast, internal operations where retry is safe and consistency is critical.
+	ConsistencyStrict ConsistencyType = "STRICT"
+
+	// ConsistencyBestEffort attempts DB → DLQ → WAL fallback chain (Lane A).
+	// Used for slow, external operations (AI) where the action already succeeded.
+	ConsistencyBestEffort ConsistencyType = "BEST_EFFORT"
+)
+
 // DynamicComponentType defines the type of atomic UI element.
 // See API_AND_TYPES_SPEC.md Section 4.5
 type DynamicComponentType string

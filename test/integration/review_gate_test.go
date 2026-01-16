@@ -48,8 +48,8 @@ func TestReviewGate_ConfidenceThreshold(t *testing.T) {
 	t.Run("Low Confidence Flags Human Review", func(t *testing.T) {
 		ext := &types.InvoiceExtraction{
 			Vendor:           "Low Confidence Vendor",
-			TotalAmount:      100.0,
-			Confidence:       0.5, // Below 0.85 threshold
+			TotalAmountCents: 10000, // $100.00
+			Confidence:       0.5,   // Below 0.85 threshold
 			SuggestedWBSCode: "1.1",
 			Date:             "2026-01-01",
 			InvoiceNumber:    "INV-LOW",
@@ -67,8 +67,8 @@ func TestReviewGate_ConfidenceThreshold(t *testing.T) {
 	t.Run("High Confidence Bypasses Human Review", func(t *testing.T) {
 		ext := &types.InvoiceExtraction{
 			Vendor:           "High Confidence Vendor",
-			TotalAmount:      200.0,
-			Confidence:       0.95, // Above 0.85 threshold
+			TotalAmountCents: 20000, // $200.00
+			Confidence:       0.95,  // Above 0.85 threshold
 			SuggestedWBSCode: "2.2",
 			Date:             "2026-01-02",
 			InvoiceNumber:    "INV-HIGH",

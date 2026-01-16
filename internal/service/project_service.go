@@ -94,9 +94,14 @@ func (s *ProjectService) GetProject(ctx context.Context, id uuid.UUID, orgID uui
 	return &p, nil
 }
 
+// ProjectProcessor is a callback function for processing projects one-by-one.
+// Uses streaming to prevent OOM at scale.
+type ProjectProcessor func(p models.Project) error
+
 // ListActiveProjects fetches all projects in Active or Preconstruction status.
 // Used by DailyFocusAgent for batch processing.
 // See PRODUCTION_PLAN.md Step 49 (Service Layer Pattern)
+// DEPRECATED: Use StreamActiveProjects for O(1) memory at scale.
 func (s *ProjectService) ListActiveProjects(ctx context.Context) ([]models.Project, error) {
 	query := `
 		SELECT id, org_id, name, address, permit_issued_date, target_end_date, status
@@ -119,4 +124,33 @@ func (s *ProjectService) ListActiveProjects(ctx context.Context) ([]models.Proje
 		projects = append(projects, p)
 	}
 	return projects, rows.Err()
+}
+
+// StreamActiveProjects iterates through active projects via callback.
+// O(1) memory - only one project loaded at a time.
+// P1 Scalability Fix: Prevents OOM at 100K+ projects.
+// See PRODUCTION_PLAN.md: DailyFocusAgent O(N) Memory Elimination
+func (s *ProjectService) StreamActiveProjects(ctx context.Context, process ProjectProcessor) error {
+	query := `
+		SELECT id, org_id, name, address, permit_issued_date, target_end_date, status
+		FROM projects
+		WHERE status IN ('Active', 'Preconstruction')
+		ORDER BY id
+	`
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to stream active projects: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var p models.Project
+		if err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.Status); err != nil {
+			return fmt.Errorf("failed to scan project: %w", err)
+		}
+		if err := process(p); err != nil {
+			return fmt.Errorf("failed to process project %s: %w", p.ID, err)
+		}
+	}
+	return rows.Err()
 }

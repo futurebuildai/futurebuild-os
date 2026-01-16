@@ -14,10 +14,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/physics"
 	"github.com/colton/futurebuild/pkg/types"
 )
+
+// defaultCfg is the standard config for physics tests
+var defaultCfg = config.DefaultPhysicsConfig()
 
 // Scenario definitions matching JSON structure
 type Scenario struct {
@@ -311,6 +315,7 @@ func TestGoldenMasterPhysics(t *testing.T) {
 					ctx,
 					scenario.Multipliers,
 					types.Forecast{}, // Assuming no weather for baseline unless specified
+					defaultCfg,
 				)
 
 				// Verify DHSM Result immediately

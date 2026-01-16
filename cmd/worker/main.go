@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/colton/futurebuild/internal/agents"
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -77,7 +78,7 @@ func main() {
 	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
 	realClock := clock.RealClock{}
 
-	dailyFocusAgent := agents.NewDailyFocusAgent(
+	dailyFocusAgent := agents.NewDailyFocusAgentWithService(
 		projectService, // Replaces dbPool - Clean Service Layer Pattern
 		scheduleService,
 		weatherService,
@@ -90,7 +91,9 @@ func main() {
 
 	// Procurement Agent for long-lead item monitoring
 	// See PRODUCTION_PLAN.md Step 46, 49
-	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock)
+	// Config Decoupling: Load ProcurementConfig from environment (defaults if not set)
+	procurementCfg := config.LoadProcurementConfigFromEnv()
+	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg)
 
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler

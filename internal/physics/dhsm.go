@@ -5,18 +5,22 @@ package physics
 import (
 	"math"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/types"
 )
 
 // CalculateSAF computes the Size Adjustment Factor.
-// SAF = (GSF / 2250) ^ 0.75
+// SAF = (GSF / StandardHouseSizeSF) ^ SizeAdjustmentExponent
 // See CPM_RES_MODEL_SPEC.md Section 11.2.1
-func CalculateSAF(gsf float64) float64 {
+// Config decoupling: Magic numbers now come from PhysicsConfig.
+func CalculateSAF(gsf float64, cfg config.PhysicsConfig) float64 {
 	if gsf <= 0 {
 		return 1.0 // Default for unset GSF
 	}
-	return math.Pow(gsf/2250.0, 0.75)
+	// Apply defaults for zero-value safety (FAANG Threshold #2)
+	cfg = cfg.WithDefaults()
+	return math.Pow(gsf/cfg.StandardHouseSizeSF, cfg.SizeAdjustmentExponent)
 }
 
 // CalculateTaskDuration computes the DHSM-adjusted task duration.
@@ -29,6 +33,7 @@ func CalculateTaskDuration(
 	context models.ProjectContext,
 	multipliers []models.DurationMultiplier,
 	forecast types.Forecast,
+	cfg config.PhysicsConfig, // Config decoupling: accepts tunable physics config
 ) float64 {
 	baseDuration := task.BaseDurationDays
 
@@ -36,7 +41,7 @@ func CalculateTaskDuration(
 	// See CPM_RES_MODEL_SPEC.md Section 11.2.1
 	saf := 1.0
 	if !task.IsInspection {
-		saf = CalculateSAF(gsf)
+		saf = CalculateSAF(gsf, cfg)
 	}
 	baseDuration *= saf
 
@@ -119,13 +124,14 @@ func CalculateBatchDurations(
 	context models.ProjectContext,
 	multipliers []models.DurationMultiplier,
 	forecast types.Forecast,
+	cfg config.PhysicsConfig, // Config decoupling: accepts tunable physics config
 ) []DHSMResult {
 	results := make([]DHSMResult, len(tasks))
 	for i, task := range tasks {
 		results[i] = DHSMResult{
 			WBSCode:            task.Code,
 			BaseDuration:       task.BaseDurationDays,
-			CalculatedDuration: CalculateTaskDuration(task, gsf, context, multipliers, forecast),
+			CalculatedDuration: CalculateTaskDuration(task, gsf, context, multipliers, forecast, cfg),
 		}
 	}
 	return results

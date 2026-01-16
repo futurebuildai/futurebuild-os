@@ -38,15 +38,15 @@ func TestGenerateContractSamples(t *testing.T) {
 			Vendor:           "Steel Co",
 			Date:             "2026-01-05",
 			InvoiceNumber:    "INV-1001",
-			TotalAmount:      1500.50,
+			TotalAmountCents: 150050, // $1500.50
 			SuggestedWBSCode: "6200-LBR",
 			Confidence:       0.98,
 			LineItems: []InvoiceExtractionItem{
 				{
-					Description: "Steel Beams",
-					Quantity:    10,
-					UnitPrice:   150.05,
-					Total:       1500.50,
+					Description:    "Steel Beams",
+					Quantity:       10,
+					UnitPriceCents: 15005, // $150.05
+					TotalCents:     150050,
 				},
 			},
 		},

@@ -4,9 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 )
+
+// defaultProcurementCfg is the standard config for procurement tests
+var defaultProcurementCfg = config.DefaultProcurementConfig()
 
 // mockWeatherService implements types.WeatherService for testing.
 type mockWeatherService struct {
@@ -23,6 +27,7 @@ func (m *mockWeatherService) GetForecast(lat, long float64) (types.Forecast, err
 func TestAnalyzeItem_ScenarioA(t *testing.T) {
 	agent := &ProcurementAgent{
 		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
 	}
 
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -55,6 +60,7 @@ func TestAnalyzeItem_ScenarioA(t *testing.T) {
 func TestAnalyzeItem_ScenarioB(t *testing.T) {
 	agent := &ProcurementAgent{
 		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
 	}
 
 	now := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)        // Day 16
@@ -93,6 +99,7 @@ func TestAnalyzeItem_ScenarioC(t *testing.T) {
 	// This is the SAFE default per P0 geolocation fix.
 	agent := &ProcurementAgent{
 		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.6}},
+		config:  defaultProcurementCfg,
 	}
 
 	now := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)         // Day 5
@@ -133,6 +140,7 @@ func TestAnalyzeItem_ScenarioC(t *testing.T) {
 func TestAnalyzeItem_Warning(t *testing.T) {
 	agent := &ProcurementAgent{
 		weather: &mockWeatherService{forecast: types.Forecast{PrecipitationProbability: 0.2}},
+		config:  defaultProcurementCfg,
 	}
 
 	now := time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC)        // Day 13
@@ -163,7 +171,9 @@ func TestAnalyzeItem_Warning(t *testing.T) {
 
 // TestAnalyzeItem_NilEarlyStart tests handling of missing schedule data.
 func TestAnalyzeItem_NilEarlyStart(t *testing.T) {
-	agent := &ProcurementAgent{}
+	agent := &ProcurementAgent{
+		config: defaultProcurementCfg,
+	}
 
 	item := procurementRow{
 		ID:            uuid.New(),

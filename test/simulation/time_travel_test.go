@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/agents"
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/colton/futurebuild/test/simulation/mocks"
@@ -56,8 +57,10 @@ func TestTimeTravelSimulation(t *testing.T) {
 
 	// Create agents using repository pattern
 	// See PRODUCTION_PLAN.md: Testing Strategy remediation
+	// Config Decoupling: Use default config for simulation tests
+	procurementCfg := config.DefaultProcurementConfig()
 	procurementRepo := agents.NewPgProcurementRepository(db)
-	procurementAgent := agents.NewProcurementAgent(procurementRepo, weatherService, mockClock)
+	procurementAgent := agents.NewProcurementAgent(procurementRepo, weatherService, mockClock, procurementCfg)
 	subLiaisonAgent := agents.NewSubLiaisonAgent(db, directoryService, notifier, mockClock)
 
 	// Track which days had alerts

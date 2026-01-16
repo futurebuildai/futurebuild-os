@@ -46,22 +46,26 @@ func NewInvoiceService(db *pgxpool.Pool, client ai.Client) *InvoiceService {
 
 // InvoicePromptTemplate is the AI prompt template for invoice extraction.
 // Exported as a var so it can be overridden by config loaders or tests.
+// MONETARY PRECISION: Instructs AI to return all monetary values as integer cents.
 var InvoicePromptTemplate = `
 Extract the following information from the invoice text provided and return it as a structured JSON object.
 Do NOT include any markdown formatting (like ` + "```" + `json) in your response. Return ONLY the raw JSON string.
+
+CRITICAL: All monetary amounts MUST be returned as INTEGERS representing CENTS.
+Example: $10.50 should be 1050, $1400.00 should be 140000, $0.99 should be 99.
 
 Schema:
 {
   "vendor": "String",
   "date": "ISO-8601 Date",
   "invoice_number": "String",
-  "total_amount": 0.00,
+  "total_amount_cents": 0,
   "line_items": [
     {
       "description": "String",
       "quantity": 0.0,
-      "unit_price": 0.0,
-      "total": 0.0
+      "unit_price_cents": 0,
+      "total_cents": 0
     }
   ],
   "suggested_wbs_code": "String",
@@ -127,10 +131,10 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 	var lineItems models.LineItems
 	for _, item := range extraction.LineItems {
 		lineItems = append(lineItems, models.LineItem{
-			Description: item.Description,
-			Quantity:    item.Quantity,
-			UnitPrice:   item.UnitPrice,
-			Total:       item.Total,
+			Description:    item.Description,
+			Quantity:       item.Quantity,
+			UnitPriceCents: item.UnitPriceCents,
+			TotalCents:     item.TotalCents,
 		})
 	}
 
@@ -178,7 +182,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		newID,
 		projectID,
 		extraction.Vendor,
-		extraction.TotalAmount,
+		extraction.TotalAmountCents,
 		lineItems,
 		extraction.SuggestedWBSCode,
 		models.InvoiceStatusPending,
