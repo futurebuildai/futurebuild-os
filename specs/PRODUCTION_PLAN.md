@@ -129,11 +129,11 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 51.1 | **Base Architecture**: `FBElement`, global styles, and registry | Step 50 | 1 | [x] |
 | 51.2 | **Reactive State Engine**: Signals Store (`store.ts`) & Service Layer | Step 51.1 | 1 | [x] |
 | 51.3 | **3-Panel Shell**: Left (Projects/Threads), Center (Chat), Right (Artifacts) | Step 51.2 | 2 | [x] |
-| 52 | **Conversation UI Components**: Message List, Action Cards, Input Bar | Step 51.3 | 2 |
-|    | *Refactor inline components from fb-panel-center.ts* | | |
-| 53 | **Agent Activity Log**: Real-time status w/ expanding details | Step 52 | 1 |
-| 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 |
-| 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 |
+| 52 | **Conversation UI Components**: Message List, Action Cards, Input Bar | Step 51.3 | 2 | [x] |
+|    | *Refactor inline components from fb-panel-center.ts* | | | [x] |
+| 53 | **Agent Activity Log**: Real-time status w/ expanding details | Step 52 | 1 | [x] |
+| 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 | [x] |
+| 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 | [x] |
 | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 |
 | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 |
 | 58 | **Artifact Fixture Testing**: Storybook-style harness | Step 55 | 1 |

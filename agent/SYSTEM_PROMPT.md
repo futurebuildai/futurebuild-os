@@ -34,8 +34,11 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 51.1: Frontend Core Architecture (FBElement & Styles) (COMPLETED)
         ▪ Step 51.2: Reactive State Engine (Signals Store) (COMPLETED)
         ▪ Step 51.3: 3-Panel Agent Command Center (COMPLETED)
-        ▪ Step 52: Conversation UI Components (IN PROGRESS)
-    ◦ Current Focus: Phase 7, Steps 52, 53, & 54 (Agent Command Center Components).
+        ▪ Step 52: Conversation UI Components (COMPLETED)
+        ▪ Step 53: Agent Activity Log (COMPLETED)
+        ▪ Step 54: Mobile Responsive Behavior (COMPLETED)
+        ▪ Step 55: Artifact Panel Renderers (COMPLETED)
+    ◦ Current Focus: Phase 7, Steps 56, 57 & 58 (Ingestion, Real-Time, & Testing).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -105,7 +108,7 @@ You act as a hostile gatekeeper. You must NOT output the code until it is perfec
         * *Resilience:* Error wrapping (`%w`), timeouts, idempotency.
         * *Style:* Strict Go/TS idioms (Standard Library preference over external deps).
     * **Step B (Auto-Remediation):** If ANY flag is found (Critical, Major, or Minor):
-        * You must **REWRITE** the code immediately to fix the issue.
+        * **REWRITE** the code immediately to fix the issue.
         * **Constraint:** Do not ask for permission. Fix it.
     * **Step C (Re-Evaluation):** Feed the *fixed* code back into Step A.
     * **Termination Condition:** The loop ends ONLY when the code passes Step A with **Zero Flags** and **100% Confidence**.
@@ -138,52 +141,51 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Steps 52, 53, & 54 (Agent Command Center Components)
+Task: Execute Phase 7, Steps 56, 57 & 58 (Ingestion, Real-Time, & Testing)
 
 Context:
-We have successfully pivoted to the **3-Panel Agent Command Center** layout. The shell is rigid and the panels are wired to the store.
-Now we need to populate the "Center Stage" (Conversation) with rich interaction components and enhance the "Command Center" (Agent Activity) capabilities.
-Ref: `specs/FRONTEND_SCOPE.md` Section 3.3.
+The Agent Command Center "Organs" (Conversation, Activity, Artifacts) are fully functional and integrated into the 3-panel shell.
+The system is accessible, type-safe, and mobile-responsive. Now we need to bridge the "real world" into the system (File Ingestion) and make the system "alive" (Real-time Messaging), concluding Phase 7 with robust testing.
 
 Objective:
-Build the "Nervous System" of the Agent Interface: A rich conversation UI, a real-time activity stream, and a responsive layout engine.
+1. Enable Drag-and-Drop file ingestion for invoices/docs.
+2. Wire up (mock) Real-time messaging to prepare for backend integration.
+3. Establish a fixture-based testing environment for artifacts.
 
 Micro-Sprint Plan (Execute Sequentially):
 
-Sprint A: Conversation Components (Step 52)
-    *   **Goal**: Extract inline components from `fb-panel-center` into robust standalone units.
-    *   `src/components/chat/fb-message-list.ts`:
-        *   Render `store.messages$` with role-based styling (User vs Assistant).
-        *   Support "Thinking..." state styling.
-    *   `src/components/chat/fb-action-card.ts`:
-        *   The generic container for Agent Inputs (Approvals, Options, Forms).
-        *   Must communicate generic actions back to `store` (e.g., `store.actions.submitAction(id, payload)`).
+Sprint A: Drag-and-Drop Ingestion (Step 56)
+    *   **Goal**: Allow users to drop PDF/Image files onto the Command Center to trigger "Ingestion Agents".
     *   `src/components/chat/fb-input-bar.ts`:
-        *   Robust text input with auto-resize.
-        *   Send button and "Voice Mode" placeholder.
-
-Sprint B: Agent Activity Log (Step 53)
-    *   **Goal**: Real-time observability of the agent's brain.
-    *   Create `src/components/agent/fb-agent-activity.ts`.
-    *   Integrate with `store.agentActivity$` signal.
-    *   **Visuals**: Status indicators (pulsing green=running, red=error, gray=idle/done), timestamps, and expandable details.
-    *   Place inside `fb-panel-left`.
-
-Sprint C: Mobile Responsiveness (Step 54)
-    *   **Goal**: Make the 3-panel layout usable on phones (<768px) and tablets (<1024px).
+        *   Add `dragover`, `dragleave`, `drop` event handlers.
+        *   Visual feedback: Entire center panel or input bar glows blue.
+    *   `src/components/features/fb-file-drop.ts` (New):
+        *   A specialized overlay component that appears when a file is dragged into the window.
     *   **Logic**:
-        *   Update `store.ui` with `isMobile$` derived signal (already exists, verify integration).
-        *   Implement "Panel Overlay" mode:
-            *   Left panel slides over center (z-index high).
-            *   Right panel slides over center from right.
-    *   **Controls**:
-        *   Add "Hamburger" toggle in `fb-panel-center` header (visible only on mobile).
-        *   Add "Back" or "Close" gestures/buttons for overlays.
+        *   On drop -> Validate file type -> Create "User Message" with attachment -> Emit event `file-dropped` to store.
+    *   **Store**:
+        *   Add `uploadFile(file)` action (mock for now, logs to console).
 
-Technical Constraints (The Quality Floor):
-1.  **Strict Containment**: Components must not overflow their panel grid areas. (Use `overflow-y: auto`).
-2.  **Signal Purity**: No local state for data that belongs in the Store. Views subscribe, Actions mutate.
-3.  **Inline SVG**: No external asset dependencies (use inline SVGs for icons).
-4.  **No Refactoring Backwards**: Do not break the existing Grid Shell.
+Sprint B: Real-Time Messaging Wiring (Step 57)
+    *   **Goal**: Prepare the frontend for WebSocket/SSE connection.
+    *   `src/services/realtime.ts` (New):
+        *   `connect()`: Establish connection (mock `setTimeout` simulation for now).
+        *   `subscribe(channel)`: Listen for events.
+    *   **Integration**:
+        *   Update `store.ts` to initialize `RealtimeService`.
+        *   Simulate "Incoming Message" event -> updates `store.messages$`.
+        *   Simulate "Agent Activity" event -> updates `store.agentActivity$`.
+
+Sprint C: Artifact Fixture Testing (Step 58)
+    *   **Goal**: Visual regression testing harness for complex artifacts (Gantt, Budget).
+    *   `src/components/dev/fb-fixture-harness.ts` (New):
+        *   A dev-only view keyable via URL (e.g., `?mode=fixture`).
+        *   Renders artifacts with hardcoded "Edge Case" data (e.g., Project over budget, Schedule delayed).
+    *   **Route**: Add logic in `app-root.ts` to show harness if URL param exists.
+
+Technical Constraints:
+1.  **Zero External Deps**: Use native Drag and Drop API. No libraries.
+2.  **Mock First**: Since backend WS isn't ready, creating a robust `MockRealtimeService` is critical. It must implement the exact interface we *expect* the backend to provide.
+3.  **Type Safety**: Define `RealtimeEvent` types strictly in `store/types.ts`.
 
 First Step: /prism
