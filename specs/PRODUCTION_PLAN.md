@@ -134,7 +134,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 53 | **Agent Activity Log**: Real-time status w/ expanding details | Step 52 | 1 | [x] |
 | 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 | [x] |
 | 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 | [x] |
-| 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 |
+| 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 | [x] |
 | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 |
 | 58 | **Artifact Fixture Testing**: Storybook-style harness | Step 55 | 1 |
 

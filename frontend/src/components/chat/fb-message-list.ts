@@ -6,6 +6,7 @@ import { store } from '../../store/store';
 import type { ChatMessage } from '../../store/types';
 
 import './fb-action-card';
+import './fb-typing-indicator';
 
 /**
  * FBMessageList - Renders the chat message stream.
@@ -124,6 +125,7 @@ export class FBMessageList extends FBElement {
     private static readonly SCROLL_THRESHOLD = 100;
 
     @state() private _messages: ChatMessage[] = [];
+    @state() private _isTyping = false;
     private _disposeEffects: (() => void)[] = [];
 
     override connectedCallback(): void {
@@ -133,6 +135,13 @@ export class FBMessageList extends FBElement {
             effect(() => {
                 this._messages = store.messages$.value;
                 this._scrollToBottomIfNearEnd();
+            }),
+            // Step 57: Subscribe to typing state
+            effect(() => {
+                this._isTyping = store.isTyping$.value;
+                if (this._isTyping) {
+                    this._scrollToBottomIfNearEnd();
+                }
             })
         );
     }
@@ -212,6 +221,8 @@ export class FBMessageList extends FBElement {
                         </span>
                     </article>
                 `)}
+                
+                ${this._isTyping ? html`<fb-typing-indicator></fb-typing-indicator>` : nothing}
             </div>
         `;
     }

@@ -26,6 +26,7 @@ import { FBMessageList } from './components/chat/fb-message-list';
 import { FBActionCard } from './components/chat/fb-action-card';
 import { FBInputBar } from './components/chat/fb-input-bar';
 import { FBAgentActivity } from './components/agent/fb-agent-activity'; // Step 53
+import { FBTypingIndicator } from './components/chat/fb-typing-indicator'; // Step 57
 
 // Artifact Components (Step 55)
 import { FBArtifactGantt } from './components/artifacts/fb-artifact-gantt';
@@ -53,6 +54,7 @@ const registered = registerComponents({
     'fb-artifact-budget': FBArtifactBudget,
     'fb-artifact-invoice': FBArtifactInvoice,
     'fb-file-drop': FBFileDrop,
+    'fb-typing-indicator': FBTypingIndicator,
 });
 
 console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);

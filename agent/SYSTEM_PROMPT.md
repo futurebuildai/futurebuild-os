@@ -39,7 +39,8 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 54: Mobile Responsive Behavior (COMPLETED)
         ▪ Step 55: Artifact Panel Renderers (COMPLETED)
         ▪ Step 56: Drag-and-Drop Ingestion (COMPLETED)
-    ◦ Current Focus: Phase 7, Step 57 (Real-Time Messaging).
+        ▪ Step 57: Real-Time Messaging Architecture (COMPLETED)
+    ◦ Current Focus: Phase 7, Step 58 (Artifact Fixture Testing).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -142,104 +143,66 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Step 57: Real-Time WebSocket/SSE Messaging
+--------------------------------------------------------------------------------
+Task: Execute Phase 7, Step 58: Artifact Fixture Testing
 
 Context:
-Drag-and-drop ingestion is complete (Step 56). The frontend can now accept file uploads via a global drop zone with proper overlay feedback. However, all "agent responses" are currently hard-coded `setTimeout` mocks inside `store.ts`. 
+Step 57 successfully implemented the Real-Time Messaging architecture with a clean `IRealtimeService` interface and `MockRealtimeService`. We now have:
+- `window.fb.triggerScenario('invoice_success')` to test Invoice artifacts
+- `window.fb.triggerScenario('budget_overview')` to test Budget artifacts
+- Scenario factory functions that generate fresh IDs on each invocation
 
-The next evolution is to abstract real-time communication into a dedicated **RealtimeService** layer with a mock implementation that simulates WebSocket/SSE patterns. This prepares the frontend for actual backend integration while enabling sophisticated dev/testing scenarios.
+The artifact renderers (`fb-artifact-invoice`, `fb-artifact-budget`, `fb-artifact-gantt`) were created in Step 55, but they rely on **hardcoded mock data** inside the components. They do NOT consume the `data` payload from the RealtimeService artifacts.
+
+This step is about **wiring the artifacts end-to-end**: when `triggerScenario('invoice_success')` fires, the Invoice data from the mock service's `ArtifactPayload.data` must flow through the Store and render in the artifact panel.
 
 Objective:
-Implement a `RealtimeService` abstraction with a `MockRealtimeService` implementation that simulates async message arrival, typing indicators, and event-driven updates.
+Create reusable fixture files and wire the artifact components to consume dynamic data from the Store instead of hardcoded mocks.
 
 Spec References:
-- FRONTEND_SCOPE.md Section 8.4 (Real-Time Communication)
-- PRODUCTION_PLAN.md Step 57: "Real-time Messaging: WebSocket/SSE wiring"
+- FRONTEND_SCOPE.md Section 8.3 (Artifact Mapping)
+- FRONTEND_SCOPE.md Section 6.3 (Right Panel: Artifact Display)
 
-Constraints & Standards (L7 Quality Floor):
-* **Interface First**: Define `RealtimeService` interface before implementation
-* **Type Safety**: All event types and payloads strictly typed
-* **Decoupling**: Store should not know about `setTimeout` - the service handles timing
-* **Testability**: `simulateIncomingMessage()` method for dev/testing
-* **Cleanup**: Proper disconnect handling and listener cleanup
-
-Deliverables:
-
-1. **Service Layer (`src/services/realtime.ts`)**:
-   ```typescript
-   export interface RealtimeService {
-       connect(): void;
-       disconnect(): void;
-       on<T>(event: RealtimeEvent, callback: (data: T) => void): () => void;
-       isConnected(): boolean;
-   }
-   
-   export type RealtimeEvent = 'message' | 'typing' | 'activity' | 'connected' | 'disconnected';
-   
-   export interface IncomingMessage {
-       id: string;
-       role: 'assistant';
-       content: string;
-       createdAt: string;
-   }
-   
-   export interface TypingIndicator {
-       isTyping: boolean;
-       agentName?: string;
-   }
-   ```
-
-2. **Mock Implementation (`MockRealtimeService`)**:
-   - Event emitter pattern with typed listeners
-   - `simulateIncomingMessage(content: string, delayMs?: number)` for testing
-   - `simulateTyping(isTyping: boolean)` for typing indicators
-   - Auto-connect on construction (for dev)
-   - Console logging for visibility
-
-3. **Store Integration (`store.ts`)**:
-   - Remove hard-coded `setTimeout` from `handleFileDrop`
-   - Initialize `MockRealtimeService` singleton
-   - Create effect that subscribes to `'message'` events
-   - Dispatch `actions.addMessage()` on incoming messages
-   - Export service for component access
-
-4. **Optional Typing Indicator (`fb-message-list.ts` or new component)**:
-   - Subscribe to `'typing'` events
-   - Show "Agent is typing..." indicator when active
-   - Auto-hide when message arrives
-
-5. **Verification**:
-   - `npm run build` - 0 errors
-   - `npm run lint` - 0 warnings
-   - Browser: Drop file → Agent "typing" appears → Message arrives after delay
-   - Console: Service logs visible
+Constraints & Standards (Google L7 Quality Floor):
+1.  **No Hardcoded Mock Data in Components**: Artifact components must accept typed props and render dynamically.
+2.  **Fixture Files**: Create `src/fixtures/` directory with typed fixture data that matches the `ArtifactPayload.data` schema.
+3.  **Store Integration**: The `artifactRef` in `ChatMessage` must trigger artifact rendering in `fb-panel-right`.
+4.  **Type Safety**: All artifact data interfaces must be strictly typed (no `any` or `Record<string, unknown>`).
 
 Micro-Sprint Plan:
 
-Sprint A: Service Definition
-    * Create `src/services/realtime.ts`
-    * Define `RealtimeService` interface
-    * Define event types and payload interfaces
-    * Implement `MockRealtimeService` class
+Sprint A: Define Artifact Data Interfaces
+    - Create `src/types/artifacts.ts`.
+    - Define `InvoiceArtifactData`, `BudgetArtifactData`, `GanttArtifactData` interfaces.
+    - These must match the `data` payload structure in `mock-service.ts` scenarios.
 
-Sprint B: Store Wiring
-    * Initialize service in `store.ts`
-    * Create effect to subscribe to service events
-    * Remove `setTimeout` from `handleFileDrop`
-    * Use `realtimeService.simulateIncomingMessage()` instead
+Sprint B: Create Fixture Files
+    - Create `src/fixtures/invoice-fixtures.ts` with 2-3 sample invoices.
+    - Create `src/fixtures/budget-fixtures.ts` with sample budget data.
+    - Create `src/fixtures/gantt-fixtures.ts` with sample timeline data.
+    - Export as typed constants.
 
-Sprint C: UI Integration (Optional)
-    * Add typing indicator to chat UI
-    * Subscribe to `'typing'` events
+Sprint C: Refactor Artifact Components
+    - Update `fb-artifact-invoice.ts` to accept `InvoiceArtifactData` as a prop.
+    - Update `fb-artifact-budget.ts` to accept `BudgetArtifactData` as a prop.
+    - Update `fb-artifact-gantt.ts` to accept `GanttArtifactData` as a prop.
+    - Remove all hardcoded mock data from render methods.
 
-Sprint D: Verification
-    * Build & lint pass
-    * Browser functional test
-    * Console shows service activity
+Sprint D: Wire Artifact Selection
+    - Update `fb-panel-right.ts` to subscribe to a new `store.activeArtifact$` signal.
+    - Add `setActiveArtifact(artifact)` action to the Store.
+    - Update message rendering to set the active artifact when a message with `artifactRef` is clicked or auto-selected.
 
-Technical Notes:
-- The Mock service uses `EventTarget` or a simple Map<event, Set<callback>> pattern
-- Real WebSocket integration in Phase 8 will swap `MockRealtimeService` for `WebSocketRealtimeService`
-- Consider using `@preact/signals-core` signal for `isTyping$` state
+Sprint E: End-to-End Verification
+    - Browser test: `window.fb.triggerScenario('invoice_success')` → Invoice renders in right panel
+    - Browser test: `window.fb.triggerScenario('budget_overview')` → Budget renders in right panel
+    - Browser test: Click on a message with artifact → Panel updates
 
-First Step: /prism
+Definition of Done:
+- [ ] Artifact components accept typed props (no hardcoded data).
+- [ ] Fixture files exist with typed sample data.
+- [ ] `window.fb.triggerScenario('invoice_success')` renders dynamic Invoice data in the right panel.
+- [ ] `npm run build` and `npm run lint` pass (0 errors).
+
+First Command: /prism
+--------------------------------------------------------------------------------

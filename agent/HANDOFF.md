@@ -1,74 +1,68 @@
-# Handoff
+# HANDOFF — Phase 7, After Step 57
 
-**Current Phase:** Phase 7: Frontend - Lit + TypeScript
-**Completed Step:** 56: Drag-and-Drop File Ingestion
-**Next Step:** Step 57: Real-time WebSocket/SSE Messaging
+> Last updated: 2026-01-19
 
 ---
 
-## ✅ What Changed This Session
+## Session Summary
 
-### Drag-and-Drop File Ingestion (Step 56)
+### Step 57: Real-Time Messaging Architecture ✅ COMPLETE
 
-Implemented a global file ingestion system with the following components:
+**Created:**
+- `src/services/realtime/types.ts` — Discriminated union `ServerEvent`, `ArtifactPayload` with shared `ArtifactType` enum
+- `src/services/realtime/interfaces.ts` — `IRealtimeService` + `IRealtimeServiceDevTools` interface segregation
+- `src/services/realtime/mock-service.ts` — 5 scenarios with factory functions for fresh IDs
+- `src/services/realtime/index.ts` — Barrel export
+- `src/components/chat/fb-typing-indicator.ts` — Animated "Processing..." indicator
 
-#### 1. Types Layer (`store/types.ts`)
-- `UploadStatus` type: `'pending' | 'uploading' | 'complete' | 'error'`
-- `PendingUpload` interface tracking file, status, and progress
-- Extended `StoreActions` with upload actions
+**Modified:**
+- `store.ts` — Added `isTyping$`, `connectionStatus$`, wired realtime events, **removed 2 setTimeouts**
+- `fb-panel-center.ts` — **Removed setTimeout**, uses `realtimeService.send()`
+- `fb-message-list.ts` — Subscribes to `isTyping$`, renders typing indicator
+- `index.ts` — Registered `FBTypingIndicator`
 
-#### 2. Store Layer (`store/store.ts`)
-- `ALLOWED_UPLOAD_TYPES` constant (PDF, JPEG, PNG, GIF, WebP)
-- `_isDragging$` signal for overlay visibility control
-- `_pendingFiles$` signal for upload queue management
-- Actions: `setDragging()`, `handleFileDrop()`, `clearPendingUploads()`
-- Mock chat integration with 1-second simulated agent response
+**L7 Quality Floor Fixes Applied:**
+1. Scenario IDs → Factory functions (fresh IDs on each trigger)
+2. `mapArtifactType` → Uses `ArtifactType` enum cases
+3. Error event handler → Added `realtimeService.on('error', ...)`
 
-#### 3. Overlay Component (`components/features/fb-file-drop.ts`)
-- Full-screen fixed overlay at z-index 1000
-- Glassmorphism styling with dashed border
-- Pulse animation for user guidance
-- Visibility bound to `store.isDragging$`
-- ARIA attributes for accessibility
-
-#### 4. Event Wiring (`components/layout/fb-app-shell.ts`)
-- **Drag Counter Technique**: Prevents overlay flickering when cursor crosses child elements
-- Four event handlers: `dragenter`, `dragover`, `dragleave`, `drop`
-- Proper cleanup in `disconnectedCallback`
-- Renders `<fb-file-drop>` component
-
-#### 5. Bug Fix (`components/layout/fb-panel-center.ts`)
-- Added `_hasMessages` state that subscribes to `store.messages$`
-- Chat UI now renders when messages exist OR when thread is selected
-- Enables file drops to work without selecting a thread first
-
-### Code Quality
-- **Build:** ✅ 0 errors (43 modules, 183ms)
-- **Lint:** ✅ 0 warnings
-- **Type Safety:** No `any` types, strict interfaces
-- **Accessibility:** ARIA labels and semantic markup
+**Verification:**
+- Build: ✅ 49 modules
+- Lint: ✅ 0 errors
+- Browser: `window.fb.triggerScenario('invoice_success')` → Message + Invoice artifact ✅
 
 ---
 
-## 📋 Next Steps
+## Next Up: Step 58 — Artifact Fixture Testing
 
-### Step 57: Real-Time WebSocket/SSE Messaging
-1. Define `RealtimeService` interface in `src/services/realtime.ts`
-2. Implement `MockRealtimeService` with event emitters
-3. Add `simulateIncomingMessage()` for dev/testing
-4. Wire service to store for auto-message dispatch
-5. Optionally add typing indicators
+**Goal:** Wire artifact components to consume dynamic data from RealtimeService instead of hardcoded mocks.
+
+**Key Tasks:**
+1. Define typed artifact data interfaces (`InvoiceArtifactData`, etc.)
+2. Create fixture files in `src/fixtures/`
+3. Refactor artifact components to accept props
+4. Wire `fb-panel-right` to `store.activeArtifact$`
+5. End-to-end verification via DevTools
 
 ---
 
-## 📦 System State
-- **Frontend Path**: `frontend/`
-- **Build Status**: ✅ Passing
-- **Lint Status**: ✅ Passing
-- **Key Files Modified This Session**:
-    - `src/store/types.ts` (+26 lines)
-    - `src/store/store.ts` (+60 lines)
-    - `src/components/features/fb-file-drop.ts` (NEW - 138 lines)
-    - `src/components/layout/fb-app-shell.ts` (+50 lines)
-    - `src/components/layout/fb-panel-center.ts` (+10 lines)
-    - `src/index.ts` (+3 lines)
+## Dev Server
+
+```bash
+cd frontend && npm run dev -- --port 5174
+```
+
+Test at http://localhost:5174
+
+---
+
+## DevTools Hooks Available
+
+```javascript
+window.fb.getScenarios()            // List available scenarios
+window.fb.triggerMessage("text")    // Inject assistant message
+window.fb.triggerScenario("name")   // Trigger full scenario
+window.fb.setTyping(true/false)     // Toggle typing indicator
+```
+
+First Command: `/prism`

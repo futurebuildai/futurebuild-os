@@ -350,4 +350,8 @@ export interface StoreActions {
     setDragging(isDragging: boolean): void;
     handleFileDrop(files: FileList): void;
     clearPendingUploads(): void;
+
+    // Realtime actions (Step 57: Real-Time Messaging)
+    setTyping(isTyping: boolean): void;
+    setConnectionStatus(status: 'connected' | 'disconnected' | 'connecting'): void;
 }

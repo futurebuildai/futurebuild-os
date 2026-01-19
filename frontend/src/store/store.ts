@@ -26,6 +26,8 @@ import type {
     PendingUpload,
 } from './types';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
+import { realtimeService, type ConnectionStatus, type ArtifactPayload } from '../services/realtime';
+import { ArtifactType } from '../types/enums';
 
 // ============================================================================
 // Constants
@@ -86,6 +88,10 @@ const _activeProjectId$ = signal<string | null>(null);
 // Upload state (Step 56: Drag-and-Drop Ingestion)
 const _isDragging$ = signal<boolean>(false);
 const _pendingFiles$ = signal<PendingUpload[]>([]);
+
+// Realtime state (Step 57: Real-Time Messaging)
+const _isTyping$ = signal<boolean>(false);
+const _connectionStatus$ = signal<ConnectionStatus>('disconnected');
 
 // ============================================================================
 // Computed Values
@@ -377,19 +383,30 @@ const actions: StoreActions = {
             createdAt: new Date().toISOString(),
         });
 
-        // Simulate agent response after 1 second
-        setTimeout(() => {
-            actions.addMessage({
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: `I received your document${newUploads.length > 1 ? 's' : ''}. Analyzing ${fileNames}...`,
-                createdAt: new Date().toISOString(),
-            });
-        }, 1000);
+        // Step 57: Send file message via RealtimeService (replaces setTimeout)
+        // See FRONTEND_SCOPE.md Section 8.4
+        const firstUpload = newUploads[0];
+        realtimeService.send({
+            type: 'file',
+            payload: {
+                fileName: fileNames,
+                fileType: firstUpload?.file.type ?? 'application/octet-stream',
+            },
+        });
     },
 
     clearPendingUploads(): void {
         _pendingFiles$.value = [];
+    },
+
+    // ---- Realtime Actions (Step 57: Real-Time Messaging) ----
+
+    setTyping(isTyping: boolean): void {
+        _isTyping$.value = isTyping;
+    },
+
+    setConnectionStatus(status: ConnectionStatus): void {
+        _connectionStatus$.value = status;
     },
 };
 
@@ -449,6 +466,10 @@ export const store = {
     // ---- Upload State (readonly, Step 56) ----
     isDragging$: _isDragging$ as ReadonlySignal<boolean>,
     pendingFiles$: _pendingFiles$ as ReadonlySignal<PendingUpload[]>,
+
+    // ---- Realtime State (readonly, Step 57) ----
+    isTyping$: _isTyping$ as ReadonlySignal<boolean>,
+    connectionStatus$: _connectionStatus$ as ReadonlySignal<ConnectionStatus>,
 
     // ---- Actions ----
     actions,
@@ -529,10 +550,67 @@ export function initializeStore(): void {
     setUnauthorizedHandler(() => {
         actions.logout();
     });
+
+    // Step 57: Initialize RealtimeService and wire event handlers
+    // See FRONTEND_SCOPE.md Section 8.4 (Streaming Response Handler)
+    realtimeService.on('message', (payload) => {
+        const firstArtifact = payload.artifacts?.[0];
+        const message: ChatMessage = {
+            id: payload.id,
+            role: payload.role,
+            content: payload.content,
+            createdAt: payload.createdAt,
+        };
+        // Map artifact if present
+        if (firstArtifact) {
+            message.artifactRef = {
+                id: firstArtifact.id,
+                type: mapArtifactType(firstArtifact.type),
+                title: firstArtifact.title,
+                scope: 'thread',
+            };
+        }
+        actions.addMessage(message);
+    });
+
+    realtimeService.on('typing', (payload) => {
+        actions.setTyping(payload.isTyping);
+    });
+
+    realtimeService.on('connection_change', (payload) => {
+        actions.setConnectionStatus(payload.status);
+    });
+
+    // Step 57 L7 Fix: Handle error events for user feedback
+    realtimeService.on('error', (payload) => {
+        console.error('[Realtime Error]', payload.code, payload.message);
+        // Future: Could dispatch to a global error notification system
+    });
+
+    // Connect to realtime service
+    realtimeService.connect();
+}
+
+/**
+ * Map ArtifactType enum to ArtifactRef type string.
+ * See FRONTEND_SCOPE.md Section 8.3
+ * L7 Fix: Uses ArtifactType enum values instead of magic strings
+ */
+function mapArtifactType(type: ArtifactType): 'gantt' | 'budget' | 'invoice' | 'table' | 'chart' {
+    switch (type) {
+        case ArtifactType.Invoice:
+            return 'invoice';
+        case ArtifactType.BudgetView:
+            return 'budget';
+        case ArtifactType.GanttView:
+            return 'gantt';
+        default:
+            return 'table';
+    }
 }
 
 // ============================================================================
 // Type Exports
 // ============================================================================
 
-export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions, Thread, AgentActivity, FocusTask };
+export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions, Thread, AgentActivity, FocusTask, ConnectionStatus, ArtifactPayload };

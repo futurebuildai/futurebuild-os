@@ -161,17 +161,15 @@ export class FBPanelCenter extends FBElement {
 
         store.actions.addMessage(message);
 
-        // TODO: Replace with real API call. Placeholder for dev testing.
-        // Simulate agent response after delay
-        setTimeout(() => {
-            const response: ChatMessage = {
-                id: `msg-${String(Date.now())}`,
-                role: 'assistant',
-                content: `I received your message: "${content}". This is a placeholder response.`,
-                createdAt: new Date().toISOString(),
-            };
-            store.actions.addMessage(response);
-        }, 1000);
+        // Step 57: Send chat message via RealtimeService
+        // Response is handled by store's realtime event listener
+        // See FRONTEND_SCOPE.md Section 8.4
+        void import('../../services/realtime').then(({ realtimeService }) => {
+            realtimeService.send({
+                type: 'chat',
+                payload: { content },
+            });
+        });
     }
 
     private _toggleLeftPanel(): void {
