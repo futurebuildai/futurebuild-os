@@ -87,26 +87,38 @@ To ensure end-to-end data integrity, the frontend MUST maintain a `types/` direc
 - **Enum Synchronization:** `TaskStatus`, `UserRole`, and `ArtifactType` must match the Go backend exactly.
 - **Strict Typing:** All components and services use these shared interfaces to eliminate "any" types and reduce integration bugs.
 
-### 3.3 High-Level Layout
+### 3.3 High-Level Layout: Agent Command Center
+
+> [!IMPORTANT]
+> **Architectural Pivot (v1.3.0)**: The UI is a 3-panel "Agent Command Center" optimized for
+> conversational AI interaction, not a traditional SaaS dashboard.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  <fb-header>  Logo | Project Selector | Notifications | User    │
-├─────────────┬───────────────────────────────────────────────────┤
-│             │                                                   │
-│  <fb-nav>   │  <fb-main>                                        │
-│             │  ┌─────────────────────────────────────────────┐  │
-│  Dashboard  │  │  <fb-dashboard>                             │  │
-│  Schedule   │  │  Status cards, metrics, quick actions       │  │
-│  Tasks      │  └─────────────────────────────────────────────┘  │
-│  Documents  │  ┌─────────────────────────────────────────────┐  │
-│  Budget     │  │  <fb-chat>                                  │  │
-│  Team       │  │  Conversational interface with artifacts    │  │
-│  Settings   │  │                                             │  │
-│             │  └─────────────────────────────────────────────┘  │
-│             │                                                   │
-└─────────────┴───────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              FutureBuild                                            │
+├───────────────────┬──────────────────────────────────────────┬──────────────────────┤
+│  LEFT PANEL       │         CENTER PANEL                     │   RIGHT PANEL        │
+│  (280px)          │         (flex: 1)                        │   (320px, collapse)  │
+├───────────────────┼──────────────────────────────────────────┼──────────────────────┤
+│ 🔔 DAILY FOCUS    │  Sunrise Villa > Budget Discussion       │   📊 ARTIFACTS       │
+│ ├─ Review Invoice │                                          │                      │
+│ ├─ Confirm Sub    │  [Agent]: Here's the budget breakdown... │   [Budget Overview]  │
+│ └─ Approve CO     │  [Action Card: Approve | Edit | Deny]    │   Est.    Actual     │
+│                   │                                          │   $80k    $65k       │
+│ 📁 PROJECTS       │  [User]: Schedule the plumber            │                      │
+│ ├─ Sunrise Villa  │  [Agent]: I recommend Tuesday...         │   [Approve] [Deny]   │
+│ │  ├─ Budget      │                                          │                      │
+│ │  └─ Schedule    │  ──────────────────────────────          │ ⚡ AGENT ACTIVITY    │
+│ ├─ Oak Ridge      │  [Type a message...]              [Send] │ ├─ Checked weather   │
+│ └─ Maple Estate   │                                          │ └─ Updated schedule  │
+│                   │                                          │                      │
+└───────────────────┴──────────────────────────────────────────┴──────────────────────┘
 ```
+
+**Panel Responsibilities:**
+- **Left**: Daily Focus tasks, Project/Thread tree, Agent Activity Log
+- **Center**: Conversation thread with inline Action Cards
+- **Right**: Artifacts (project-level or thread-level), action approval buttons
 
 ### 3.4 Responsive Behavior
 
@@ -115,37 +127,40 @@ To ensure end-to-end data integrity, the frontend MUST maintain a `types/` direc
 | **Desktop (≥1200px)** | Centered chat channel (max-width 900px) with optional "Artifact Sidebar" for persistent pinning. |
 | **Tablet/Mobile** | Full-width chat stream. Artifacts are inline cards. |
 
-### 3.3 Component Tree
+### 3.4 Component Tree (Agent Command Center)
 
 ```
-<fb-app>
-├── <fb-header>
-│   ├── <fb-logo>
-│   ├── <fb-notification-bell>
-│   └── <fb-user-menu>
+<fb-app-shell>
+├── <fb-panel-left>                    // 280px, collapsible on mobile
+│   ├── <fb-daily-focus>               // Prioritized agent tasks
+│   │   └── <fb-focus-item>            // Click → navigate to thread
+│   ├── <fb-project-tree>              // Expandable project/thread list
+│   │   └── <fb-thread-item>           // Click → load conversation
+│   └── <fb-agent-activity>            // Autonomous action log
+│       └── <fb-activity-item>         // Click → jump to context
 │
-├── <fb-chat-interface>
-│   ├── <fb-message-list>
+├── <fb-panel-center>                  // flex: 1
+│   ├── <fb-breadcrumb>                // Project > Thread
+│   ├── <fb-message-list>              // Conversation stream
 │   │   ├── <fb-message type="user">
 │   │   ├── <fb-message type="assistant">
-│   │   └── <fb-ephemeral-card>
-│   │       ├── <fb-artifact-gantt>
-│   │       ├── <fb-artifact-table>
-│   │       ├── <fb-artifact-chart>
-│   │       └── <fb-artifact-invoice>
-│   │
+│   │   └── <fb-action-card>           // Approve | Edit | Deny
+│   │       └── <fb-artifact-*>        // Inline artifact preview
 │   └── <fb-input-bar>
 │       ├── <fb-text-input>
-│       ├── <fb-voice-button> (STT)
+│       ├── <fb-voice-button>          // STT
 │       └── <fb-upload-button>
 │
-├── <fb-notification-center>
-│   └── <fb-notification-item>
+├── <fb-panel-right>                   // 320px, collapsible
+│   ├── <fb-artifact-panel>            // Thread or project artifacts
+│   │   ├── <fb-artifact-gantt>
+│   │   ├── <fb-artifact-table>
+│   │   ├── <fb-artifact-chart>
+│   │   └── <fb-artifact-invoice>
+│   └── <fb-artifact-actions>          // Approve | Edit | Deny
 │
-├── <fb-modal>
-│   └── <fb-artifact-fullscreen>
-│
-└── <fb-toast>
+├── <fb-modal>                         // Fullscreen artifact view
+└── <fb-toast>                         // Notifications
 ```
 
 ---

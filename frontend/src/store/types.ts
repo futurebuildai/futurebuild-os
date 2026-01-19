@@ -100,6 +100,35 @@ export interface ChatMessage {
     createdAt: string;
     /** Whether this message is still being streamed */
     isStreaming?: boolean;
+    /** Optional action card if agent is requesting approval */
+    actionCard?: ActionCard;
+    /** Optional artifact reference to display inline */
+    artifactRef?: ArtifactRef;
+}
+
+/**
+ * Action card embedded in assistant message.
+ * Represents a recommended action requiring user approval.
+ */
+export interface ActionCard {
+    id: string;
+    type: 'invoice_approval' | 'schedule_change' | 'material_order' | 'confirmation' | 'general';
+    title: string;
+    summary: string;
+    status: 'pending' | 'approved' | 'denied' | 'edited';
+    /** Optional data payload for the action */
+    data?: Record<string, unknown>;
+}
+
+/**
+ * Reference to an artifact (can be displayed inline or in artifact panel).
+ */
+export interface ArtifactRef {
+    id: string;
+    type: 'gantt' | 'budget' | 'invoice' | 'table' | 'chart';
+    title: string;
+    /** Whether this is a project-level (global) or thread-level artifact */
+    scope: 'project' | 'thread';
 }
 
 /**
@@ -115,6 +144,80 @@ export interface ChatState {
 }
 
 // ============================================================================
+// Thread State (New for Agent Command Center)
+// ============================================================================
+
+/**
+ * Conversation thread within a project.
+ * Projects can have multiple concurrent threads.
+ */
+export interface Thread {
+    id: string;
+    projectId: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    /** Messages in this thread */
+    messages: ChatMessage[];
+    /** Whether this thread has unread messages */
+    hasUnread: boolean;
+}
+
+/**
+ * Thread state slice.
+ */
+export interface ThreadState {
+    /** All threads for the current project */
+    items: Thread[];
+    /** Currently active thread ID */
+    activeId: string | null;
+    /** Whether thread data is loading */
+    isLoading: boolean;
+}
+
+// ============================================================================
+// Agent Activity State
+// ============================================================================
+
+/**
+ * Autonomous agent activity log entry.
+ * Shows what the AI agent did without user prompting.
+ */
+export interface AgentActivity {
+    id: string;
+    action: string;
+    description: string;
+    timestamp: string;
+    /** Associated project ID if applicable */
+    projectId?: string;
+    /** Associated thread ID if applicable */
+    threadId?: string;
+    /** Activity status */
+    status: 'running' | 'completed' | 'failed';
+}
+
+// ============================================================================
+// Daily Focus State
+// ============================================================================
+
+/**
+ * Daily Focus task - prioritized agent-recommended action.
+ */
+export interface FocusTask {
+    id: string;
+    title: string;
+    description: string;
+    priority: 'high' | 'medium' | 'low';
+    projectId: string;
+    projectName: string;
+    /** Thread ID to navigate to when clicked */
+    threadId?: string;
+    /** Action type this task relates to */
+    actionType: 'approval' | 'review' | 'confirmation' | 'urgent';
+    createdAt: string;
+}
+
+// ============================================================================
 // UI State
 // ============================================================================
 
@@ -125,16 +228,23 @@ export type Theme = 'light' | 'dark' | 'system';
 
 /**
  * UI state slice.
+ * Updated for 3-panel Agent Command Center layout.
  */
 export interface UIState {
-    /** Whether the sidebar is expanded */
-    sidebarOpen: boolean;
+    /** Whether the left panel is visible (projects/threads) */
+    leftPanelOpen: boolean;
+    /** Whether the right panel is visible (artifacts) */
+    rightPanelOpen: boolean;
     /** Current theme preference */
     theme: Theme;
     /** Whether the app is in mobile viewport */
     isMobile: boolean;
-    /** Currently active view/route */
-    activeView: string;
+    /** Whether the app is in tablet viewport */
+    isTablet: boolean;
+    /** Currently active project ID */
+    activeProjectId: string | null;
+    /** Currently active thread ID */
+    activeThreadId: string | null;
 }
 
 // ============================================================================
@@ -148,8 +258,13 @@ export interface UIState {
 export interface AppState {
     auth: AuthState;
     project: ProjectState;
+    thread: ThreadState;
     chat: ChatState;
     ui: UIState;
+    /** Daily Focus tasks */
+    focusTasks: FocusTask[];
+    /** Agent activity log */
+    agentActivity: AgentActivity[];
 }
 
 // ============================================================================
@@ -174,17 +289,34 @@ export interface StoreActions {
     setProjectLoading(loading: boolean): void;
     setProjectError(error: string | null): void;
 
+    // Thread actions
+    setThreads(threads: Thread[]): void;
+    selectThread(id: string | null): void;
+    addThread(thread: Thread): void;
+    markThreadRead(id: string): void;
+
     // Chat actions
     addMessage(message: ChatMessage): void;
     setMessages(messages: ChatMessage[]): void;
     updateMessage(id: string, updates: Partial<ChatMessage>): void;
     setChatLoading(loading: boolean): void;
     setChatError(error: string | null): void;
+    updateActionCard(messageId: string, status: ActionCard['status']): void;
+
+    // Focus & Activity actions
+    setFocusTasks(tasks: FocusTask[]): void;
+    dismissFocusTask(id: string): void;
+    addAgentActivity(activity: AgentActivity): void;
+    updateAgentActivity(id: string, updates: Partial<AgentActivity>): void;
 
     // UI actions
-    toggleSidebar(): void;
-    setSidebarOpen(open: boolean): void;
+    toggleLeftPanel(): void;
+    toggleRightPanel(): void;
+    setLeftPanelOpen(open: boolean): void;
+    setRightPanelOpen(open: boolean): void;
     setTheme(theme: Theme): void;
     setIsMobile(isMobile: boolean): void;
-    setActiveView(view: string): void;
+    setIsTablet(isTablet: boolean): void;
+    setActiveProject(projectId: string | null): void;
+    setActiveThread(threadId: string | null): void;
 }

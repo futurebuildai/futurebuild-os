@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 24" fill="none">
+  <!-- FutureBuild AI Text-Only Logo (Horizontal) -->
+  
+  <g fill="currentColor">
+    <!-- FUTURE (bold weight) -->
+    <text x="0" y="18" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="700" letter-spacing="2">FUTURE</text>
+    
+    <!-- BUILD AI (lighter weight) -->
+    <text x="95" y="18" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="300" letter-spacing="2">BUILD AI</text>
+  </g>
+</svg>

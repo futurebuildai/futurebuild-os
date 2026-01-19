@@ -119,20 +119,24 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 
 ## Phase 7: Frontend - Lit + TypeScript (Steps 50-56)
 
+> [!IMPORTANT]
+> **UI Architecture Pivot (v1.3.0)**: 3-panel "Agent Command Center" layout replaces SaaS dashboard.
+> See FRONTEND_SCOPE.md Section 3.3 for details.
+
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
 | 50 | **Initialize Vite project with Lit + TS**; Configure `@types` aliases | Step 18 | 1 | [x] |
 | 51.1 | **Base Architecture**: `FBElement`, global styles, and registry | Step 50 | 1 | [x] |
 | 51.2 | **Reactive State Engine**: Signals Store (`store.ts`) & Service Layer | Step 51.1 | 1 | [x] |
-| 51.3 | **App Shell & Layout**: Header, Sidebar, Responsive Grid (`fb-app-shell`) | Step 51.2 | 1.5 | |
-| 51.4 | **View Routing & Guards**: Basic view switching logic & Auth redirection | Step 51.3 | 1 | |
-| 52 | **Build Chat Interface Container with Message List and Ephemeral Cards** | Step 51.3 | 2 |
-| 52.5 | **Implement WebSocket/SSE real-time messaging** for agent responses | Step 52 | 2 |
-| 53 | **Build Specialized Artifact components** (Invoice, Budget, Gantt, Rolodex) | Step 18, 44 | 3 |
-| 53.5 | **Implement Dynamic Agent UI Renderer** (Recursively render `<fb-dynamic-renderer>` from JSON) | Step 53 | 2 |
-| 54 | **Implement Drag-and-Drop zone** for invoice ingestion | Step 35, 51 | 1.5 |
-| 55 | Finalize responsive mobile navigation and state hydration | Step 52 | 2 |
-| 56 | **Artifact Fixture Testing**: Implement a Storybook-style harness to render artifacts in isolation. | Step 53 | 1 |
+| 51.3 | **3-Panel Shell**: Left (Projects/Threads), Center (Chat), Right (Artifacts) | Step 51.2 | 2 | [x] |
+| 52 | **Conversation UI Components**: Message List, Action Cards, Input Bar | Step 51.3 | 2 |
+|    | *Refactor inline components from fb-panel-center.ts* | | |
+| 53 | **Agent Activity Log**: Real-time status w/ expanding details | Step 52 | 1 |
+| 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 |
+| 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 |
+| 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 |
+| 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 |
+| 58 | **Artifact Fixture Testing**: Storybook-style harness | Step 55 | 1 |
 
 ---
 

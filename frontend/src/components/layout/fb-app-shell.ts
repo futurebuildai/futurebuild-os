@@ -1,26 +1,26 @@
 /**
- * FBAppShell - Root Application Container
- * See FRONTEND_SCOPE.md Section 3.3, PRODUCTION_PLAN.md Step 51.3
+ * FBAppShell - Root Application Container (3-Panel Agent Command Center)
+ * See FRONTEND_SCOPE.md Section 3.3 (Updated v1.3.0)
  *
- * CSS Grid container for the Command Center layout.
- * - Desktop: Grid "rail header" / "rail stage"
- * - Mobile: Grid "header" / "stage" / "nav"
- * - Viewport locked: height 100vh, overflow hidden
+ * CSS Grid container for 3-panel layout:
+ * - Left Panel (280px): Projects, Threads, Daily Focus, Agent Activity
+ * - Center Panel (flex: 1): Conversation / Main Content
+ * - Right Panel (320px, collapsible): Artifacts
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store, initializeStore } from '../../store/store';
 
-// Import child layout components
-import './fb-nav-rail';
-import './fb-header';
+// Import panel components
+import './fb-panel-left';
+import './fb-panel-center';
+import './fb-panel-right';
 
 /**
- * Application Shell - Root layout container
+ * Application Shell - 3-Panel Layout Container
  * @element fb-app-shell
- * @slot - Default slot for main stage content
  */
 @customElement('fb-app-shell')
 export class FBAppShell extends FBElement {
@@ -29,11 +29,9 @@ export class FBAppShell extends FBElement {
         css`
             :host {
                 display: grid;
-                grid-template-columns: var(--fb-rail-width) 1fr;
-                grid-template-rows: var(--fb-header-height) 1fr;
-                grid-template-areas:
-                    "rail header"
-                    "rail stage";
+                grid-template-columns: var(--fb-left-panel-width, 280px) 1fr var(--fb-right-panel-width, 320px);
+                grid-template-rows: 1fr;
+                grid-template-areas: "left center right";
                 height: 100vh;
                 width: 100vw;
                 overflow: hidden;
@@ -42,34 +40,118 @@ export class FBAppShell extends FBElement {
                 font-family: var(--fb-font-family);
             }
 
-            fb-nav-rail {
-                grid-area: rail;
+            /* Left panel closed */
+            :host([left-closed]) {
+                grid-template-columns: 0 1fr var(--fb-right-panel-width, 320px);
             }
 
-            fb-header {
-                grid-area: header;
+            /* Right panel closed */
+            :host([right-closed]) {
+                grid-template-columns: var(--fb-left-panel-width, 280px) 1fr 0;
             }
 
-            .stage {
-                grid-area: stage;
-                overflow: auto;
-                background: var(--fb-bg-stage);
+            /* Both panels closed */
+            :host([left-closed][right-closed]) {
+                grid-template-columns: 0 1fr 0;
             }
 
-            /* Mobile layout */
+            fb-panel-left {
+                grid-area: left;
+            }
+
+            fb-panel-center {
+                grid-area: center;
+            }
+
+            fb-panel-right {
+                grid-area: right;
+            }
+
+            /* Panel visibility */
+            :host([left-closed]) fb-panel-left {
+                display: none;
+            }
+
+            :host([right-closed]) fb-panel-right {
+                display: none;
+            }
+
+            /* Mobile: Only center panel visible */
             @media (max-width: 768px) {
                 :host {
                     grid-template-columns: 1fr;
-                    grid-template-rows: var(--fb-header-height) 1fr auto;
-                    grid-template-areas:
-                        "header"
-                        "stage"
-                        "nav";
+                    grid-template-areas: "center";
                 }
 
-                fb-nav-rail {
-                    grid-area: nav;
+                fb-panel-left,
+                fb-panel-right {
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    z-index: var(--fb-z-panel, 100);
+                    transition: transform 0.3s ease;
                 }
+
+                fb-panel-left {
+                    left: 0;
+                    width: 280px;
+                    transform: translateX(-100%);
+                }
+
+                fb-panel-right {
+                    right: 0;
+                    width: 320px;
+                    transform: translateX(100%);
+                }
+
+                :host(:not([left-closed])) fb-panel-left {
+                    display: block;
+                    transform: translateX(0);
+                }
+
+                :host(:not([right-closed])) fb-panel-right {
+                    display: block;
+                    transform: translateX(0);
+                }
+            }
+
+            /* Tablet: Hide right panel by default */
+            @media (min-width: 769px) and (max-width: 1024px) {
+                :host {
+                    grid-template-columns: var(--fb-left-panel-width, 280px) 1fr 0;
+                }
+
+                :host(:not([right-closed])) {
+                    grid-template-columns: var(--fb-left-panel-width, 280px) 1fr var(--fb-right-panel-width, 320px);
+                }
+            }
+
+            /* Login mode: Full screen center */
+            :host([login-mode]) {
+                grid-template-columns: 1fr;
+                grid-template-areas: "center";
+            }
+
+            :host([login-mode]) fb-panel-left,
+            :host([login-mode]) fb-panel-right {
+                display: none;
+            }
+
+            .backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(2px);
+                z-index: calc(var(--fb-z-panel, 100) - 1);
+                animation: fadeIn 0.2s ease;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
             }
 
             /* Theme: Light */
@@ -78,8 +160,7 @@ export class FBAppShell extends FBElement {
                 --fb-bg-secondary: #f5f5f5;
                 --fb-bg-tertiary: #eeeeee;
                 --fb-bg-card: #ffffff;
-                --fb-bg-rail: #f0f0f0;
-                --fb-bg-stage: #fafafa;
+                --fb-bg-panel: #fafafa;
                 --fb-text-primary: #111111;
                 --fb-text-secondary: #666666;
                 --fb-text-muted: #999999;
@@ -93,8 +174,7 @@ export class FBAppShell extends FBElement {
                 --fb-bg-secondary: #0a0a0a;
                 --fb-bg-tertiary: #1a1a1a;
                 --fb-bg-card: #111111;
-                --fb-bg-rail: #050505;
-                --fb-bg-stage: #0a0a0a;
+                --fb-bg-panel: #0a0a0a;
                 --fb-text-primary: #ffffff;
                 --fb-text-secondary: #aaaaaa;
                 --fb-text-muted: #666666;
@@ -109,8 +189,12 @@ export class FBAppShell extends FBElement {
     ];
 
     @state() private _resolvedTheme: 'light' | 'dark' = 'dark';
+    @state() private _isAuthenticated = false;
+    @state() private _leftPanelOpen = true;
+    @state() private _rightPanelOpen = true;
+    @state() private _isMobile = false;
 
-    private _disposeEffect: (() => void) | null = null;
+    private _disposeEffects: (() => void)[] = [];
 
     override connectedCallback(): void {
         super.connectedCallback();
@@ -119,15 +203,59 @@ export class FBAppShell extends FBElement {
         initializeStore();
 
         // Subscribe to theme changes
-        this._disposeEffect = effect(() => {
-            const theme = store.theme$.value;
-            this._resolvedTheme = this._resolveTheme(theme);
-        });
+        this._disposeEffects.push(
+            effect(() => {
+                const theme = store.theme$.value;
+                this._resolvedTheme = this._resolveTheme(theme);
+            })
+        );
+
+        // Subscribe to auth state changes
+        this._disposeEffects.push(
+            effect(() => {
+                this._isAuthenticated = store.isAuthenticated$.value;
+                if (this._isAuthenticated) {
+                    this.removeAttribute('login-mode');
+                } else {
+                    this.setAttribute('login-mode', '');
+                }
+            })
+        );
+
+        // Subscribe to panel visibility
+        this._disposeEffects.push(
+            effect(() => {
+                this._leftPanelOpen = store.leftPanelOpen$.value;
+                if (this._leftPanelOpen) {
+                    this.removeAttribute('left-closed');
+                } else {
+                    this.setAttribute('left-closed', '');
+                }
+            })
+        );
+
+        this._disposeEffects.push(
+            effect(() => {
+                this._rightPanelOpen = store.rightPanelOpen$.value;
+                if (this._rightPanelOpen) {
+                    this.removeAttribute('right-closed');
+                } else {
+                    this.setAttribute('right-closed', '');
+                }
+            })
+        );
+
+        // Subscribe to mobile state
+        this._disposeEffects.push(
+            effect(() => {
+                this._isMobile = store.isMobile$.value;
+            })
+        );
     }
 
     override disconnectedCallback(): void {
-        this._disposeEffect?.();
-        this._disposeEffect = null;
+        this._disposeEffects.forEach((dispose) => { dispose(); });
+        this._disposeEffects = [];
         super.disconnectedCallback();
     }
 
@@ -139,14 +267,21 @@ export class FBAppShell extends FBElement {
         return theme === 'light' ? 'light' : 'dark';
     }
 
+    private _closePanels(): void {
+        if (this._leftPanelOpen) store.actions.setLeftPanelOpen(false);
+        if (this._rightPanelOpen) store.actions.setRightPanelOpen(false);
+    }
+
     override render(): TemplateResult {
         return html`
             <div class="shell" data-theme="${this._resolvedTheme}">
-                <fb-nav-rail></fb-nav-rail>
-                <fb-header></fb-header>
-                <main class="stage">
-                    <slot></slot>
-                </main>
+                ${this._isAuthenticated ? html`<fb-panel-left></fb-panel-left>` : nothing}
+                <fb-panel-center .isAuthenticated=${this._isAuthenticated}></fb-panel-center>
+                ${this._isAuthenticated ? html`<fb-panel-right></fb-panel-right>` : nothing}
+                
+                ${this._isMobile && (this._leftPanelOpen || this._rightPanelOpen) ? html`
+                    <div class="backdrop" @click=${this._closePanels.bind(this)}></div>
+                ` : nothing}
             </div>
         `;
     }
@@ -157,4 +292,3 @@ declare global {
         'fb-app-shell': FBAppShell;
     }
 }
-

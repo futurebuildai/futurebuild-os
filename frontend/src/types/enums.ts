@@ -32,3 +32,44 @@ export enum ArtifactType {
     BudgetView = "Budget_View",
     GanttView = "Gantt_View",
 }
+
+// ============================================================================
+// Routing Types
+// ============================================================================
+
+/**
+ * ViewId defines the strict set of valid view identifiers.
+ * See PRODUCTION_PLAN.md Step 51.4 - L7 Amendment: Type Safety
+ *
+ * Used by:
+ * - store.ui.activeView$ signal
+ * - FBAppShell router switch
+ * - Navigation rail click handlers
+ */
+export type ViewId =
+    | 'dashboard'
+    | 'projects'
+    | 'chat'
+    | 'schedule'
+    | 'directory'
+    | 'login';
+
+/**
+ * Array of valid ViewIds for runtime validation (e.g., URL parsing).
+ */
+export const VIEW_IDS: readonly ViewId[] = [
+    'dashboard',
+    'projects',
+    'chat',
+    'schedule',
+    'directory',
+    'login',
+] as const;
+
+/**
+ * Type guard to check if a string is a valid ViewId.
+ * Used for URL parsing and defensive routing.
+ */
+export function isViewId(value: string): value is ViewId {
+    return VIEW_IDS.includes(value as ViewId);
+}

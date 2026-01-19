@@ -1,6 +1,6 @@
 /**
  * Global State Store - Signals-Based Reactive State
- * See FRONTEND_SCOPE.md Section 5.1
+ * See FRONTEND_SCOPE.md Section 5.1 (Updated for Agent Command Center)
  *
  * Implements a centralized state store using @preact/signals-core.
  * Key patterns:
@@ -8,18 +8,7 @@
  * - Action-based mutations for predictable state changes
  * - localStorage persistence for auth token
  * - Computed values for derived state
- *
- * @example
- * ```typescript
- * import { store } from '@/store/store';
- *
- * // Read state (reactive)
- * const isAuth = store.isAuthenticated$.value;
- *
- * // Mutate via actions
- * store.actions.login(user, token);
- * store.actions.logout();
- * ```
+ * - 3-panel architecture state (left/center/right)
  */
 
 import { signal, computed, effect, type ReadonlySignal } from '@preact/signals-core';
@@ -30,6 +19,10 @@ import type {
     ChatMessage,
     Theme,
     StoreActions,
+    Thread,
+    AgentActivity,
+    FocusTask,
+    ActionCard,
 } from './types';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 
@@ -57,16 +50,27 @@ const _currentProjectDetail$ = signal<ProjectDetail | null>(null);
 const _projectLoading$ = signal<boolean>(false);
 const _projectError$ = signal<string | null>(null);
 
+// Threads (New for Agent Command Center)
+const _threads$ = signal<Thread[]>([]);
+const _activeThreadId$ = signal<string | null>(null);
+const _threadLoading$ = signal<boolean>(false);
+
 // Chat
 const _messages$ = signal<ChatMessage[]>([]);
 const _chatLoading$ = signal<boolean>(false);
 const _chatError$ = signal<string | null>(null);
 
-// UI
-const _sidebarOpen$ = signal<boolean>(true);
+// Daily Focus & Agent Activity (New for Agent Command Center)
+const _focusTasks$ = signal<FocusTask[]>([]);
+const _agentActivity$ = signal<AgentActivity[]>([]);
+
+// UI (Updated for 3-panel layout)
+const _leftPanelOpen$ = signal<boolean>(true);
+const _rightPanelOpen$ = signal<boolean>(true);
 const _theme$ = signal<Theme>('system');
 const _isMobile$ = signal<boolean>(false);
-const _activeView$ = signal<string>('dashboard');
+const _isTablet$ = signal<boolean>(false);
+const _activeProjectId$ = signal<string | null>(null);
 
 // ============================================================================
 // Computed Values
@@ -81,16 +85,34 @@ const _isAuthenticated$ = computed(() => _token$.value !== null && _user$.value 
  * Computed: The currently selected project from the list.
  */
 const _currentProject$ = computed(() => {
-    const id = _currentProjectId$.value;
+    const id = _activeProjectId$.value;
     if (!id) return null;
     return _projects$.value.find((p) => p.id === id) ?? null;
+});
+
+/**
+ * Computed: The currently active thread.
+ */
+const _activeThread$ = computed(() => {
+    const id = _activeThreadId$.value;
+    if (!id) return null;
+    return _threads$.value.find((t) => t.id === id) ?? null;
+});
+
+/**
+ * Computed: Threads for the currently active project.
+ */
+const _projectThreads$ = computed(() => {
+    const projectId = _activeProjectId$.value;
+    if (!projectId) return [];
+    return _threads$.value.filter((t) => t.projectId === projectId);
 });
 
 /**
  * Computed: Whether any async operation is in progress.
  */
 const _isLoading$ = computed(
-    () => _authLoading$.value || _projectLoading$.value || _chatLoading$.value
+    () => _authLoading$.value || _projectLoading$.value || _chatLoading$.value || _threadLoading$.value
 );
 
 // ============================================================================
@@ -110,9 +132,13 @@ const actions: StoreActions = {
     logout(): void {
         _user$.value = null;
         _token$.value = null;
-        _currentProjectId$.value = null;
+        _activeProjectId$.value = null;
+        _activeThreadId$.value = null;
         _currentProjectDetail$.value = null;
         _messages$.value = [];
+        _threads$.value = [];
+        _focusTasks$.value = [];
+        _agentActivity$.value = [];
         _authError$.value = null;
     },
 
@@ -135,11 +161,13 @@ const actions: StoreActions = {
 
     selectProject(id: string | null): void {
         _currentProjectId$.value = id;
+        _activeProjectId$.value = id;
         // Clear detail when switching projects
         if (_currentProjectDetail$.value?.id !== id) {
             _currentProjectDetail$.value = null;
         }
-        // Clear chat when switching projects
+        // Clear thread selection and messages when switching projects
+        _activeThreadId$.value = null;
         _messages$.value = [];
     },
 
@@ -157,10 +185,42 @@ const actions: StoreActions = {
         _projectLoading$.value = false;
     },
 
+    // ---- Thread Actions ----
+
+    setThreads(threads: Thread[]): void {
+        _threads$.value = threads;
+        _threadLoading$.value = false;
+    },
+
+    selectThread(id: string | null): void {
+        _activeThreadId$.value = id;
+        // Load messages from thread
+        const thread = _threads$.value.find((t) => t.id === id);
+        _messages$.value = thread?.messages ?? [];
+    },
+
+    addThread(thread: Thread): void {
+        _threads$.value = [..._threads$.value, thread];
+    },
+
+    markThreadRead(id: string): void {
+        _threads$.value = _threads$.value.map((t) =>
+            t.id === id ? { ...t, hasUnread: false } : t
+        );
+    },
+
     // ---- Chat Actions ----
 
     addMessage(message: ChatMessage): void {
         _messages$.value = [..._messages$.value, message];
+        // Also update the thread's messages
+        if (_activeThreadId$.value) {
+            _threads$.value = _threads$.value.map((t) =>
+                t.id === _activeThreadId$.value
+                    ? { ...t, messages: [...t.messages, message], updatedAt: new Date().toISOString() }
+                    : t
+            );
+        }
     },
 
     setMessages(messages: ChatMessage[]): void {
@@ -184,14 +244,50 @@ const actions: StoreActions = {
         _chatLoading$.value = false;
     },
 
-    // ---- UI Actions ----
-
-    toggleSidebar(): void {
-        _sidebarOpen$.value = !_sidebarOpen$.value;
+    updateActionCard(messageId: string, status: ActionCard['status']): void {
+        _messages$.value = _messages$.value.map((m) =>
+            m.id === messageId && m.actionCard
+                ? { ...m, actionCard: { ...m.actionCard, status } }
+                : m
+        );
     },
 
-    setSidebarOpen(open: boolean): void {
-        _sidebarOpen$.value = open;
+    // ---- Focus & Activity Actions ----
+
+    setFocusTasks(tasks: FocusTask[]): void {
+        _focusTasks$.value = tasks;
+    },
+
+    dismissFocusTask(id: string): void {
+        _focusTasks$.value = _focusTasks$.value.filter((t) => t.id !== id);
+    },
+
+    addAgentActivity(activity: AgentActivity): void {
+        _agentActivity$.value = [activity, ..._agentActivity$.value].slice(0, 50); // Keep last 50
+    },
+
+    updateAgentActivity(id: string, updates: Partial<AgentActivity>): void {
+        _agentActivity$.value = _agentActivity$.value.map((a) =>
+            a.id === id ? { ...a, ...updates } : a
+        );
+    },
+
+    // ---- UI Actions ----
+
+    toggleLeftPanel(): void {
+        _leftPanelOpen$.value = !_leftPanelOpen$.value;
+    },
+
+    toggleRightPanel(): void {
+        _rightPanelOpen$.value = !_rightPanelOpen$.value;
+    },
+
+    setLeftPanelOpen(open: boolean): void {
+        _leftPanelOpen$.value = open;
+    },
+
+    setRightPanelOpen(open: boolean): void {
+        _rightPanelOpen$.value = open;
     },
 
     setTheme(theme: Theme): void {
@@ -200,14 +296,33 @@ const actions: StoreActions = {
 
     setIsMobile(isMobile: boolean): void {
         _isMobile$.value = isMobile;
-        // Auto-close sidebar on mobile
+        // Auto-close panels on mobile
         if (isMobile) {
-            _sidebarOpen$.value = false;
+            _leftPanelOpen$.value = false;
+            _rightPanelOpen$.value = false;
         }
     },
 
-    setActiveView(view: string): void {
-        _activeView$.value = view;
+    setIsTablet(isTablet: boolean): void {
+        _isTablet$.value = isTablet;
+        // Auto-close right panel on tablet
+        if (isTablet) {
+            _rightPanelOpen$.value = false;
+        }
+    },
+
+    setActiveProject(projectId: string | null): void {
+        _activeProjectId$.value = projectId;
+        // Clear thread selection when switching projects
+        _activeThreadId$.value = null;
+        _messages$.value = [];
+    },
+
+    setActiveThread(threadId: string | null): void {
+        _activeThreadId$.value = threadId;
+        // Load messages from thread
+        const thread = _threads$.value.find((t) => t.id === threadId);
+        _messages$.value = thread?.messages ?? [];
     },
 };
 
@@ -237,16 +352,29 @@ export const store = {
     projectLoading$: _projectLoading$ as ReadonlySignal<boolean>,
     projectError$: _projectError$ as ReadonlySignal<string | null>,
 
+    // ---- Thread State (readonly) ----
+    threads$: _threads$ as ReadonlySignal<Thread[]>,
+    activeThreadId$: _activeThreadId$ as ReadonlySignal<string | null>,
+    activeThread$: _activeThread$,
+    projectThreads$: _projectThreads$,
+    threadLoading$: _threadLoading$ as ReadonlySignal<boolean>,
+
     // ---- Chat State (readonly) ----
     messages$: _messages$ as ReadonlySignal<ChatMessage[]>,
     chatLoading$: _chatLoading$ as ReadonlySignal<boolean>,
     chatError$: _chatError$ as ReadonlySignal<string | null>,
 
+    // ---- Focus & Activity State (readonly) ----
+    focusTasks$: _focusTasks$ as ReadonlySignal<FocusTask[]>,
+    agentActivity$: _agentActivity$ as ReadonlySignal<AgentActivity[]>,
+
     // ---- UI State (readonly) ----
-    sidebarOpen$: _sidebarOpen$ as ReadonlySignal<boolean>,
+    leftPanelOpen$: _leftPanelOpen$ as ReadonlySignal<boolean>,
+    rightPanelOpen$: _rightPanelOpen$ as ReadonlySignal<boolean>,
     theme$: _theme$ as ReadonlySignal<Theme>,
     isMobile$: _isMobile$ as ReadonlySignal<boolean>,
-    activeView$: _activeView$ as ReadonlySignal<string>,
+    isTablet$: _isTablet$ as ReadonlySignal<boolean>,
+    activeProjectId$: _activeProjectId$ as ReadonlySignal<string | null>,
 
     // ---- Global Computed ----
     isLoading$: _isLoading$,
@@ -301,12 +429,27 @@ export function initializeStore(): void {
         _theme$.value = storedTheme;
     }
 
-    // Detect mobile viewport
+    // Detect mobile/tablet viewport
     if (typeof window !== 'undefined') {
-        const mql = window.matchMedia('(max-width: 768px)');
-        _isMobile$.value = mql.matches;
-        mql.addEventListener('change', (e) => {
+        const mobileQuery = window.matchMedia('(max-width: 768px)');
+        const tabletQuery = window.matchMedia('(max-width: 1024px)');
+
+        _isMobile$.value = mobileQuery.matches;
+        _isTablet$.value = tabletQuery.matches && !mobileQuery.matches;
+
+        // Auto-collapse panels on smaller screens
+        if (mobileQuery.matches) {
+            _leftPanelOpen$.value = false;
+            _rightPanelOpen$.value = false;
+        } else if (tabletQuery.matches) {
+            _rightPanelOpen$.value = false;
+        }
+
+        mobileQuery.addEventListener('change', (e) => {
             actions.setIsMobile(e.matches);
+        });
+        tabletQuery.addEventListener('change', (e) => {
+            actions.setIsTablet(e.matches && !mobileQuery.matches);
         });
     }
 
@@ -321,4 +464,4 @@ export function initializeStore(): void {
 // Type Exports
 // ============================================================================
 
-export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions };
+export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions, Thread, AgentActivity, FocusTask };

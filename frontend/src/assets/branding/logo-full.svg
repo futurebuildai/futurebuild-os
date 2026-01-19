@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 150" fill="none">
+  <!-- FutureBuild AI Full Logo (Mark + Text) -->
+  
+  <!-- Logo Mark (scaled and positioned) -->
+  <g transform="translate(110, 5) scale(0.8)" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer roof -->
+    <path d="M10 45 L50 15 L90 45"/>
+    
+    <!-- Inner roof -->
+    <path d="M20 50 L50 25 L80 50"/>
+    
+    <!-- Left wall -->
+    <path d="M25 48 L25 85"/>
+    
+    <!-- Right wall -->
+    <path d="M75 48 L75 85"/>
+    
+    <!-- Floor -->
+    <path d="M25 85 L75 85"/>
+    
+    <!-- Chimney -->
+    <path d="M65 25 L65 35"/>
+    <path d="M65 25 L75 25"/>
+    <path d="M75 25 L75 40"/>
+  </g>
+  
+  <!-- Hexagonal AI Robot Head (scaled and positioned) -->
+  <g transform="translate(110, 5) scale(0.8)" stroke="currentColor" stroke-width="2" fill="none">
+    <!-- Top small house/roof on robot -->
+    <path d="M50 38 L42 45 L42 50 L50 45 L58 50 L58 45 Z" fill="currentColor"/>
+    
+    <!-- Main hexagon body -->
+    <path d="M50 50 L40 56 L40 68 L50 74 L60 68 L60 56 Z"/>
+    
+    <!-- Robot eyes -->
+    <circle cx="46" cy="60" r="2" fill="currentColor"/>
+    <circle cx="54" cy="60" r="2" fill="currentColor"/>
+    
+    <!-- Antenna dots on top -->
+    <circle cx="50" cy="42" r="1.5" fill="currentColor"/>
+    
+    <!-- Cross/plus pattern on body -->
+    <path d="M50 64 L50 72"/>
+    <path d="M44 68 L56 68"/>
+    
+    <!-- Bottom point -->
+    <path d="M50 74 L50 82"/>
+    <path d="M46 78 L50 82 L54 78"/>
+  </g>
+  
+  <!-- Text: FUTUREBUILD AI -->
+  <g fill="currentColor">
+    <!-- FUTURE (bold weight) -->
+    <text x="40" y="130" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="3">FUTURE</text>
+    
+    <!-- BUILD AI (lighter weight) -->
+    <text x="148" y="130" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="300" letter-spacing="3">BUILD AI</text>
+  </g>
+</svg>

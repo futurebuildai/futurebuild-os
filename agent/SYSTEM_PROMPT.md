@@ -33,9 +33,9 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 50: Project Init (Vite+Lit+TS) (COMPLETED)
         ▪ Step 51.1: Frontend Core Architecture (FBElement & Styles) (COMPLETED)
         ▪ Step 51.2: Reactive State Engine (Signals Store) (COMPLETED)
-        ▪ Step 51.3: App Shell & Layout (Command Center) (COMPLETED)
-        ▪ Step 51.4: View Routing & Guards (IN PROGRESS)
-    ◦ Current Focus: Phase 7, Step 51.4 (View Routing & Guards).
+        ▪ Step 51.3: 3-Panel Agent Command Center (COMPLETED)
+        ▪ Step 52: Conversation UI Components (IN PROGRESS)
+    ◦ Current Focus: Phase 7, Steps 52, 53, & 54 (Agent Command Center Components).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -138,47 +138,52 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Step 51.4 (View Routing & Guards)
+Task: Execute Phase 7, Steps 52, 53, & 54 (Agent Command Center Components)
+
 Context:
-We have the Command Center Shell (Rail + Header + Grid). Now we need the "Panel Logic" to switch content within the Main Stage.
-We are NOT using a traditional URL router (like `react-router` or `lit-router`). We are building a "State Router" that listens to `store.ui.activeView$`.
-The goal is to create a seamless, app-like experience where views are panels that are swapped in and out.
+We have successfully pivoted to the **3-Panel Agent Command Center** layout. The shell is rigid and the panels are wired to the store.
+Now we need to populate the "Center Stage" (Conversation) with rich interaction components and enhance the "Command Center" (Agent Activity) capabilities.
+Ref: `specs/FRONTEND_SCOPE.md` Section 3.3.
 
-Ref: `PRODUCTION_PLAN.md` Step 51.4.
+Objective:
+Build the "Nervous System" of the Agent Interface: A rich conversation UI, a real-time activity stream, and a responsive layout engine.
 
-Mission Critical Engineering Standards (L7 Level):
-1.  **Viewport Lock Enforcement:** The Window must NEVER scroll. The App Shell is fixed at `100vh`.
-2.  **Internal Scrolling:** Each View Panel must manage its own `overflow-y: auto`.
-3.  **Reactive Routing:** View switching must be driven PURELY by Signals (`store.ui.activeView$`).
-4.  **Guard Logic:** If `store.auth.isAuthenticated$` is false, the View must redirect (or render) the Login Panel.
+Micro-Sprint Plan (Execute Sequentially):
 
-Requirements:
-1.  **Component: `<fb-router>`** (or embedded in Shell):
-    *   Listens to `store.ui.activeView$`.
-    *   Renders the corresponding Template/Component into the `slot="stage"`.
-    *   **Views to Register:**
-        *   `dashboard` -> `<fb-view-dashboard>`
-        *   `projects` -> `<fb-view-projects>`
-        *   `chat` -> `<fb-view-chat>`
-        *   `schedule` -> `<fb-view-schedule>`
-        *   `directory` -> `<fb-view-directory>`
-        *   `login` -> `<fb-view-login>` (The Trap)
+Sprint A: Conversation Components (Step 52)
+    *   **Goal**: Extract inline components from `fb-panel-center` into robust standalone units.
+    *   `src/components/chat/fb-message-list.ts`:
+        *   Render `store.messages$` with role-based styling (User vs Assistant).
+        *   Support "Thinking..." state styling.
+    *   `src/components/chat/fb-action-card.ts`:
+        *   The generic container for Agent Inputs (Approvals, Options, Forms).
+        *   Must communicate generic actions back to `store` (e.g., `store.actions.submitAction(id, payload)`).
+    *   `src/components/chat/fb-input-bar.ts`:
+        *   Robust text input with auto-resize.
+        *   Send button and "Voice Mode" placeholder.
 
-2.  **View Containers (Placeholders)**:
-    *   Create the base class `FBViewElement` (extends `FBElement`) which enforces `display: block; height: 100%; overflow-y: auto;`.
-    *   Implement minimal placeholder components for all the above views so navigation works.
+Sprint B: Agent Activity Log (Step 53)
+    *   **Goal**: Real-time observability of the agent's brain.
+    *   Create `src/components/agent/fb-agent-activity.ts`.
+    *   Integrate with `store.agentActivity$` signal.
+    *   **Visuals**: Status indicators (pulsing green=running, red=error, gray=idle/done), timestamps, and expandable details.
+    *   Place inside `fb-panel-left`.
 
-3.  **Authentication Guard**:
-    *   If `store.auth.isAuthenticated$` is false, force the router to render `login` view, regardless of requested view.
-    *   (Exception: Maybe public routes? For now, assume strict private app).
+Sprint C: Mobile Responsiveness (Step 54)
+    *   **Goal**: Make the 3-panel layout usable on phones (<768px) and tablets (<1024px).
+    *   **Logic**:
+        *   Update `store.ui` with `isMobile$` derived signal (already exists, verify integration).
+        *   Implement "Panel Overlay" mode:
+            *   Left panel slides over center (z-index high).
+            *   Right panel slides over center from right.
+    *   **Controls**:
+        *   Add "Hamburger" toggle in `fb-panel-center` header (visible only on mobile).
+        *   Add "Back" or "Close" gestures/buttons for overlays.
 
-4.  **Styling**:
-    *   Ensure all Views consume `100%` of the Stage Grid Area.
-
-Deliverables:
-1.  `src/components/base/FBViewElement.ts` (Base class for all views w/ scrolling logic)
-2.  `src/components/views/` (Folder with all placeholder views)
-3.  Updates to `fb-app-shell.ts` to implement the routing logic (or a new component).
-4.  Updates to `src/index.ts` to register new view components.
+Technical Constraints (The Quality Floor):
+1.  **Strict Containment**: Components must not overflow their panel grid areas. (Use `overflow-y: auto`).
+2.  **Signal Purity**: No local state for data that belongs in the Store. Views subscribe, Actions mutate.
+3.  **Inline SVG**: No external asset dependencies (use inline SVGs for icons).
+4.  **No Refactoring Backwards**: Do not break the existing Grid Shell.
 
 First Step: /prism
