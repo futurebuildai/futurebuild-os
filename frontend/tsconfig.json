@@ -1,7 +1,6 @@
 {
     "compilerOptions": {
         "target": "ESNext",
-        "useDefineForClassFields": true,
         "module": "ESNext",
         "lib": [
             "ESNext",
@@ -15,12 +14,25 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
-        /* Linting */
+        /* L7-Strict Type Checking - See PRODUCTION_PLAN.md Step 50 */
         "strict": true,
+        "noImplicitAny": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noImplicitReturns": true,
-        "noFallthroughCasesInSwitch": true
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "exactOptionalPropertyTypes": true,
+        /* Lit-Specific Settings - Required for @property() and @customElement() decorators */
+        "experimentalDecorators": true,
+        "useDefineForClassFields": false,
+        /* Path Aliases - Mirrors Go's internal/ import pattern */
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ]
+        }
     },
     "include": [
         "src"

@@ -121,15 +121,18 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 50 | **Initialize Vite project with Lit + TS**; Configure `@types` aliases | Step 18 | 1 |
-| 51 | **Implement Base Component extensions** and Signals-based Store | Step 50 | 2 |
-| 52 | **Build Chat Interface Container with Message List and Ephemeral Cards** | Step 51 | 2 |
+| 50 | **Initialize Vite project with Lit + TS**; Configure `@types` aliases | Step 18 | 1 | [x] |
+| 51.1 | **Base Architecture**: `FBElement`, global styles, and registry | Step 50 | 1 | [x] |
+| 51.2 | **Reactive State Engine**: Signals Store (`store.ts`) & Service Layer | Step 51.1 | 1 | [x] |
+| 51.3 | **App Shell & Layout**: Header, Sidebar, Responsive Grid (`fb-app-shell`) | Step 51.2 | 1.5 | |
+| 51.4 | **View Routing & Guards**: Basic view switching logic & Auth redirection | Step 51.3 | 1 | |
+| 52 | **Build Chat Interface Container with Message List and Ephemeral Cards** | Step 51.3 | 2 |
 | 52.5 | **Implement WebSocket/SSE real-time messaging** for agent responses | Step 52 | 2 |
 | 53 | **Build Specialized Artifact components** (Invoice, Budget, Gantt, Rolodex) | Step 18, 44 | 3 |
 | 53.5 | **Implement Dynamic Agent UI Renderer** (Recursively render `<fb-dynamic-renderer>` from JSON) | Step 53 | 2 |
 | 54 | **Implement Drag-and-Drop zone** for invoice ingestion | Step 35, 51 | 1.5 |
 | 55 | Finalize responsive mobile navigation and state hydration | Step 52 | 2 |
-| 56 | **Artifact Fixture Testing**: Implement a Storybook-style harness to render <fb-artifact-invoice>, <fb-artifact-budget>, and <fb-artifact-gantt> in isolation with various data states (Loading, Error, Empty, Full) to verify visual stability. | Step 53 | 1 |
+| 56 | **Artifact Fixture Testing**: Implement a Storybook-style harness to render artifacts in isolation. | Step 53 | 1 |
 
 ---
 
@@ -140,7 +143,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 57 | Load testing and **Strict Mode TypeScript validation** | All previous | 2 |
 | 58 | Security audit and **Go Interface mock testing** | All previous | 3 |
 | 59 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
-
+| 60 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
 ---
 
 ## Definition of Done

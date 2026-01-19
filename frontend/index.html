@@ -1,12 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FutureBuild</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/index.ts"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="FutureBuild - AI-Powered Construction Management" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>FutureBuild OS</title>
+</head>
+
+<body>
+  <!-- Main Application Shell -->
+  <app-root></app-root>
+
+  <!-- Demo Button for Step 51.1 Verification (DELETE AFTER TESTING) -->
+  <div id="demo-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;">
+    <fb-demo-button>Click to Test</fb-demo-button>
+  </div>
+
+  <!-- Main entry point loads all styles and components -->
+  <script type="module" src="/src/index.ts"></script>
+
+  <!-- Event listener for verification -->
+  <script type="module">
+    document.addEventListener('fb-click', (e) => {
+      console.log('[Verification] Caught fb-click event:', e.detail);
+      console.log('  ✅ bubbles:', e.bubbles);
+      console.log('  ✅ composed:', e.composed);
+    });
+  </script>
+</body>
+
 </html>

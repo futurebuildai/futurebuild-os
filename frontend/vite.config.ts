@@ -1,9 +1,27 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
+// See FRONTEND_SCOPE.md Section 12.1 - Vite Configuration
 export default defineConfig({
-    root: './',
+    resolve: {
+        alias: {
+            '@': resolve(__dirname, './src'),
+        },
+    },
+    server: {
+        port: 3000,
+        host: true,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+            },
+        },
+    },
     build: {
         outDir: 'dist',
         emptyOutDir: true,
-    }
-})
+        target: 'esnext',
+        modulePreload: { polyfill: false },
+    },
+});

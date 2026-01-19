@@ -1,0 +1,99 @@
+/* 
+ * FutureBuild Design System - CSS Custom Properties
+ * See FRONTEND_SCOPE.md Section 7.1
+ */
+
+:root {
+  /* Dawn Gradient - Primary Brand Identity */
+  --fb-primary: #667eea;
+  --fb-primary-hover: #5a6fd6;
+  --fb-secondary: #764ba2;
+  --fb-dawn-gradient: linear-gradient(135deg, var(--fb-primary) 0%, var(--fb-secondary) 100%);
+
+  /* Dark Theme (Default) */
+  --fb-bg-primary: #000000;
+  --fb-bg-secondary: #0a0a0a;
+  --fb-bg-tertiary: #1a1a1a;
+  --fb-bg-card: #111111;
+
+  --fb-text-primary: #ffffff;
+  --fb-text-secondary: #aaaaaa;
+  --fb-text-muted: #666666;
+
+  /* Semantic Colors */
+  --fb-success: #2e7d32;
+  --fb-warning: #e65100;
+  --fb-error: #c62828;
+  --fb-info: #1565c0;
+
+  /* Borders */
+  --fb-border: #333333;
+  --fb-border-light: #222222;
+
+  /* Typography */
+  --fb-font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fb-text-xs: 0.75rem;
+  --fb-text-sm: 0.875rem;
+  --fb-text-base: 1rem;
+  --fb-text-lg: 1.125rem;
+  --fb-text-xl: 1.25rem;
+  --fb-text-2xl: 1.5rem;
+  --fb-text-3xl: 2rem;
+
+  /* Spacing Scale */
+  --fb-spacing-xs: 0.25rem;
+  --fb-spacing-sm: 0.5rem;
+  --fb-spacing-md: 1rem;
+  --fb-spacing-lg: 1.5rem;
+  --fb-spacing-xl: 2rem;
+  --fb-spacing-2xl: 3rem;
+
+  /* Border Radius */
+  --fb-radius-sm: 4px;
+  --fb-radius-md: 8px;
+  --fb-radius-lg: 12px;
+  --fb-radius-xl: 16px;
+  --fb-radius-full: 9999px;
+
+  /* Shadows */
+  --fb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --fb-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --fb-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+  /* Transitions */
+  --fb-transition-fast: 150ms ease;
+  --fb-transition-base: 250ms ease;
+  --fb-transition-slow: 350ms ease;
+
+  /* Layout - Command Center (Step 51.3) */
+  --fb-rail-width: 64px;
+  --fb-header-height: 56px;
+  --fb-bg-rail: #050505;
+  --fb-bg-stage: #0a0a0a;
+
+  /* Z-Index Layers */
+  --fb-z-backdrop: 50;
+  --fb-z-rail: 100;
+  --fb-z-header: 200;
+}
+
+/* Light Theme Override */
+@media (prefers-color-scheme: light) {
+  :root {
+    --fb-bg-primary: #ffffff;
+    --fb-bg-secondary: #f5f5f5;
+    --fb-bg-tertiary: #eeeeee;
+    --fb-bg-card: #ffffff;
+
+    --fb-text-primary: #111111;
+    --fb-text-secondary: #666666;
+    --fb-text-muted: #999999;
+
+    --fb-border: #e0e0e0;
+    --fb-border-light: #f0f0f0;
+
+    --fb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --fb-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --fb-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  }
+}

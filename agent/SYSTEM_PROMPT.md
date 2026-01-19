@@ -30,8 +30,12 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 48: Inbound Message Processing (COMPLETED)
         ▪ Step 49: Time-Travel Agent Simulation (COMPLETED)
     ◦ Phase 7 (Steps 50-56): Frontend - Lit + TypeScript: IN PROGRESS.
-        ▪ Step 50: Project Init (Vite+Lit+TS) (IN PROGRESS)
-    ◦ Current Focus: Phase 7, Step 50 (Frontend Initialization).
+        ▪ Step 50: Project Init (Vite+Lit+TS) (COMPLETED)
+        ▪ Step 51.1: Frontend Core Architecture (FBElement & Styles) (COMPLETED)
+        ▪ Step 51.2: Reactive State Engine (Signals Store) (COMPLETED)
+        ▪ Step 51.3: App Shell & Layout (Command Center) (COMPLETED)
+        ▪ Step 51.4: View Routing & Guards (IN PROGRESS)
+    ◦ Current Focus: Phase 7, Step 51.4 (View Routing & Guards).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -134,49 +138,47 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Step 50 (Frontend Initialization - Vite + Lit + TypeScript)
-Context: We have a robust, verified Go backend (Phase 6 Complete). Now we break ground on the Frontend. This is a greenfield implementation in the `frontend/` directory. We strictly use **Lit 3.0** (Web Components) and **TypeScript 5.0+** (Strict Mode). No React, No Vue, No ORMs.
-Ref: `PRODUCTION_PLAN.md` Step 50.
+Task: Execute Phase 7, Step 51.4 (View Routing & Guards)
+Context:
+We have the Command Center Shell (Rail + Header + Grid). Now we need the "Panel Logic" to switch content within the Main Stage.
+We are NOT using a traditional URL router (like `react-router` or `lit-router`). We are building a "State Router" that listens to `store.ui.activeView$`.
+The goal is to create a seamless, app-like experience where views are panels that are swapped in and out.
+
+Ref: `PRODUCTION_PLAN.md` Step 51.4.
+
+Mission Critical Engineering Standards (L7 Level):
+1.  **Viewport Lock Enforcement:** The Window must NEVER scroll. The App Shell is fixed at `100vh`.
+2.  **Internal Scrolling:** Each View Panel must manage its own `overflow-y: auto`.
+3.  **Reactive Routing:** View switching must be driven PURELY by Signals (`store.ui.activeView$`).
+4.  **Guard Logic:** If `store.auth.isAuthenticated$` is false, the View must redirect (or render) the Login Panel.
 
 Requirements:
-1.  **Scaffold Project**:
-    *   Initialize a new project within the `frontend` root directory using Vite.
-    *   Template: `lit-ts` (or equivalent valid Vite template for Lit + TypeScript).
-    *   Command: `npm create vite@latest frontend -- --template lit-ts`.
-    *   Clean up boilerplate: Remove default icons, counters, and generic CSS.
+1.  **Component: `<fb-router>`** (or embedded in Shell):
+    *   Listens to `store.ui.activeView$`.
+    *   Renders the corresponding Template/Component into the `slot="stage"`.
+    *   **Views to Register:**
+        *   `dashboard` -> `<fb-view-dashboard>`
+        *   `projects` -> `<fb-view-projects>`
+        *   `chat` -> `<fb-view-chat>`
+        *   `schedule` -> `<fb-view-schedule>`
+        *   `directory` -> `<fb-view-directory>`
+        *   `login` -> `<fb-view-login>` (The Trap)
 
-2.  **Strict TypeScript Configuration**:
-    *   Configure `tsconfig.json` for maximum safety (`"strict": true`, `"noImplicitAny": true`).
-    *   Set up path aliases: `@/*` -> `./src/*` and `@types/*` -> `./src/types/*` in `tsconfig.json` and `vite.config.ts`.
+2.  **View Containers (Placeholders)**:
+    *   Create the base class `FBViewElement` (extends `FBElement`) which enforces `display: block; height: 100%; overflow-y: auto;`.
+    *   Implement minimal placeholder components for all the above views so navigation works.
 
-3.  **Directory Structure (The Frame)**:
-    *   Establish the L7 Frontend folder structure:
-        *   `src/components/base/` (Atomic UI elements)
-        *   `src/components/layout/` (Header, Nav)
-        *   `src/store/` (Signals-based state)
-        *   `src/services/` (API clients)
-        *   `src/types/` (Shared types mirroring Backend)
-        *   `src/assets/` (SVG icons, fonts)
+3.  **Authentication Guard**:
+    *   If `store.auth.isAuthenticated$` is false, force the router to render `login` view, regardless of requested view.
+    *   (Exception: Maybe public routes? For now, assume strict private app).
 
-4.  **Base Styling**:
-    *   Create `src/styles/variables.css` implementing the "Dawn Gradient" design system (CSS Custom Properties).
-    *   Ref: `FRONTEND_SCOPE.md` Section 7.1.
+4.  **Styling**:
+    *   Ensure all Views consume `100%` of the Stage Grid Area.
 
-Technical Constraints:
-*   **Package Manager**: Use `npm`.
-*   **No "Any"**: Strict type checking is mandatory.
-*   **Component Model**: All UI must be Lit Components (`LitElement`).
-*   **Styling**: Use standard CSS variables and shadow DOM scoping. No Tailwind (unless user explicitly overrides, but default is Vanilla CSS).
-
-Key Files:
-*   `frontend/package.json`
-*   `frontend/tsconfig.json`
-*   `frontend/vite.config.ts`
-*   `frontend/src/styles/variables.css`
-
-Spec References:
-*   `PRODUCTION_PLAN.md` Step 50.
-*   `FRONTEND_SCOPE.md` Section 2 (Design) & Section 3 (Architecture).
-*   `FRONTEND_TYPES_SPEC.md` (for type alignment prep).
+Deliverables:
+1.  `src/components/base/FBViewElement.ts` (Base class for all views w/ scrolling logic)
+2.  `src/components/views/` (Folder with all placeholder views)
+3.  Updates to `fb-app-shell.ts` to implement the routing logic (or a new component).
+4.  Updates to `src/index.ts` to register new view components.
 
 First Step: /prism
