@@ -135,8 +135,8 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 | [x] |
 | 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 | [x] |
 | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 | [x] |
-| 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 |
-| 58 | **Artifact Fixture Testing**: Storybook-style harness | Step 55 | 1 |
+| 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 | [x] |
+| 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |
 
 ---
 
@@ -148,6 +148,17 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 58 | Security audit and **Go Interface mock testing** | All previous | 3 |
 | 59 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
 | 60 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
+
+## Phase 9: FutureShade - The Intelligence Layer (Steps 60-65)
+
+| Step | Task | Dependencies | Est. Days |
+|------|------|--------------|-----------|
+| 60 | **Initialize FutureShade Service**: Create `internal/futureshade` (Go) and `frontend/futureshade` (Lit). Connect to the main Event Bus. | Step 59 | 2 |
+| 61 | **Implement "The Tribunal" Interfaces**: Define the Multi-Model Client (Gemini, Claude, OSS) and the Consensus Logic. | Step 60 | 3 |
+| 62 | **Build The Shadow Viewer**: A specialized UI to view the "ShadowDocs" and Tribunal Decision Logs side-by-side. | Step 50, 60 | 3 |
+| 63 | **Integrate Antigravity Skills**: Allow FutureShade to call `internal/agents` to execute code changes. | Step 49, 61 | 2 |
+| 64 | **Implement Automated PR Review**: GitHub Webhook -> Tribunal -> PR Comment (Accept/Request Changes). | Step 63 | 2 |
+| 65 | **The "Tree Planting" Ceremony**: Final integration test where FutureShade auto-diagnoses a bug, debates it, writes the fix, and merges it. | Step 64 | 2 |
 ---
 
 ## Definition of Done

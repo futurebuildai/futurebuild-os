@@ -2,11 +2,14 @@
  * FBPanelRight - Right Panel (Artifacts)
  * See FRONTEND_SCOPE.md Section 3.3
  */
+import { effect } from '@preact/signals-core';
 import { html, css, TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
 import type { ArtifactRef } from '../../store/types';
+import type { ArtifactData } from '../../types/artifacts';
+import { normalizeArtifactType, getArtifactIcon } from '../../utils/artifact-helpers';
 
 @customElement('fb-panel-right')
 export class FBPanelRight extends FBElement {
@@ -189,18 +192,39 @@ export class FBPanelRight extends FBElement {
 
     @state() private _activeScope: 'project' | 'thread' = 'thread';
     @state() private _artifacts: ArtifactRef[] = [];
+    @state() private _artifactData: Record<string, ArtifactData> = {};
 
     private _disposeEffects: (() => void)[] = [];
 
     override connectedCallback(): void {
         super.connectedCallback();
 
-        // Mock artifacts for demo
-        this._artifacts = [
-            { id: '1', type: 'budget', title: 'Budget Overview', scope: 'project' },
-            { id: '2', type: 'gantt', title: 'Project Timeline', scope: 'project' },
-            { id: '3', type: 'invoice', title: 'Framing Invoice #142', scope: 'thread' },
-        ];
+        // Subscribe to active artifact from Realtime Service
+        this._disposeEffects.push(
+            effect(() => {
+                const active = store.activeArtifact$.value;
+                if (active) {
+                    // Store data
+                    this._artifactData = {
+                        ...this._artifactData,
+                        [active.id]: active.data
+                    };
+
+                    // 2. Ensure ref exists in list
+                    const exists = this._artifacts.find(a => a.id === active.id);
+                    if (!exists) {
+                        const newRef: ArtifactRef = {
+                            id: active.id,
+                            type: normalizeArtifactType(active.type),
+                            title: active.title,
+                            scope: 'thread'
+                        };
+                        this._artifacts = [newRef, ...this._artifacts];
+                    }
+                }
+            })
+        );
+
     }
 
     override disconnectedCallback(): void {
@@ -221,16 +245,7 @@ export class FBPanelRight extends FBElement {
         return this._artifacts.filter((a) => a.scope === this._activeScope);
     }
 
-    private _getArtifactIcon(type: string): string {
-        const icons: Record<string, string> = {
-            budget: '💰',
-            gantt: '📊',
-            invoice: '📄',
-            table: '📋',
-            chart: '📈',
-        };
-        return icons[type] ?? '📎';
-    }
+    // _getArtifactIcon removed - use getArtifactIcon from artifact-helpers.ts
 
     override render(): TemplateResult {
         const filteredArtifacts = this._getFilteredArtifacts();
@@ -264,14 +279,15 @@ export class FBPanelRight extends FBElement {
                 ${filteredArtifacts.length > 0 ? filteredArtifacts.map((artifact) => html`
                     <div class="artifact-card" role="listitem">
                         <div class="artifact-header">
-                            <span class="artifact-title">${this._getArtifactIcon(artifact.type)} ${artifact.title}</span>
+                            <span class="artifact-title">${getArtifactIcon(artifact.type)} ${artifact.title}</span>
                             <span class="artifact-type">${artifact.type}</span>
                         </div>
                         
                         <div class="artifact-content">
-                            ${this._renderArtifactContent(artifact.type)}
+                            ${this._renderArtifactContent(artifact)}
                         </div>
 
+                        <!-- TODO: Wire up action handlers in future sprint -->
                         <div class="artifact-actions">
                             <button class="action-btn approve" aria-label="Approve artifact">✓ Approve</button>
                             <button class="action-btn edit" aria-label="Edit artifact">✎ Edit</button>
@@ -288,18 +304,24 @@ export class FBPanelRight extends FBElement {
         `;
     }
 
-    private _renderArtifactContent(type: string): TemplateResult {
-        switch (type) {
+    private _renderArtifactContent(artifact: ArtifactRef): TemplateResult {
+        const data = this._artifactData[artifact.id];
+
+        // Use shared normalization helper
+        const normalizedType = normalizeArtifactType(artifact.type);
+
+        switch (normalizedType) {
             case 'gantt':
-                return html`<fb-artifact-gantt></fb-artifact-gantt>`;
+                return html`<fb-artifact-gantt .data=${data}></fb-artifact-gantt>`;
             case 'budget':
-                return html`<fb-artifact-budget></fb-artifact-budget>`;
+                return html`<fb-artifact-budget .data=${data}></fb-artifact-budget>`;
             case 'invoice':
-                return html`<fb-artifact-invoice status="pending"></fb-artifact-invoice>`;
+                return html`<fb-artifact-invoice .data=${data}></fb-artifact-invoice>`;
             default:
-                return html`<div class="placeholder">Preview not available for ${type}</div>`;
+                return html`<div class="placeholder">Preview not available for ${artifact.type}</div>`;
         }
     }
+
 }
 
 declare global {

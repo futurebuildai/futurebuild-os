@@ -14,4 +14,5 @@
 - [x] Step 55: **Artifact Panel Renderers** (Gantt, Budget, Invoice)
 - [x] Step 56: **Drag-and-Drop Ingestion** (Global overlay, Flicker prevention)
 - [x] Step 57: **Real-time WebSocket/SSE Messaging** (RealtimeService, DevTools hooks, Typing indicator)
-- [ ] Step 58: Artifact Fixture Testing
+- [x] Step 58: **Artifact Fixture Testing** (Pure components, shared helpers, fixture harness)
+- [ ] Step 59: **E2E Demo Readiness** (Full flow verification, polish)

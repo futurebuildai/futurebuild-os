@@ -1,6 +1,7 @@
 import { html, css, TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { BudgetArtifactData } from '../../types/artifacts';
 
 @customElement('fb-artifact-budget')
 export class FBArtifactBudget extends FBElement {
@@ -88,51 +89,76 @@ export class FBArtifactBudget extends FBElement {
 
             .progress-fill.warning { background: var(--fb-warning); }
             .progress-fill.danger { background: var(--fb-error); }
+            /* Skeleton styles inherited from FBElement */
         `
     ];
 
-    private _data = {
-        totalBudget: 450000,
-        totalSpent: 125000,
-        categories: [
-            { name: 'Materials', budget: 200000, spent: 65000 },
-            { name: 'Labor', budget: 150000, spent: 45000 },
-            { name: 'Permits & Fees', budget: 25000, spent: 12000 },
-            { name: 'Contingency', budget: 75000, spent: 3000 }
-        ]
-    };
+    @property({ attribute: false })
+    data: BudgetArtifactData | null = null;
+
 
     private _formatCurrency(amount: number): string {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
     }
 
     private _getPercent(spent: number, total: number): number {
+        if (total === 0) return 0;
         return Math.min(100, Math.round((spent / total) * 100));
     }
 
     private _getStatusClass(spent: number, total: number): string {
+        if (total === 0) return '';
         const pct = spent / total;
         if (pct > 0.9) return 'danger';
         if (pct > 0.75) return 'warning';
         return '';
     }
 
+    private _renderSkeleton(): TemplateResult {
+        return html`
+            <div class="container">
+                 <div class="summary">
+                    <div class="metric">
+                        <div class="skeleton skeleton-text" style="width: 100px;"></div>
+                        <div class="skeleton skeleton-text" style="width: 150px; height: 32px;"></div>
+                    </div>
+                    <div class="metric">
+                        <div class="skeleton skeleton-text" style="width: 100px;"></div>
+                        <div class="skeleton skeleton-text" style="width: 150px; height: 32px;"></div>
+                    </div>
+                </div>
+                <div class="category-list">
+                    ${[1, 2, 3].map(() => html`
+                        <div class="category-row">
+                             <div class="cat-header">
+                                <div class="skeleton skeleton-text" style="width: 120px;"></div>
+                            </div>
+                            <div class="skeleton skeleton-bar"></div>
+                        </div>
+                    `)}
+                </div>
+            </div>
+        `;
+    }
+
     override render(): TemplateResult {
+        if (!this.data) return this._renderSkeleton();
+
         return html`
             <div class="container">
                 <div class="summary">
                     <div class="metric">
                         <span class="label">Total Budget</span>
-                        <span class="value total">${this._formatCurrency(this._data.totalBudget)}</span>
+                        <span class="value total">${this._formatCurrency(this.data.totalBudget)}</span>
                     </div>
                     <div class="metric">
                         <span class="label">Spent to Date</span>
-                        <span class="value spent">${this._formatCurrency(this._data.totalSpent)}</span>
+                        <span class="value spent">${this._formatCurrency(this.data.totalSpent)}</span>
                     </div>
                 </div>
 
                 <div class="category-list">
-                    ${this._data.categories.map(cat => html`
+                    ${this.data.categories.map(cat => html`
                         <div class="category-row">
                             <div class="cat-header">
                                 <span class="cat-name">${cat.name}</span>

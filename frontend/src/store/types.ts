@@ -7,6 +7,7 @@
  */
 
 import type { UserRole } from '../types/enums';
+import type { ArtifactPayload } from '../services/realtime/types';
 
 // ============================================================================
 // Auth State
@@ -354,4 +355,5 @@ export interface StoreActions {
     // Realtime actions (Step 57: Real-Time Messaging)
     setTyping(isTyping: boolean): void;
     setConnectionStatus(status: 'connected' | 'disconnected' | 'connecting'): void;
+    setActiveArtifact(artifact: ArtifactPayload | null): void;
 }

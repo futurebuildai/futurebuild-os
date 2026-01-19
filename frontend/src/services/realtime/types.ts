@@ -7,6 +7,7 @@
  */
 
 import { ArtifactType } from '../../types/enums';
+import { ArtifactData } from '../../types/artifacts';
 
 // ============================================================================
 // Connection State
@@ -34,7 +35,7 @@ export interface ArtifactPayload {
     /** Display title for the artifact */
     title: string;
     /** The structured data for the artifact renderer */
-    data: Record<string, unknown>;
+    data: ArtifactData;
 }
 
 // ============================================================================

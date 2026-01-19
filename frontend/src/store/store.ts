@@ -27,7 +27,7 @@ import type {
 } from './types';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 import { realtimeService, type ConnectionStatus, type ArtifactPayload } from '../services/realtime';
-import { ArtifactType } from '../types/enums';
+import { normalizeArtifactType } from '../utils/artifact-helpers';
 
 // ============================================================================
 // Constants
@@ -92,6 +92,7 @@ const _pendingFiles$ = signal<PendingUpload[]>([]);
 // Realtime state (Step 57: Real-Time Messaging)
 const _isTyping$ = signal<boolean>(false);
 const _connectionStatus$ = signal<ConnectionStatus>('disconnected');
+const _activeArtifact$ = signal<ArtifactPayload | null>(null);
 
 // ============================================================================
 // Computed Values
@@ -408,6 +409,14 @@ const actions: StoreActions = {
     setConnectionStatus(status: ConnectionStatus): void {
         _connectionStatus$.value = status;
     },
+
+    setActiveArtifact(artifact: ArtifactPayload | null): void {
+        _activeArtifact$.value = artifact;
+        if (!artifact) return;
+
+        // Auto-open right panel when artifact is set
+        _rightPanelOpen$.value = true;
+    },
 };
 
 // ============================================================================
@@ -470,6 +479,7 @@ export const store = {
     // ---- Realtime State (readonly, Step 57) ----
     isTyping$: _isTyping$ as ReadonlySignal<boolean>,
     connectionStatus$: _connectionStatus$ as ReadonlySignal<ConnectionStatus>,
+    activeArtifact$: _activeArtifact$ as ReadonlySignal<ArtifactPayload | null>,
 
     // ---- Actions ----
     actions,
@@ -565,12 +575,17 @@ export function initializeStore(): void {
         if (firstArtifact) {
             message.artifactRef = {
                 id: firstArtifact.id,
-                type: mapArtifactType(firstArtifact.type),
+                type: normalizeArtifactType(firstArtifact.type),
                 title: firstArtifact.title,
                 scope: 'thread',
             };
         }
         actions.addMessage(message);
+
+        // L7 Update: Set active artifact so it renders in the right panel
+        if (firstArtifact) {
+            actions.setActiveArtifact(firstArtifact);
+        }
     });
 
     realtimeService.on('typing', (payload) => {
@@ -591,23 +606,7 @@ export function initializeStore(): void {
     realtimeService.connect();
 }
 
-/**
- * Map ArtifactType enum to ArtifactRef type string.
- * See FRONTEND_SCOPE.md Section 8.3
- * L7 Fix: Uses ArtifactType enum values instead of magic strings
- */
-function mapArtifactType(type: ArtifactType): 'gantt' | 'budget' | 'invoice' | 'table' | 'chart' {
-    switch (type) {
-        case ArtifactType.Invoice:
-            return 'invoice';
-        case ArtifactType.BudgetView:
-            return 'budget';
-        case ArtifactType.GanttView:
-            return 'gantt';
-        default:
-            return 'table';
-    }
-}
+// mapArtifactType removed - use normalizeArtifactType from artifact-helpers.ts
 
 // ============================================================================
 // Type Exports

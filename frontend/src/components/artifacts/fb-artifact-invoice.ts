@@ -1,6 +1,7 @@
 import { html, css, TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { InvoiceArtifactData } from '../../types/artifacts';
 
 @customElement('fb-artifact-invoice')
 export class FBArtifactInvoice extends FBElement {
@@ -96,7 +97,7 @@ export class FBArtifactInvoice extends FBElement {
                 margin-top: 8px;
             }
             
-            /* Status Stamp */
+            /* Status Stamp - TODO: Add @property status when approval workflow is implemented */
             .stamp {
                 position: absolute;
                 top: 40px;
@@ -110,48 +111,51 @@ export class FBArtifactInvoice extends FBElement {
                 opacity: 0.2;
                 pointer-events: none;
             }
-            :host([status="approved"]) .stamp { color: var(--fb-success); border-color: var(--fb-success); }
-            :host([status="denied"]) .stamp { color: var(--fb-error); border-color: var(--fb-error); }
-            :host([status="pending"]) .stamp { opacity: 0; }
+            /* Skeleton styles inherited from FBElement */
         `
     ];
 
-    private _data = {
-        number: 'INV-2024-001',
-        date: '2024-01-15',
-        vendor: 'ABC Lumber Co.',
-        address: '123 Tree St, Woodville, OR',
-        items: [
-            { desc: '2x4x8 Doug Fir Studs', qty: 500, price: 4.50 },
-            { desc: '3/4" Plywood Sheets (4x8)', qty: 100, price: 32.00 },
-            { desc: 'Delivery Fee', qty: 1, price: 150.00 },
-        ]
-    };
+    @property({ attribute: false })
+    data: InvoiceArtifactData | null = null;
+
 
     private _formatCurrency(amount: number): string {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     }
 
-    private _getTotal(): number {
-        return this._data.items.reduce((acc, item) => acc + (item.qty * item.price), 0);
+    private _renderSkeleton(): TemplateResult {
+        return html`
+            <div class="invoice-container">
+                <div class="header">
+                    <div class="vendor-info" style="width: 200px;">
+                        <div class="skeleton skeleton-text" style="width: 150px; height: 24px;"></div>
+                        <div class="skeleton skeleton-text" style="width: 100px;"></div>
+                    </div>
+                </div>
+                <div class="skeleton skeleton-box"></div>
+                <div class="total-section">
+                    <div class="skeleton skeleton-box" style="width: 200px; height: 80px;"></div>
+                </div>
+            </div>
+        `;
     }
 
     override render(): TemplateResult {
-        const subtotal = this._getTotal();
-        const tax = subtotal * 0.08;
-        const total = subtotal + tax;
+        if (!this.data) return this._renderSkeleton();
+
+        const total = this.data.total_amount;
 
         return html`
             <div class="invoice-container">
                 <div class="stamp">PAID</div>
                 <div class="header">
                     <div class="vendor-info">
-                        <h2>${this._data.vendor}</h2>
-                        <div>${this._data.address}</div>
+                        <h2>${this.data.vendor}</h2>
+                        <div>${this.data.address || ''}</div>
                     </div>
                     <div class="invoice-meta">
-                        <div class="meta-row"><span class="label">Invoice #:</span> ${this._data.number}</div>
-                        <div class="meta-row"><span class="label">Date:</span> ${this._data.date}</div>
+                        <div class="meta-row"><span class="label">Invoice #:</span> ${this.data.invoice_number}</div>
+                        <div class="meta-row"><span class="label">Date:</span> ${new Date(this.data.date).toLocaleDateString()}</div>
                     </div>
                 </div>
 
@@ -165,12 +169,12 @@ export class FBArtifactInvoice extends FBElement {
                         </tr>
                     </thead>
                     <tbody>
-                        ${this._data.items.map(item => html`
+                        ${this.data.line_items.map(item => html`
                             <tr>
-                                <td class="col-desc">${item.desc}</td>
-                                <td class="col-qty">${item.qty}</td>
-                                <td class="col-price">${this._formatCurrency(item.price)}</td>
-                                <td class="col-total">${this._formatCurrency(item.qty * item.price)}</td>
+                                <td class="col-desc">${item.description}</td>
+                                <td class="col-qty">${item.quantity}</td>
+                                <td class="col-price">${this._formatCurrency(item.unit_price)}</td>
+                                <td class="col-total">${this._formatCurrency(item.total)}</td>
                             </tr>
                         `)}
                     </tbody>
@@ -178,14 +182,6 @@ export class FBArtifactInvoice extends FBElement {
 
                 <div class="total-section">
                     <div class="total-box">
-                        <div class="total-row">
-                            <span>Subtotal:</span>
-                            <span>${this._formatCurrency(subtotal)}</span>
-                        </div>
-                        <div class="total-row">
-                            <span>Tax (8%):</span>
-                            <span>${this._formatCurrency(tax)}</span>
-                        </div>
                         <div class="total-row grand-total">
                             <span>TOTAL:</span>
                             <span>${this._formatCurrency(total)}</span>

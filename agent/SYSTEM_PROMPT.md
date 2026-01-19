@@ -40,7 +40,8 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 55: Artifact Panel Renderers (COMPLETED)
         ▪ Step 56: Drag-and-Drop Ingestion (COMPLETED)
         ▪ Step 57: Real-Time Messaging Architecture (COMPLETED)
-    ◦ Current Focus: Phase 7, Step 58 (Artifact Fixture Testing).
+        ▪ Step 58: Artifact Fixture Testing & Component Wiring (COMPLETED)
+    ◦ Current Focus: Phase 7, Step 59 (E2E Demo Readiness).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -144,65 +145,68 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Step 58: Artifact Fixture Testing
+Task: Execute Phase 7, Step 59: E2E Demo Readiness & Polish
 
 Context:
-Step 57 successfully implemented the Real-Time Messaging architecture with a clean `IRealtimeService` interface and `MockRealtimeService`. We now have:
-- `window.fb.triggerScenario('invoice_success')` to test Invoice artifacts
-- `window.fb.triggerScenario('budget_overview')` to test Budget artifacts
-- Scenario factory functions that generate fresh IDs on each invocation
+Step 58 completed successfully. All artifact components are now "Pure Components" receiving data via props from the Store. The `MockRealtimeService` provides typed fixture data, and the right panel dynamically renders artifacts. Shared utilities exist in `src/utils/artifact-helpers.ts`. Skeleton CSS is centralized in `FBElement.ts`.
 
-The artifact renderers (`fb-artifact-invoice`, `fb-artifact-budget`, `fb-artifact-gantt`) were created in Step 55, but they rely on **hardcoded mock data** inside the components. They do NOT consume the `data` payload from the RealtimeService artifacts.
-
-This step is about **wiring the artifacts end-to-end**: when `triggerScenario('invoice_success')` fires, the Invoice data from the mock service's `ArtifactPayload.data` must flow through the Store and render in the artifact panel.
+The frontend is feature-complete for the demo but needs polish and end-to-end verification.
 
 Objective:
-Create reusable fixture files and wire the artifact components to consume dynamic data from the Store instead of hardcoded mocks.
+Verify all user flows work seamlessly end-to-end. Polish UI edge cases, loading states, and accessibility. Ensure the application is demo-ready for a prospect presentation.
 
 Spec References:
-- FRONTEND_SCOPE.md Section 8.3 (Artifact Mapping)
-- FRONTEND_SCOPE.md Section 6.3 (Right Panel: Artifact Display)
+- FRONTEND_SCOPE.md Section 3 (3-Panel Layout)
+- FRONTEND_SCOPE.md Section 8 (Artifact System)
+- MASTER_PRD.md Feature Set E (Command Center)
 
 Constraints & Standards (Google L7 Quality Floor):
-1.  **No Hardcoded Mock Data in Components**: Artifact components must accept typed props and render dynamically.
-2.  **Fixture Files**: Create `src/fixtures/` directory with typed fixture data that matches the `ArtifactPayload.data` schema.
-3.  **Store Integration**: The `artifactRef` in `ChatMessage` must trigger artifact rendering in `fb-panel-right`.
-4.  **Type Safety**: All artifact data interfaces must be strictly typed (no `any` or `Record<string, unknown>`).
+1.  **Complete User Flow**: Login simulation → File drop → Chat interaction → Artifact display must work seamlessly.
+2.  **Accessibility**: All interactive elements must have proper `aria-*` attributes.
+3.  **Responsive**: Mobile viewport must work correctly with panel overlays.
+4.  **No Errors**: Console must be clean (no warnings, no errors except expected dev notices).
 
 Micro-Sprint Plan:
 
-Sprint A: Define Artifact Data Interfaces
-    - Create `src/types/artifacts.ts`.
-    - Define `InvoiceArtifactData`, `BudgetArtifactData`, `GanttArtifactData` interfaces.
-    - These must match the `data` payload structure in `mock-service.ts` scenarios.
+Sprint 59.1: Full Flow Verification
+    -   **Goal**: Verify the complete user journey works.
+    -   **Action**:
+        -   Start fresh at http://localhost:5174
+        -   Test login simulation (Click to Test)
+        -   Drop a file → verify message appears
+        -   Trigger scenarios via DevTools → verify artifacts render
+        -   Capture screenshots/recordings as verification
+    -   **Check**: All flows work without console errors.
 
-Sprint B: Create Fixture Files
-    - Create `src/fixtures/invoice-fixtures.ts` with 2-3 sample invoices.
-    - Create `src/fixtures/budget-fixtures.ts` with sample budget data.
-    - Create `src/fixtures/gantt-fixtures.ts` with sample timeline data.
-    - Export as typed constants.
+Sprint 59.2: Accessibility Audit
+    -   **Goal**: Ensure WCAG 2.1 AA compliance for key components.
+    -   **Action**:
+        -   Run Lighthouse accessibility audit
+        -   Add missing `aria-label`, `aria-labelledby`, `role` attributes
+        -   Ensure keyboard navigation works for panels
+        -   Check color contrast ratios
 
-Sprint C: Refactor Artifact Components
-    - Update `fb-artifact-invoice.ts` to accept `InvoiceArtifactData` as a prop.
-    - Update `fb-artifact-budget.ts` to accept `BudgetArtifactData` as a prop.
-    - Update `fb-artifact-gantt.ts` to accept `GanttArtifactData` as a prop.
-    - Remove all hardcoded mock data from render methods.
+Sprint 59.3: Responsive Polish
+    -   **Goal**: Mobile experience is polished.
+    -   **Action**:
+        -   Test at 375px viewport (mobile)
+        -   Verify panels collapse/expand correctly
+        -   Ensure touch targets are 44px minimum
+        -   Test orientation changes
 
-Sprint D: Wire Artifact Selection
-    - Update `fb-panel-right.ts` to subscribe to a new `store.activeArtifact$` signal.
-    - Add `setActiveArtifact(artifact)` action to the Store.
-    - Update message rendering to set the active artifact when a message with `artifactRef` is clicked or auto-selected.
-
-Sprint E: End-to-End Verification
-    - Browser test: `window.fb.triggerScenario('invoice_success')` → Invoice renders in right panel
-    - Browser test: `window.fb.triggerScenario('budget_overview')` → Budget renders in right panel
-    - Browser test: Click on a message with artifact → Panel updates
+Sprint 59.4: Demo Script Documentation
+    -   **Goal**: Create a demo script for the prospect presentation.
+    -   **Action**:
+        -   Document the exact steps to demonstrate the UI
+        -   Include DevTools commands for triggering scenarios
+        -   Note any setup requirements
 
 Definition of Done:
-- [ ] Artifact components accept typed props (no hardcoded data).
-- [ ] Fixture files exist with typed sample data.
-- [ ] `window.fb.triggerScenario('invoice_success')` renders dynamic Invoice data in the right panel.
-- [ ] `npm run build` and `npm run lint` pass (0 errors).
-
-First Command: /prism
+- [ ] Complete user flow verified (login → drop → chat → artifact)
+- [ ] Lighthouse accessibility score ≥ 90
+- [ ] Mobile viewport works correctly
+- [ ] Console clean (no errors)
+- [ ] Demo script documented
 --------------------------------------------------------------------------------
+
+execute /prism

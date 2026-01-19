@@ -54,6 +54,22 @@ export abstract class FBElement extends LitElement {
         :host *::after {
             box-sizing: inherit;
         }
+
+        /* Shared Skeleton Loading Styles */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        .skeleton-text { height: 1em; width: 100%; margin-bottom: 0.5em; display: block; }
+        .skeleton-box { height: 100px; width: 100%; display: block; }
+        .skeleton-bar { height: 8px; width: 100%; display: block; }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     `;
 
     /**

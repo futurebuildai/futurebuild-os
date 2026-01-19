@@ -18,6 +18,9 @@ import type {
     IncomingMessageEvent,
 } from './types';
 import type { IRealtimeServiceDevTools, EventHandler } from './interfaces';
+import { MOCK_INVOICE_DATA } from '../../fixtures/invoice';
+import { MOCK_BUDGET_DATA } from '../../fixtures/budget';
+import { MOCK_GANTT_DATA } from '../../fixtures/gantt';
 
 // ============================================================================
 // Scenario Registry
@@ -79,20 +82,7 @@ const SCENARIOS: Record<string, Scenario> = {
                             type: ArtifactType.Invoice,
                             id: `artifact-${String(Date.now())}`,
                             title: 'Extracted Invoice',
-                            data: {
-                                vendor: 'ABC Lumber Supply',
-                                invoiceNumber: 'INV-2026-0142',
-                                date: '2026-01-15',
-                                amount: 4250.0,
-                                currency: 'USD',
-                                lineItems: [
-                                    { description: '2x4 Lumber (100 pcs)', quantity: 100, unitPrice: 8.5, total: 850.0 },
-                                    { description: 'Plywood Sheets (50 pcs)', quantity: 50, unitPrice: 45.0, total: 2250.0 },
-                                    { description: 'Hardware Supplies', quantity: 1, unitPrice: 1150.0, total: 1150.0 },
-                                ],
-                                wbsCode: '3.2.1',
-                                confidence: 0.94,
-                            },
+                            data: MOCK_INVOICE_DATA,
                         },
                     ],
                     createdAt: new Date().toISOString(),
@@ -115,18 +105,30 @@ const SCENARIOS: Record<string, Scenario> = {
                             type: ArtifactType.BudgetView,
                             id: `artifact-${String(Date.now())}`,
                             title: 'Project Budget',
-                            data: {
-                                projectId: 'proj-001',
-                                totalBudget: 450000,
-                                spent: 287500,
-                                committed: 312000,
-                                remaining: 138000,
-                                categories: [
-                                    { name: 'Foundation', budget: 45000, spent: 44200, status: 'complete' },
-                                    { name: 'Framing', budget: 85000, spent: 82000, status: 'complete' },
-                                    { name: 'Roofing', budget: 35000, spent: 12000, status: 'in_progress' },
-                                ],
-                            },
+                            data: MOCK_BUDGET_DATA,
+                        },
+                    ],
+                    createdAt: new Date().toISOString(),
+                },
+            },
+        ],
+    },
+    schedule_change: {
+        description: 'Gantt chart schedule response',
+        delay: 1800,
+        createEvents: () => [
+            {
+                type: 'message',
+                payload: {
+                    id: generateId(),
+                    role: 'assistant',
+                    content: "I've updated the project schedule based on the latest delays. Here is the revised Gantt view:",
+                    artifacts: [
+                        {
+                            type: ArtifactType.GanttView,
+                            id: `artifact-${String(Date.now())}`,
+                            title: 'Updated Schedule',
+                            data: MOCK_GANTT_DATA,
                         },
                     ],
                     createdAt: new Date().toISOString(),

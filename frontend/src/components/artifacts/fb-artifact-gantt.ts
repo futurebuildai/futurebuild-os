@@ -1,6 +1,8 @@
 import { html, css, TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { GanttArtifactData } from '../../types/artifacts';
+import { TaskStatus } from '../../types/enums';
 
 @customElement('fb-artifact-gantt')
 export class FBArtifactGantt extends FBElement {
@@ -83,35 +85,54 @@ export class FBArtifactGantt extends FBElement {
                 font-size: var(--fb-text-xs);
                 color: var(--fb-text-secondary);
             }
+            /* Skeleton styles inherited from FBElement */
         `
     ];
 
-    // Placeholder mock data
-    private _tasks = [
-        { id: 1, name: 'Foundation', status: 'completed', progress: 100, start: 'Jan 1', end: 'Jan 10' },
-        { id: 2, name: 'Framing', status: 'in-progress', progress: 60, start: 'Jan 12', end: 'Feb 15' },
-        { id: 3, name: 'Rough Plumbing', status: 'pending', progress: 0, start: 'Feb 16', end: 'Feb 28' },
-        { id: 4, name: 'Electrical', status: 'pending', progress: 0, start: 'Mar 1', end: 'Mar 14' },
-    ];
+    @property({ attribute: false })
+    data: GanttArtifactData | null = null;
 
-    override render(): TemplateResult {
+
+    private _renderSkeleton(): TemplateResult {
         return html`
             <div class="gantt-container">
                 <div class="timeline-header">
                     <div class="col-task">Task Phase</div>
                     <div class="col-date">Duration</div>
                 </div>
-                ${this._tasks.map(task => html`
+                ${[1, 2, 3, 4].map(() => html`
+                    <div class="task-group">
+                         <div class="task-row">
+                             <div class="skeleton skeleton-box" style="width: 60%"></div>
+                         </div>
+                    </div>
+                `)}
+            </div>
+        `;
+    }
+
+    override render(): TemplateResult {
+        if (!this.data) return this._renderSkeleton();
+
+        return html`
+            <div class="gantt-container">
+                <div class="timeline-header">
+                    <div class="col-task">Task Phase</div>
+                    <div class="col-date">Duration</div>
+                </div>
+                ${this.data.tasks.map(task => html`
                     <div class="task-group">
                         <div class="task-row">
                             <div class="task-name">
-                                <span class="status-dot ${task.status}"></span>
+                                <span class="status-dot ${task.status.toLowerCase().replace('_', '-')}"></span>
                                 ${task.name}
                             </div>
-                            <div class="task-meta">${task.start} - ${task.end}</div>
+                            <div class="task-meta">${task.duration_days}d</div>
                         </div>
                         <div class="task-bar-container">
-                            <div class="task-bar" style="width: ${task.progress}%"></div>
+                            <div class="task-bar" style="width: ${task.status === TaskStatus.Completed ? 100 :
+                task.status === TaskStatus.InProgress ? 50 : 0
+            }%"></div>
                         </div>
                     </div>
                 `)}
