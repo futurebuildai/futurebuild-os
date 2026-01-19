@@ -137,28 +137,29 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 | [x] |
 | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 | [x] |
 | 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |
+| 59 | **E2E Demo Readiness**: Full flow verification, accessibility, polish | Step 58 | 2 |
 
 ---
 
-## Phase 8: Production Readiness (Steps 57-59)
+## Phase 8: Production Readiness (Steps 60-62)
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 57 | Load testing and **Strict Mode TypeScript validation** | All previous | 2 |
-| 58 | Security audit and **Go Interface mock testing** | All previous | 3 |
-| 59 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
-| 60 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
+| 60 | Load testing and **Strict Mode TypeScript validation** | All previous | 2 |
+| 61 | Security audit and **Go Interface mock testing** | All previous | 3 |
+| 62 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
+| 63 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
 
-## Phase 9: FutureShade - The Intelligence Layer (Steps 60-65)
+## Phase 9: FutureShade - The Intelligence Layer (Steps 64-69)
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 60 | **Initialize FutureShade Service**: Create `internal/futureshade` (Go) and `frontend/futureshade` (Lit). Connect to the main Event Bus. | Step 59 | 2 |
-| 61 | **Implement "The Tribunal" Interfaces**: Define the Multi-Model Client (Gemini, Claude, OSS) and the Consensus Logic. | Step 60 | 3 |
-| 62 | **Build The Shadow Viewer**: A specialized UI to view the "ShadowDocs" and Tribunal Decision Logs side-by-side. | Step 50, 60 | 3 |
-| 63 | **Integrate Antigravity Skills**: Allow FutureShade to call `internal/agents` to execute code changes. | Step 49, 61 | 2 |
-| 64 | **Implement Automated PR Review**: GitHub Webhook -> Tribunal -> PR Comment (Accept/Request Changes). | Step 63 | 2 |
-| 65 | **The "Tree Planting" Ceremony**: Final integration test where FutureShade auto-diagnoses a bug, debates it, writes the fix, and merges it. | Step 64 | 2 |
+| 64 | **Initialize FutureShade Service**: Create `internal/futureshade` (Go) and `frontend/futureshade` (Lit). Connect to the main Event Bus. | Step 63 | 2 |
+| 65 | **Implement "The Tribunal" Interfaces**: Define the Multi-Model Client (Gemini, Claude, OSS) and the Consensus Logic. | Step 64 | 3 |
+| 66 | **Build The Shadow Viewer**: A specialized UI to view the "ShadowDocs" and Tribunal Decision Logs side-by-side. | Step 50, 64 | 3 |
+| 67 | **Integrate Antigravity Skills**: Allow FutureShade to call `internal/agents` to execute code changes. | Step 49, 65 | 2 |
+| 68 | **Implement Automated PR Review**: GitHub Webhook -> Tribunal -> PR Comment (Accept/Request Changes). | Step 67 | 2 |
+| 69 | **The "Tree Planting" Ceremony**: Final integration test where FutureShade auto-diagnoses a bug, debates it, writes the fix, and merges it. | Step 68 | 2 |
 ---
 
 ## Definition of Done
