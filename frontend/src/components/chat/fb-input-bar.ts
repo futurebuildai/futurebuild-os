@@ -5,6 +5,14 @@ import { FBElement } from '../base/FBElement';
 /**
  * FBInputBar - User input component for chat messages.
  * Features auto-resizing textarea, keyboard shortcuts, and accessibility.
+ * 
+ * NOTE: The file upload button is currently inert (placeholder for Step 56).
+ * 
+ * **Step 56 Implementation Guidance:**
+ * When implementing drag-and-drop file ingestion, attach drag event listeners
+ * to the ENTIRE chat window (fb-panel-center), not just this input bar.
+ * Users expect to drop files anywhere on the chat interface.
+ * 
  * @element fb-input-bar
  * @fires send - When user submits a message
  */

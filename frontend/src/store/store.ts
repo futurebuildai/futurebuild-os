@@ -23,6 +23,7 @@ import type {
     AgentActivity,
     FocusTask,
     ActionCard,
+    PendingUpload,
 } from './types';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 
@@ -32,6 +33,16 @@ import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 
 const STORAGE_KEY_TOKEN = 'fb_token';
 const STORAGE_KEY_THEME = 'fb_theme';
+
+// Step 56: Allowed MIME types for drag-and-drop file ingestion
+// See FRONTEND_SCOPE.md Section 8.2
+const ALLOWED_UPLOAD_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+] as const;
 
 // ============================================================================
 // Internal Writable Signals
@@ -71,6 +82,10 @@ const _theme$ = signal<Theme>('system');
 const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
 const _activeProjectId$ = signal<string | null>(null);
+
+// Upload state (Step 56: Drag-and-Drop Ingestion)
+const _isDragging$ = signal<boolean>(false);
+const _pendingFiles$ = signal<PendingUpload[]>([]);
 
 // ============================================================================
 // Computed Values
@@ -324,6 +339,58 @@ const actions: StoreActions = {
         const thread = _threads$.value.find((t) => t.id === threadId);
         _messages$.value = thread?.messages ?? [];
     },
+
+    // ---- Upload Actions (Step 56: Drag-and-Drop Ingestion) ----
+
+    setDragging(isDragging: boolean): void {
+        _isDragging$.value = isDragging;
+    },
+
+    handleFileDrop(files: FileList): void {
+        const newUploads: PendingUpload[] = [];
+
+        Array.from(files).forEach((file) => {
+            if (ALLOWED_UPLOAD_TYPES.includes(file.type as typeof ALLOWED_UPLOAD_TYPES[number])) {
+                newUploads.push({
+                    id: crypto.randomUUID(),
+                    file,
+                    status: 'pending',
+                    progress: 0,
+                });
+            }
+        });
+
+        if (newUploads.length === 0) {
+            _isDragging$.value = false;
+            return;
+        }
+
+        _pendingFiles$.value = [..._pendingFiles$.value, ...newUploads];
+        _isDragging$.value = false;
+
+        // Create user message with attachment info
+        const fileNames = newUploads.map((u) => u.file.name).join(', ');
+        actions.addMessage({
+            id: crypto.randomUUID(),
+            role: 'user',
+            content: `📎 Uploaded: ${fileNames}`,
+            createdAt: new Date().toISOString(),
+        });
+
+        // Simulate agent response after 1 second
+        setTimeout(() => {
+            actions.addMessage({
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: `I received your document${newUploads.length > 1 ? 's' : ''}. Analyzing ${fileNames}...`,
+                createdAt: new Date().toISOString(),
+            });
+        }, 1000);
+    },
+
+    clearPendingUploads(): void {
+        _pendingFiles$.value = [];
+    },
 };
 
 // ============================================================================
@@ -378,6 +445,10 @@ export const store = {
 
     // ---- Global Computed ----
     isLoading$: _isLoading$,
+
+    // ---- Upload State (readonly, Step 56) ----
+    isDragging$: _isDragging$ as ReadonlySignal<boolean>,
+    pendingFiles$: _pendingFiles$ as ReadonlySignal<PendingUpload[]>,
 
     // ---- Actions ----
     actions,

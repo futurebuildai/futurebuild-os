@@ -32,6 +32,9 @@ import { FBArtifactGantt } from './components/artifacts/fb-artifact-gantt';
 import { FBArtifactBudget } from './components/artifacts/fb-artifact-budget';
 import { FBArtifactInvoice } from './components/artifacts/fb-artifact-invoice';
 
+// Feature Components (Step 56)
+import { FBFileDrop } from './components/features/fb-file-drop';
+
 // App shell
 import './app-root';
 
@@ -49,6 +52,7 @@ const registered = registerComponents({
     'fb-artifact-gantt': FBArtifactGantt,
     'fb-artifact-budget': FBArtifactBudget,
     'fb-artifact-invoice': FBArtifactInvoice,
+    'fb-file-drop': FBFileDrop,
 });
 
 console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);

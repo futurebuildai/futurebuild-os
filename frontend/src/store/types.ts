@@ -248,6 +248,32 @@ export interface UIState {
 }
 
 // ============================================================================
+// Upload State (Step 56: Drag-and-Drop Ingestion)
+// See FRONTEND_SCOPE.md Section 8.2
+// ============================================================================
+
+/**
+ * Upload status progression.
+ */
+export type UploadStatus = 'pending' | 'uploading' | 'complete' | 'error';
+
+/**
+ * Pending file upload tracked in state.
+ */
+export interface PendingUpload {
+    /** Unique identifier for this upload */
+    id: string;
+    /** The File object being uploaded */
+    file: File;
+    /** Current upload status */
+    status: UploadStatus;
+    /** Upload progress (0-100) */
+    progress: number;
+    /** Error message if status is 'error' */
+    errorMessage?: string;
+}
+
+// ============================================================================
 // Aggregate State
 // ============================================================================
 
@@ -319,4 +345,9 @@ export interface StoreActions {
     setIsTablet(isTablet: boolean): void;
     setActiveProject(projectId: string | null): void;
     setActiveThread(threadId: string | null): void;
+
+    // Upload actions (Step 56: Drag-and-Drop Ingestion)
+    setDragging(isDragging: boolean): void;
+    handleFileDrop(files: FileList): void;
+    clearPendingUploads(): void;
 }

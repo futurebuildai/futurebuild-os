@@ -18,6 +18,9 @@ import './fb-panel-left';
 import './fb-panel-center';
 import './fb-panel-right';
 
+// Import feature components (Step 56)
+import '../features/fb-file-drop';
+
 /**
  * Application Shell - 3-Panel Layout Container
  * @element fb-app-shell
@@ -196,11 +199,63 @@ export class FBAppShell extends FBElement {
 
     private _disposeEffects: (() => void)[] = [];
 
+    /**
+     * Counter for drag enter/leave events.
+     * Prevents flicker when cursor moves over child elements.
+     * See: https://stackoverflow.com/q/7110353
+     * Step 56: Drag-and-Drop Ingestion
+     */
+    private _dragCounter = 0;
+
+    // ---- Drag-and-Drop Handlers (Step 56) ----
+
+    private _handleDragEnter = (e: DragEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._dragCounter++;
+        if (this._dragCounter === 1) {
+            store.actions.setDragging(true);
+        }
+    };
+
+    private _handleDragOver = (e: DragEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    private _handleDragLeave = (e: DragEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._dragCounter--;
+        if (this._dragCounter === 0) {
+            store.actions.setDragging(false);
+        }
+    };
+
+    private _handleDrop = (e: DragEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._dragCounter = 0;
+
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            store.actions.handleFileDrop(files);
+        } else {
+            store.actions.setDragging(false);
+        }
+    };
+
     override connectedCallback(): void {
         super.connectedCallback();
 
         // Initialize store on shell mount
         initializeStore();
+
+        // Drag-and-drop event listeners (Step 56)
+        this.addEventListener('dragenter', this._handleDragEnter);
+        this.addEventListener('dragover', this._handleDragOver);
+        this.addEventListener('dragleave', this._handleDragLeave);
+        this.addEventListener('drop', this._handleDrop);
 
         // Subscribe to theme changes
         this._disposeEffects.push(
@@ -254,6 +309,12 @@ export class FBAppShell extends FBElement {
     }
 
     override disconnectedCallback(): void {
+        // Remove drag listeners (Step 56)
+        this.removeEventListener('dragenter', this._handleDragEnter);
+        this.removeEventListener('dragover', this._handleDragOver);
+        this.removeEventListener('dragleave', this._handleDragLeave);
+        this.removeEventListener('drop', this._handleDrop);
+
         this._disposeEffects.forEach((dispose) => { dispose(); });
         this._disposeEffects = [];
         super.disconnectedCallback();
@@ -275,6 +336,7 @@ export class FBAppShell extends FBElement {
     override render(): TemplateResult {
         return html`
             <div class="shell" data-theme="${this._resolvedTheme}">
+                <fb-file-drop></fb-file-drop>
                 ${this._isAuthenticated ? html`<fb-panel-left></fb-panel-left>` : nothing}
                 <fb-panel-center .isAuthenticated=${this._isAuthenticated}></fb-panel-center>
                 ${this._isAuthenticated ? html`<fb-panel-right></fb-panel-right>` : nothing}

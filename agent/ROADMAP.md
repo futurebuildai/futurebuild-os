@@ -12,6 +12,6 @@
 - [x] Step 53: **Agent Activity Log** (Real-time status)
 - [x] Step 54: **Mobile Responsive Behavior** (Overlay/Collapse)
 - [x] Step 55: **Artifact Panel Renderers** (Gantt, Budget, Invoice)
-- [ ] Step 56: Drag-and-Drop Ingestion
+- [x] Step 56: **Drag-and-Drop Ingestion** (Global overlay, Flicker prevention)
 - [ ] Step 57: Real-time WebSocket/SSE Messaging
 - [ ] Step 58: Artifact Fixture Testing

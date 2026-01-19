@@ -38,7 +38,8 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 53: Agent Activity Log (COMPLETED)
         ▪ Step 54: Mobile Responsive Behavior (COMPLETED)
         ▪ Step 55: Artifact Panel Renderers (COMPLETED)
-    ◦ Current Focus: Phase 7, Steps 56, 57 & 58 (Ingestion, Real-Time, & Testing).
+        ▪ Step 56: Drag-and-Drop Ingestion (COMPLETED)
+    ◦ Current Focus: Phase 7, Step 57 (Real-Time Messaging).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -69,9 +70,9 @@ When presenting the final code, you must prepend a validation badge:
 
 SLASH COMMANDS (Interaction Protocols)
 
-Command: /forward
+Command: /next
 Role: You act as the Release Manager.
-Trigger: When the user types /forward (and you (the Agent) CANNOT trigger this yourself), you must:
+Trigger: When the user types /next (and you (the Agent) CANNOT trigger this yourself), you must:
 1.  **Verification:** Confirm that the current Step in `specs/PRODUCTION_PLAN.md` is fully implemented and tested.
 2.  **Documentation Update:**
     * Update `agent/ROADMAP.md`: Mark the current step as `[x]`.
@@ -141,51 +142,104 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Steps 56, 57 & 58 (Ingestion, Real-Time, & Testing)
+Task: Execute Phase 7, Step 57: Real-Time WebSocket/SSE Messaging
 
 Context:
-The Agent Command Center "Organs" (Conversation, Activity, Artifacts) are fully functional and integrated into the 3-panel shell.
-The system is accessible, type-safe, and mobile-responsive. Now we need to bridge the "real world" into the system (File Ingestion) and make the system "alive" (Real-time Messaging), concluding Phase 7 with robust testing.
+Drag-and-drop ingestion is complete (Step 56). The frontend can now accept file uploads via a global drop zone with proper overlay feedback. However, all "agent responses" are currently hard-coded `setTimeout` mocks inside `store.ts`. 
+
+The next evolution is to abstract real-time communication into a dedicated **RealtimeService** layer with a mock implementation that simulates WebSocket/SSE patterns. This prepares the frontend for actual backend integration while enabling sophisticated dev/testing scenarios.
 
 Objective:
-1. Enable Drag-and-Drop file ingestion for invoices/docs.
-2. Wire up (mock) Real-time messaging to prepare for backend integration.
-3. Establish a fixture-based testing environment for artifacts.
+Implement a `RealtimeService` abstraction with a `MockRealtimeService` implementation that simulates async message arrival, typing indicators, and event-driven updates.
 
-Micro-Sprint Plan (Execute Sequentially):
+Spec References:
+- FRONTEND_SCOPE.md Section 8.4 (Real-Time Communication)
+- PRODUCTION_PLAN.md Step 57: "Real-time Messaging: WebSocket/SSE wiring"
 
-Sprint A: Drag-and-Drop Ingestion (Step 56)
-    *   **Goal**: Allow users to drop PDF/Image files onto the Command Center to trigger "Ingestion Agents".
-    *   `src/components/chat/fb-input-bar.ts`:
-        *   Add `dragover`, `dragleave`, `drop` event handlers.
-        *   Visual feedback: Entire center panel or input bar glows blue.
-    *   `src/components/features/fb-file-drop.ts` (New):
-        *   A specialized overlay component that appears when a file is dragged into the window.
-    *   **Logic**:
-        *   On drop -> Validate file type -> Create "User Message" with attachment -> Emit event `file-dropped` to store.
-    *   **Store**:
-        *   Add `uploadFile(file)` action (mock for now, logs to console).
+Constraints & Standards (L7 Quality Floor):
+* **Interface First**: Define `RealtimeService` interface before implementation
+* **Type Safety**: All event types and payloads strictly typed
+* **Decoupling**: Store should not know about `setTimeout` - the service handles timing
+* **Testability**: `simulateIncomingMessage()` method for dev/testing
+* **Cleanup**: Proper disconnect handling and listener cleanup
 
-Sprint B: Real-Time Messaging Wiring (Step 57)
-    *   **Goal**: Prepare the frontend for WebSocket/SSE connection.
-    *   `src/services/realtime.ts` (New):
-        *   `connect()`: Establish connection (mock `setTimeout` simulation for now).
-        *   `subscribe(channel)`: Listen for events.
-    *   **Integration**:
-        *   Update `store.ts` to initialize `RealtimeService`.
-        *   Simulate "Incoming Message" event -> updates `store.messages$`.
-        *   Simulate "Agent Activity" event -> updates `store.agentActivity$`.
+Deliverables:
 
-Sprint C: Artifact Fixture Testing (Step 58)
-    *   **Goal**: Visual regression testing harness for complex artifacts (Gantt, Budget).
-    *   `src/components/dev/fb-fixture-harness.ts` (New):
-        *   A dev-only view keyable via URL (e.g., `?mode=fixture`).
-        *   Renders artifacts with hardcoded "Edge Case" data (e.g., Project over budget, Schedule delayed).
-    *   **Route**: Add logic in `app-root.ts` to show harness if URL param exists.
+1. **Service Layer (`src/services/realtime.ts`)**:
+   ```typescript
+   export interface RealtimeService {
+       connect(): void;
+       disconnect(): void;
+       on<T>(event: RealtimeEvent, callback: (data: T) => void): () => void;
+       isConnected(): boolean;
+   }
+   
+   export type RealtimeEvent = 'message' | 'typing' | 'activity' | 'connected' | 'disconnected';
+   
+   export interface IncomingMessage {
+       id: string;
+       role: 'assistant';
+       content: string;
+       createdAt: string;
+   }
+   
+   export interface TypingIndicator {
+       isTyping: boolean;
+       agentName?: string;
+   }
+   ```
 
-Technical Constraints:
-1.  **Zero External Deps**: Use native Drag and Drop API. No libraries.
-2.  **Mock First**: Since backend WS isn't ready, creating a robust `MockRealtimeService` is critical. It must implement the exact interface we *expect* the backend to provide.
-3.  **Type Safety**: Define `RealtimeEvent` types strictly in `store/types.ts`.
+2. **Mock Implementation (`MockRealtimeService`)**:
+   - Event emitter pattern with typed listeners
+   - `simulateIncomingMessage(content: string, delayMs?: number)` for testing
+   - `simulateTyping(isTyping: boolean)` for typing indicators
+   - Auto-connect on construction (for dev)
+   - Console logging for visibility
+
+3. **Store Integration (`store.ts`)**:
+   - Remove hard-coded `setTimeout` from `handleFileDrop`
+   - Initialize `MockRealtimeService` singleton
+   - Create effect that subscribes to `'message'` events
+   - Dispatch `actions.addMessage()` on incoming messages
+   - Export service for component access
+
+4. **Optional Typing Indicator (`fb-message-list.ts` or new component)**:
+   - Subscribe to `'typing'` events
+   - Show "Agent is typing..." indicator when active
+   - Auto-hide when message arrives
+
+5. **Verification**:
+   - `npm run build` - 0 errors
+   - `npm run lint` - 0 warnings
+   - Browser: Drop file → Agent "typing" appears → Message arrives after delay
+   - Console: Service logs visible
+
+Micro-Sprint Plan:
+
+Sprint A: Service Definition
+    * Create `src/services/realtime.ts`
+    * Define `RealtimeService` interface
+    * Define event types and payload interfaces
+    * Implement `MockRealtimeService` class
+
+Sprint B: Store Wiring
+    * Initialize service in `store.ts`
+    * Create effect to subscribe to service events
+    * Remove `setTimeout` from `handleFileDrop`
+    * Use `realtimeService.simulateIncomingMessage()` instead
+
+Sprint C: UI Integration (Optional)
+    * Add typing indicator to chat UI
+    * Subscribe to `'typing'` events
+
+Sprint D: Verification
+    * Build & lint pass
+    * Browser functional test
+    * Console shows service activity
+
+Technical Notes:
+- The Mock service uses `EventTarget` or a simple Map<event, Set<callback>> pattern
+- Real WebSocket integration in Phase 8 will swap `MockRealtimeService` for `WebSocketRealtimeService`
+- Consider using `@preact/signals-core` signal for `isTyping$` state
 
 First Step: /prism

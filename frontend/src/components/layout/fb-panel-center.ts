@@ -119,6 +119,7 @@ export class FBPanelCenter extends FBElement {
     @state() private _activeProject: ProjectSummary | null = null;
     @state() private _activeThread: Thread | null = null;
     @state() private _isMobile = false;
+    @state() private _hasMessages = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -134,6 +135,10 @@ export class FBPanelCenter extends FBElement {
             }),
             effect(() => {
                 this._isMobile = store.isMobile$.value;
+            }),
+            // Step 56: Track messages for file drop display
+            effect(() => {
+                this._hasMessages = store.messages$.value.length > 0;
             })
         );
     }
@@ -219,7 +224,7 @@ export class FBPanelCenter extends FBElement {
             </nav>
 
             <!-- Conversation / Empty State -->
-            ${this._activeThread ? html`
+            ${this._activeThread || this._hasMessages ? html`
                 <fb-message-list></fb-message-list>
                 <fb-input-bar @send=${this._handleSend.bind(this)}></fb-input-bar>
             ` : html`
@@ -227,6 +232,9 @@ export class FBPanelCenter extends FBElement {
                     <div class="empty-icon" aria-hidden="true">💬</div>
                     <div class="empty-title">No conversation selected</div>
                     <div>Select a project and thread from the left panel to start chatting.</div>
+                    <div style="margin-top: var(--fb-spacing-md); font-size: var(--fb-text-sm);">
+                        Or drag and drop a file anywhere to upload.
+                    </div>
                 </div>
             `}
         `;

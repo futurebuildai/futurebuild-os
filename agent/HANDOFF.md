@@ -1,58 +1,63 @@
 # Handoff
 
 **Current Phase:** Phase 7: Frontend - Lit + TypeScript
-**Completed Step:** 55: Artifact Panel Renderers
-**Next Step:** Step 56: Drag-and-Drop Ingestion
+**Completed Step:** 56: Drag-and-Drop File Ingestion
+**Next Step:** Step 57: Real-time WebSocket/SSE Messaging
 
 ---
 
 ## ✅ What Changed This Session
 
-### Agent Command Center "Organs" (Steps 52-55)
-We implemented the functional components for all three panels of the Agent Command Center:
+### Drag-and-Drop File Ingestion (Step 56)
 
-#### 1. Conversation Engine (Steps 52)
-- **`fb-message-list`**: Renders chat stream, user/assistant distinction, "Thinking..." state (mocked).
-- **`fb-action-card`**: The interactive "Approval Interface" for Agent recommendations (Approve/Edit/Deny).
-- **`fb-input-bar`**: Auto-resizing text input, send button, voice placeholder.
+Implemented a global file ingestion system with the following components:
 
-#### 2. Agent Activity Log (Step 53)
-- **`fb-agent-activity`**: Visualizes background agent thought process.
-- **Visuals**: Pulsing "Running" indicators, static "Completed"/"Failed" states.
-- Integrated into `fb-panel-left`.
+#### 1. Types Layer (`store/types.ts`)
+- `UploadStatus` type: `'pending' | 'uploading' | 'complete' | 'error'`
+- `PendingUpload` interface tracking file, status, and progress
+- Extended `StoreActions` with upload actions
 
-#### 3. Mobile Responsiveness (Step 54)
-- **Overlay Architecture**: On mobile (`<768px`), panels slide over the chat instead of shrinking.
-- **Backdrop**: Dimmed background when panels are open.
-- **Signals**: Driven by `store.ui.isMobile$` signal.
+#### 2. Store Layer (`store/store.ts`)
+- `ALLOWED_UPLOAD_TYPES` constant (PDF, JPEG, PNG, GIF, WebP)
+- `_isDragging$` signal for overlay visibility control
+- `_pendingFiles$` signal for upload queue management
+- Actions: `setDragging()`, `handleFileDrop()`, `clearPendingUploads()`
+- Mock chat integration with 1-second simulated agent response
 
-#### 4. Artifact Panel (Step 55)
-- **Renderers Directory**: `src/components/artifacts/`
-- **New Components**:
-    - `fb-artifact-gantt`: Visual timeline visualization.
-    - `fb-artifact-budget`: Financial progress bars and status indicators.
-    - `fb-artifact-invoice`: Paper-like invoice layout with line item calculation.
-- **Integration**: `fb-panel-right` now renders these components dynamically based on artifact type.
+#### 3. Overlay Component (`components/features/fb-file-drop.ts`)
+- Full-screen fixed overlay at z-index 1000
+- Glassmorphism styling with dashed border
+- Pulse animation for user guidance
+- Visibility bound to `store.isDragging$`
+- ARIA attributes for accessibility
+
+#### 4. Event Wiring (`components/layout/fb-app-shell.ts`)
+- **Drag Counter Technique**: Prevents overlay flickering when cursor crosses child elements
+- Four event handlers: `dragenter`, `dragover`, `dragleave`, `drop`
+- Proper cleanup in `disconnectedCallback`
+- Renders `<fb-file-drop>` component
+
+#### 5. Bug Fix (`components/layout/fb-panel-center.ts`)
+- Added `_hasMessages` state that subscribes to `store.messages$`
+- Chat UI now renders when messages exist OR when thread is selected
+- Enables file drops to work without selecting a thread first
 
 ### Code Quality
-- **Accessibility**: All interactive elements have ARIA labels. Live regions used for chat/activity logs.
-- **Type Safety**: No `any` types. Strict TypeScript enforcement.
-- **Linting**: 0 errors, 0 warnings.
-- **Dead Code**: Cleaned up unused variables and imports throughout the session.
+- **Build:** ✅ 0 errors (43 modules, 183ms)
+- **Lint:** ✅ 0 warnings
+- **Type Safety:** No `any` types, strict interfaces
+- **Accessibility:** ARIA labels and semantic markup
 
 ---
 
 ## 📋 Next Steps
 
-### Phase 7: Frontend Polish (Steps 56-58)
-1. **Drag-and-Drop Ingestion (Step 56)**: Implement file upload zone in `fb-input-bar` or distinct drop zone.
-2. **Real-time Messaging (Step 57)**: Wire up WebSocket/SSE to `fb-message-list` for real streaming.
-3. **Artifact Fixture Testing (Step 58)**: Create a harness to test artifact renderers with various data states.
-
-### System Verification
-- **Run Build**: `npm run build`
-- **Run Lint**: `npm run lint`
-- **Dev Server**: `npm run dev -- --port 5174`
+### Step 57: Real-Time WebSocket/SSE Messaging
+1. Define `RealtimeService` interface in `src/services/realtime.ts`
+2. Implement `MockRealtimeService` with event emitters
+3. Add `simulateIncomingMessage()` for dev/testing
+4. Wire service to store for auto-message dispatch
+5. Optionally add typing indicators
 
 ---
 
@@ -60,6 +65,10 @@ We implemented the functional components for all three panels of the Agent Comma
 - **Frontend Path**: `frontend/`
 - **Build Status**: ✅ Passing
 - **Lint Status**: ✅ Passing
-- **Key Files**:
-    - Components: `src/components/chat/`, `src/components/agent/`, `src/components/artifacts/`
-    - Store: `src/store/store.ts` (Signals for all new UI states)
+- **Key Files Modified This Session**:
+    - `src/store/types.ts` (+26 lines)
+    - `src/store/store.ts` (+60 lines)
+    - `src/components/features/fb-file-drop.ts` (NEW - 138 lines)
+    - `src/components/layout/fb-app-shell.ts` (+50 lines)
+    - `src/components/layout/fb-panel-center.ts` (+10 lines)
+    - `src/index.ts` (+3 lines)
