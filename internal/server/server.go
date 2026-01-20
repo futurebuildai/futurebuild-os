@@ -44,7 +44,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	taskHandler := handlers.NewTaskHandler(scheduleService)
 
 	// See PRODUCTION_PLAN.md Step 37
-	invoiceService := service.NewInvoiceService(db, aiClient)
+	// See PRODUCTION_PLAN.md Step 37
+	invoiceService := service.NewInvoiceService(db, aiClient, cfg)
 	// See PRODUCTION_PLAN.md Step 41
 	documentService := service.NewDocumentService(db, aiClient)
 	documentHandler := handlers.NewDocumentHandler(invoiceService, documentService)
@@ -56,24 +57,30 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	messageStore := chat.NewPgxMessageStore(db)
 	dlq := chat.NewAsynqDLQ(cfg.RedisURL)
 
+	wal := &chat.NoOpAuditWAL{}                  // TODO: Replace with production WAL
+	circuitBreaker := &chat.NoOpCircuitBreaker{} // TODO: Replace with production circuit breaker
+
 	// PRODUCTION SAFETY CHECK (Code Review Issue 3B)
 	// NoOp implementations are placeholders that skip critical functionality.
 	// They MUST be replaced before production deployment.
 	if cfg.Environment == "production" {
-		// Log CRITICAL warning - do not panic to allow graceful degradation
-		// but make this extremely visible in production logs
-		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-		fmt.Println("CRITICAL SECURITY WARNING: NoOpAuditWAL and NoOpCircuitBreaker in use!")
-		fmt.Println("These MUST be replaced with production implementations before launch.")
-		fmt.Println("See PRODUCTION_PLAN.md for WAL and circuit breaker configuration.")
-		fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		// P0 FIX: Fail Fast in Production
+		if _, ok := interface{}(wal).(*chat.NoOpAuditWAL); ok {
+			panic("CRITICAL SECURITY ERROR: NoOpAuditWAL is not allowed in production! Configure a real WAL.")
+		}
+		if _, ok := interface{}(circuitBreaker).(*chat.NoOpCircuitBreaker); ok {
+			panic("CRITICAL SECURITY ERROR: NoOpCircuitBreaker is not allowed in production! Configure a real CircuitBreaker.")
+		}
 	}
 
-	chatOrchestrator := chat.NewOrchestrator(
+	chatOrchestrator, err := chat.NewOrchestrator(
 		messageStore, scheduleService, scheduleService, invoiceService, dlq,
-		&chat.NoOpAuditWAL{},       // TODO: Replace with production WAL - See Code Review Issue 3B
-		&chat.NoOpCircuitBreaker{}, // TODO: Replace with production circuit breaker - See Code Review Issue 3B
+		wal,
+		circuitBreaker,
 	)
+	if err != nil {
+		panic(fmt.Sprintf("CRITICAL: Failed to initialize Chat Orchestrator: %v", err))
+	}
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	notificationService := service.NewConsoleEmailProvider()

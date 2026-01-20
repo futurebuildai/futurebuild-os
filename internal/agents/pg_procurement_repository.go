@@ -196,3 +196,43 @@ func (r *PgProcurementRepository) GetNotificationHistoryForBatch(ctx context.Con
 	slog.Debug("batch dampening check completed", "items_checked", len(itemIDs), "dampened", len(result))
 	return result, nil
 }
+
+// LogNotificationsBatch persists multiple alerts to communication_logs in a single operation.
+// P1 Performance Fix: Reduces N database round-trips to 1 per batch.
+func (r *PgProcurementRepository) LogNotificationsBatch(ctx context.Context, results []alertResult, now time.Time) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	b := &pgx.Batch{}
+	query := `
+		INSERT INTO communication_logs (
+			project_id, direction, content, channel, timestamp, 
+			related_entity_id, related_entity_type
+		)
+		SELECT p.id, 'Outbound', $1, 'Chat', $2, $3, 'procurement_item'
+		FROM procurement_items pi
+		JOIN project_tasks pt ON pi.project_task_id = pt.id
+		JOIN projects p ON pt.project_id = p.id
+		WHERE pi.id = $4
+	`
+
+	for _, result := range results {
+		content := fmt.Sprintf("[PROCUREMENT ALERT] %s", result.Message)
+		// Note: We need result.ID twice: once for related_entity_id ($3) and once for WHERE clause ($4)
+		b.Queue(query, content, now, result.ID, result.ID)
+	}
+
+	br := r.db.SendBatch(ctx, b)
+	defer br.Close()
+
+	for i := 0; i < len(results); i++ {
+		if _, err := br.Exec(); err != nil {
+			slog.Error("batch log notification failed", "index", i, "id", results[i].ID, "error", err)
+			// Continue best-effort
+		}
+	}
+
+	slog.Debug("batch notifications logged", "count", len(results))
+	return nil
+}

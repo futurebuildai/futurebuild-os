@@ -81,6 +81,10 @@ func (r *concurrencyTrackingRepository) GetNotificationHistoryForBatch(ctx conte
 	return make(map[uuid.UUID]bool), nil
 }
 
+func (r *concurrencyTrackingRepository) LogNotificationsBatch(ctx context.Context, results []alertResult, now time.Time) error {
+	return nil
+}
+
 // mockBlockingMutex simulates a distributed lock that blocks concurrent execution.
 // Uses a real sync.Mutex internally to ensure atomic lock acquisition.
 // IMPORTANT: The lock is NEVER released during test to simulate a long-running process.
@@ -103,13 +107,17 @@ func (m *mockBlockingMutex) TryLock(ctx context.Context, key string, ttl time.Du
 	m.lockHeld = true
 	m.mu.Unlock()
 
-	// Return a no-op unlock - lock stays held for test duration
 	// This simulates a long-running process that holds the lock
 	return func() error {
 		// Lock stays held - this simulates the "winner" still running
 		// while others try to acquire
 		return nil
 	}, nil
+}
+
+// ExtendLock simulates lock extension (heartbeat).
+func (m *mockBlockingMutex) ExtendLock(ctx context.Context, key string, ttl time.Duration) error {
+	return nil // Always succeeds in keeping the lock
 }
 
 // TestExecute_ConcurrentInstances_RedTest proves race condition vulnerability.

@@ -44,7 +44,8 @@ const DefaultBatchSize = 100
 // P0 Reliability Fix: Prevents duplicate execution across application replicas.
 const (
 	procurementLockKey = "futurebuild:agent:procurement:lock"
-	procurementLockTTL = 5 * time.Minute
+	// P1 Fix: Short TTL with heartbeat prevents zombie locks if agent crashing hard
+	procurementLockTTL = 30 * time.Second
 )
 
 // NewProcurementAgent creates a new agent instance with repository abstraction.
@@ -136,6 +137,27 @@ func (a *ProcurementAgent) Execute(ctx context.Context) error {
 			return fmt.Errorf("acquiring distributed lock: %w", err)
 		}
 		defer unlock() // SAFETY: Always release lock
+
+		// P1 Fix: Heartbeat to extend lock
+		heartbeatCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go func() {
+			ticker := time.NewTicker(procurementLockTTL / 3) // Renew every 10s (if TTL=30s)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-heartbeatCtx.Done():
+					return
+				case <-ticker.C:
+					if err := a.mutex.ExtendLock(heartbeatCtx, procurementLockKey, procurementLockTTL); err != nil {
+						slog.Warn("failed to extend lock heartbeat", "error", err)
+						// If heartbeat fails, we risk losing the lock.
+						// We continue, relying on the fact that if we lost it,
+						// another instance might pick it up after we finish (or crash).
+					}
+				}
+			}
+		}()
 	}
 
 	slog.Info("Starting Procurement Agent...")
@@ -241,6 +263,7 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 	}
 
 	// Process notifications: log to communication_logs and optionally enqueue async
+	var resultsToLog []alertResult
 	for _, result := range batch {
 		if result.ShouldNotify {
 			// O(1) map lookup instead of O(N) database queries
@@ -248,12 +271,22 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 				slog.Debug("notification dampened", "id", result.ID)
 				continue
 			}
+			resultsToLog = append(resultsToLog, result)
+		}
+	}
 
-			// Log to communication_logs for audit trail
-			a.logNotification(ctx, result)
+	// P1 Performance Fix: Batch insert into communication_logs (O(1) round-trip)
+	// Replaces N+1 individual inserts logic.
+	if len(resultsToLog) > 0 {
+		if err := a.repo.LogNotificationsBatch(ctx, resultsToLog, now); err != nil {
+			slog.Error("failed to log notification batch", "count", len(resultsToLog), "error", err)
+			// Proceed best-effort to enqueue sidecars
+		}
 
-			// Enqueue async notification if sidecar is configured
-			if a.notifier != nil {
+		// Enqueue async notifications (still individual, but typically fast Redis/Memory)
+		// Sidecar pattern for async delivery.
+		if a.notifier != nil {
+			for _, result := range resultsToLog {
 				if err := a.notifier.EnqueueNotification(ctx, result.ID, result.Message, now); err != nil {
 					slog.Error("failed to enqueue notification", "id", result.ID, "error", err)
 					// Continue - notifications are best-effort

@@ -4,32 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
 )
 
-// ConfidenceThresholdForReview defines the minimum AI confidence
-// required to bypass human review. See PRODUCTION_PLAN.md Step 39.
-const ConfidenceThresholdForReview = 0.85
+// MaxInvoiceTextLength defines the hard limit for invoice text to prevent memory exhaustion/DoS.
+// 25,000 characters is roughly 6,000-8,000 tokens, sufficient for most single-page invoices.
+// See Code Review Issue 1B.
+const MaxInvoiceTextLength = 25000
 
 // InvoiceService handles invoice-specific analysis and persistence.
 // See PRODUCTION_PLAN.md Step 37
 type InvoiceService struct {
 	db     *pgxpool.Pool
 	client ai.Client
+	cfg    *config.Config
 }
 
 // NewInvoiceService creates a new InvoiceService.
-func NewInvoiceService(db *pgxpool.Pool, client ai.Client) *InvoiceService {
+func NewInvoiceService(db *pgxpool.Pool, client ai.Client, cfg *config.Config) *InvoiceService {
 	return &InvoiceService{
 		db:     db,
 		client: client,
+		cfg:    cfg,
 	}
 }
 
@@ -97,6 +102,17 @@ func (s *InvoiceService) AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, do
 		return uuid.Nil, nil, fmt.Errorf("document has no extracted text")
 	}
 
+	// SAFETY FIX (P0 Issue B): TokenTruncator / Length Limit
+	// Truncate text to prevent memory exhaustion and reduce prompt injection surface.
+	if len(extractedText) > MaxInvoiceTextLength {
+		slog.Warn("invoice text truncated",
+			"doc_id", docID,
+			"original_length", len(extractedText),
+			"limit", MaxInvoiceTextLength,
+		)
+		extractedText = extractedText[:MaxInvoiceTextLength]
+	}
+
 	// 2. AI Prompting (Mandated use of Gemini 2.5 Flash per BACKEND_SCOPE Section 3.2)
 	// L7 Vendor Abstraction: Use ai.GenerateRequest instead of genai.Part
 	// Code Review Issue 1B Fix: Enable logprobs for actual model confidence scoring
@@ -161,7 +177,8 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 	// uses the JSON-provided confidence with caution.
 	//
 	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
-	isHumanReviewRequired := extraction.Confidence < ConfidenceThresholdForReview
+	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
+	isHumanReviewRequired := extraction.Confidence < s.cfg.InvoiceConfidenceThreshold
 
 	// 3. Prepare Variables
 	// Generate a new ID to use IF this turns out to be an INSERT.

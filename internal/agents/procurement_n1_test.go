@@ -82,6 +82,10 @@ func (r *queryCountingRepository) GetNotificationHistoryForBatch(ctx context.Con
 	return make(map[uuid.UUID]bool), nil
 }
 
+func (r *queryCountingRepository) LogNotificationsBatch(ctx context.Context, results []alertResult, now time.Time) error {
+	return nil
+}
+
 // TestFlushBatch_QueryCount_RedTest proves N+1 pattern exists.
 //
 // This test will FAIL before the fix is applied because:

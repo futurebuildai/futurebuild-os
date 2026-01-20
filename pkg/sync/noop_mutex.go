@@ -18,5 +18,10 @@ func (n *NoOpMutex) TryLock(ctx context.Context, key string, ttl time.Duration) 
 	return func() error { return nil }, nil
 }
 
+// ExtendLock always succeeds.
+func (n *NoOpMutex) ExtendLock(ctx context.Context, key string, ttl time.Duration) error {
+	return nil
+}
+
 // Ensure NoOpMutex implements DistributedMutex at compile time.
 var _ DistributedMutex = (*NoOpMutex)(nil)

@@ -53,7 +53,7 @@ func (m *AmnesiacPersister) Pool() Transactor {
 
 func newTestOrchestrator(persister MessagePersister) *Orchestrator {
 	// SRP Refactoring: Use constructor to properly build the executor and strategy registry
-	return NewOrchestratorWithPersister(
+	orch, err := NewOrchestratorWithPersister(
 		persister,
 		NewDefaultRegexClassifier(),
 		&MockTaskService{},
@@ -70,6 +70,10 @@ func newTestOrchestrator(persister MessagePersister) *Orchestrator {
 		nil,        // Optional: WAL not tested here
 		nil,        // Optional: CircuitBreaker not tested here
 	)
+	if err != nil {
+		panic(err)
+	}
+	return orch
 }
 
 // captureLog returns a buffer that captures slog output and restores the default logger after the test.

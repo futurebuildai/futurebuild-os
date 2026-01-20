@@ -30,6 +30,10 @@ type Config struct {
 	// Environment specifies the runtime environment (development, staging, production).
 	// Used for safety checks like NoOp implementations. See Code Review Issue 3B.
 	Environment string
+
+	// InvoiceConfidenceThreshold defines the minimum AI confidence required to bypass human review.
+	// Defaults to 0.85. See Code Review Issue 3B.
+	InvoiceConfidenceThreshold float64
 }
 
 // LoadConfig loads configuration from environment variables.
@@ -51,6 +55,13 @@ func LoadConfig() (*Config, error) {
 		expiry = 24 * time.Hour
 	}
 
+	// Parse InvoiceConfidenceThreshold with default 0.85
+	confidenceStr := getEnvOrDefault("INVOICE_CONFIDENCE_THRESHOLD", "0.85")
+	confidenceThreshold, err := strconv.ParseFloat(confidenceStr, 64)
+	if err != nil {
+		confidenceThreshold = 0.85
+	}
+
 	cfg := &Config{
 		DatabaseURL:            os.Getenv("DATABASE_URL"),
 		RedisURL:               getEnvOrDefault("REDIS_URL", "localhost:6379"),
@@ -69,6 +80,7 @@ func LoadConfig() (*Config, error) {
 		S3SecretKey:            os.Getenv("S3_SECRET_KEY"),
 		WebhookSecret:          os.Getenv("WEBHOOK_SECRET"),
 		Environment:            getEnvOrDefault("APP_ENV", "development"),
+		InvoiceConfidenceThreshold: confidenceThreshold,
 	}
 
 	// Fail Fast: Validate critical configuration

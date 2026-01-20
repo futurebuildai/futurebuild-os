@@ -90,7 +90,7 @@ func (m *mockDLQTest) EnqueueRetry(_ context.Context, _ models.ChatMessage) erro
 // newTestOrchestratorWithPersister creates a test orchestrator with the given persister.
 // SRP Refactoring: Uses constructor to properly build executor and strategy registry.
 func newTestOrchestratorWithPersister(db MessagePersister) *Orchestrator {
-	return NewOrchestratorWithPersister(
+	orch, err := NewOrchestratorWithPersister(
 		db,
 		NewDefaultRegexClassifier(),
 		&MockTaskService{},
@@ -100,11 +100,15 @@ func newTestOrchestratorWithPersister(db MessagePersister) *Orchestrator {
 		nil, // WAL
 		nil, // CircuitBreaker
 	)
+	if err != nil {
+		panic(err)
+	}
+	return orch
 }
 
 // newTestOrchestratorWithSchedule creates a test orchestrator with a custom schedule service.
 func newTestOrchestratorWithSchedule(db MessagePersister, schedule ScheduleService) *Orchestrator {
-	return NewOrchestratorWithPersister(
+	orch, err := NewOrchestratorWithPersister(
 		db,
 		NewDefaultRegexClassifier(),
 		&MockTaskService{},
@@ -114,6 +118,10 @@ func newTestOrchestratorWithSchedule(db MessagePersister, schedule ScheduleServi
 		nil, // WAL
 		nil, // CircuitBreaker
 	)
+	if err != nil {
+		panic(err)
+	}
+	return orch
 }
 
 // --- Tests ---

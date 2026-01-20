@@ -78,7 +78,7 @@ func (m *mockDLQPersister) EnqueueRetry(_ context.Context, _ models.ChatMessage)
 // --- Helpers ---
 
 func newTestOrchestrator() *chat.Orchestrator {
-	return chat.NewOrchestratorWithPersister(
+	orch, err := chat.NewOrchestratorWithPersister(
 		&mockMessagePersister{},
 		chat.NewDefaultRegexClassifier(),
 		&mockTaskService{},
@@ -88,6 +88,10 @@ func newTestOrchestrator() *chat.Orchestrator {
 		nil, // AuditWAL
 		nil, // AuditCircuitBreaker
 	)
+	if err != nil {
+		panic(err)
+	}
+	return orch
 }
 
 func injectClaims(r *http.Request, userID, orgID string) *http.Request {
@@ -244,7 +248,7 @@ func TestHandleChat_OrchestratorError(t *testing.T) {
 	// Actually, we are in 'handlers' package, so we use the public constructor we added.
 
 	// We need to extend the mock helper to support failure
-	failingOrch := chat.NewOrchestratorWithPersister(
+	failingOrch, err := chat.NewOrchestratorWithPersister(
 		failingPersister,
 		chat.NewDefaultRegexClassifier(),
 		&mockTaskService{},
@@ -254,6 +258,9 @@ func TestHandleChat_OrchestratorError(t *testing.T) {
 		nil, // AuditWAL
 		nil, // AuditCircuitBreaker
 	)
+	if err != nil {
+		t.Fatalf("Failed to create orchestrator: %v", err)
+	}
 	handler := NewChatHandler(failingOrch)
 
 	userID := uuid.New().String()

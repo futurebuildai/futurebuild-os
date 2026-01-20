@@ -34,7 +34,7 @@ export interface InvoiceExtraction {
     vendor: string;
     date: string; // ISO-8601 Date
     invoice_number: string;
-    total_amount: number;
+    total_amount: string; // P1 Fix: String for 64-bit precision
     line_items: InvoiceExtractionItem[];
     suggested_wbs_code: string;
     confidence: number;
@@ -46,8 +46,8 @@ export interface InvoiceExtraction {
 export interface InvoiceExtractionItem {
     description: string;
     quantity: number;
-    unit_price: number;
-    total: number;
+    unit_price: string; // P1 Fix: String for 64-bit precision
+    total: string; // P1 Fix: String for 64-bit precision
 }
 
 /**

@@ -34,7 +34,7 @@ type InvoiceExtraction struct {
 	Vendor           string                  `json:"vendor"`
 	Date             string                  `json:"date"`
 	InvoiceNumber    string                  `json:"invoice_number"`
-	TotalAmountCents int64                   `json:"total_amount_cents"`
+	TotalAmountCents int64                   `json:"total_amount_cents,string"`
 	LineItems        []InvoiceExtractionItem `json:"line_items"`
 	SuggestedWBSCode string                  `json:"suggested_wbs_code"`
 	Confidence       float64                 `json:"confidence"` // Confidence remains float (0.0-1.0)
@@ -45,8 +45,8 @@ type InvoiceExtraction struct {
 type InvoiceExtractionItem struct {
 	Description    string  `json:"description"`
 	Quantity       float64 `json:"quantity"` // Kept as float - quantities can be fractional
-	UnitPriceCents int64   `json:"unit_price_cents"`
-	TotalCents     int64   `json:"total_cents"`
+	UnitPriceCents int64   `json:"unit_price_cents,string"`
+	TotalCents     int64   `json:"total_cents,string"`
 }
 
 // GanttData represents the project schedule for the Gantt view.

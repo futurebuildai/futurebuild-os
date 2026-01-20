@@ -115,3 +115,12 @@ func (m *MockProcurementRepository) CountStatusUpdates(status string) int {
 	}
 	return count
 }
+
+// LogNotificationsBatch records the batch for later assertions.
+func (m *MockProcurementRepository) LogNotificationsBatch(ctx context.Context, results []alertResult, now time.Time) error {
+	if m.LogNotificationErr != nil {
+		return m.LogNotificationErr
+	}
+	m.LoggedNotifs = append(m.LoggedNotifs, results...)
+	return nil
+}

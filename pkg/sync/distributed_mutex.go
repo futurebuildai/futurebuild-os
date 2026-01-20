@@ -50,4 +50,8 @@ type DistributedMutex interface {
 	//
 	// The lock MUST auto-expire after TTL to prevent deadlocks from crashed processes.
 	TryLock(ctx context.Context, key string, ttl time.Duration) (UnlockFunc, error)
+
+	// ExtendLock extends the TTL of an existing lock.
+	// Must be called by the process holding the lock (heartbeat).
+	ExtendLock(ctx context.Context, key string, ttl time.Duration) error
 }

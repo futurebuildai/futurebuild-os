@@ -52,10 +52,20 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Parse Request Body
+	// SAFETY FIX (P0 Issue C): Unbounded Request Body Read
+	// Enforce 1MB limit to prevent DoS via memory exhaustion.
+	const MaxBodyBytes = 1048576 // 1MB
+	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+
 	var req chat.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		slog.Warn("chat: invalid request body", "error", err)
-		response.JSONError(w, http.StatusBadRequest, "Invalid request payload")
+		if err.Error() == "http: request body too large" {
+			slog.Warn("chat: request body too large", "ip", r.RemoteAddr)
+			response.JSONError(w, http.StatusRequestEntityTooLarge, "Request payload too large (max 1MB)")
+		} else {
+			slog.Warn("chat: invalid request body", "error", err)
+			response.JSONError(w, http.StatusBadRequest, "Invalid request payload")
+		}
 		return
 	}
 

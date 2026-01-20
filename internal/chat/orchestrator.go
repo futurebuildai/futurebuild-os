@@ -166,6 +166,8 @@ func (c *StrictPlaceholderCommand) ConsistencyLevel() types.ConsistencyType {
 // to enable strict dependency injection and testability.
 // P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
 // SRP Refactoring: Persistence strategy selection moved to CommandExecutor.
+// P0 FIX (Blocker B): DLQ is now REQUIRED. Returns error on nil to fail fast at startup.
+// SRP Refactoring: Persistence strategy selection moved to CommandExecutor.
 func NewOrchestrator(
 	persister MessagePersister,
 	taskService TaskService,
@@ -174,9 +176,9 @@ func NewOrchestrator(
 	dlq DLQPersister,
 	wal AuditWAL,
 	circuitBreaker AuditCircuitBreaker,
-) *Orchestrator {
+) (*Orchestrator, error) {
 	if dlq == nil {
-		panic("chat: DLQPersister is required for compliance audit trails")
+		return nil, fmt.Errorf("chat: DLQPersister is required for compliance audit trails")
 	}
 	// Build strategy registry (Strategy Pattern)
 	registry := NewPersistenceStrategyRegistry(persister, dlq, wal, circuitBreaker)
@@ -187,13 +189,13 @@ func NewOrchestrator(
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
 		executor:        NewCommandExecutor(registry),
-	}
+	}, nil
 }
 
 // NewOrchestratorWithPersister creates a new Orchestrator with a custom MessagePersister and IntentClassifier.
 // This is primarily used for testing to inject mock dependencies.
 // See PRODUCTION_PLAN.md Step 43.4
-// P0 FIX (Blocker B): DLQ is now REQUIRED. Panics on nil to fail fast at startup.
+// P0 FIX (Blocker B): DLQ is now REQUIRED. Returns error on nil to fail fast at startup.
 // SRP Refactoring: Persistence strategy selection moved to CommandExecutor.
 func NewOrchestratorWithPersister(
 	persister MessagePersister,
@@ -204,9 +206,9 @@ func NewOrchestratorWithPersister(
 	dlq DLQPersister,
 	wal AuditWAL,
 	circuitBreaker AuditCircuitBreaker,
-) *Orchestrator {
+) (*Orchestrator, error) {
 	if dlq == nil {
-		panic("chat: DLQPersister is required for compliance audit trails")
+		return nil, fmt.Errorf("chat: DLQPersister is required for compliance audit trails")
 	}
 	// Build strategy registry (Strategy Pattern)
 	registry := NewPersistenceStrategyRegistry(persister, dlq, wal, circuitBreaker)
@@ -217,7 +219,7 @@ func NewOrchestratorWithPersister(
 		ScheduleService: scheduleService,
 		InvoiceService:  invoiceService,
 		executor:        NewCommandExecutor(registry),
-	}
+	}, nil
 }
 
 // ProcessRequest is the main entry point for handling a user's chat message.

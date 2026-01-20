@@ -39,4 +39,8 @@ type ProcurementRepository interface {
 	// Returns a map where true = notification was sent in last 72 hours (should dampen).
 	// P0 Performance Fix: Reduces N database round-trips to 1.
 	GetNotificationHistoryForBatch(ctx context.Context, itemIDs []uuid.UUID, now time.Time) (map[uuid.UUID]bool, error)
+
+	// LogNotificationsBatch persists multiple alerts to communication_logs in a single operation.
+	// P1 Performance Fix: Reduces N database round-trips to 1 per batch.
+	LogNotificationsBatch(ctx context.Context, results []alertResult, now time.Time) error
 }
