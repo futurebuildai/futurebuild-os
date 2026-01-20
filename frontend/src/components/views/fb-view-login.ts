@@ -113,6 +113,7 @@ export class FBViewLogin extends FBViewElement {
                     <input
                         type="email"
                         placeholder="Enter your email"
+                        aria-label="Email address"
                         .value=${this._email}
                         @input=${this._handleEmailInput.bind(this)}
                         @keyup=${this._handleKeyUp.bind(this)}

@@ -21,6 +21,12 @@ import './fb-panel-right';
 // Import feature components (Step 56)
 import '../features/fb-file-drop';
 
+// Import resize handle (Step 59.5)
+import './fb-resize-handle';
+
+// Import artifact modal (Step 59.5)
+import '../artifacts/fb-artifact-modal';
+
 /**
  * Application Shell - 3-Panel Layout Container
  * @element fb-app-shell
@@ -196,6 +202,8 @@ export class FBAppShell extends FBElement {
     @state() private _leftPanelOpen = true;
     @state() private _rightPanelOpen = true;
     @state() private _isMobile = false;
+    @state() private _rightPanelWidth = 320;
+    @state() private _hasPopoutArtifact = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -306,6 +314,21 @@ export class FBAppShell extends FBElement {
                 this._isMobile = store.isMobile$.value;
             })
         );
+
+        // Subscribe to panel width (Step 59.5: UX Enhancements)
+        this._disposeEffects.push(
+            effect(() => {
+                this._rightPanelWidth = store.rightPanelWidth$.value;
+                this.style.setProperty('--fb-right-panel-width', `${String(this._rightPanelWidth)}px`);
+            })
+        );
+
+        // Subscribe to popout artifact
+        this._disposeEffects.push(
+            effect(() => {
+                this._hasPopoutArtifact = store.popoutArtifact$.value !== null;
+            })
+        );
     }
 
     override disconnectedCallback(): void {
@@ -334,16 +357,24 @@ export class FBAppShell extends FBElement {
     }
 
     override render(): TemplateResult {
+        const resizeHandleOffset = this._rightPanelOpen && !this._isMobile ? this._rightPanelWidth : 0;
+
         return html`
-            <div class="shell" data-theme="${this._resolvedTheme}">
+            <div class="shell" data-theme="${this._resolvedTheme}" style="position: relative;">
                 <fb-file-drop></fb-file-drop>
                 ${this._isAuthenticated ? html`<fb-panel-left></fb-panel-left>` : nothing}
                 <fb-panel-center .isAuthenticated=${this._isAuthenticated}></fb-panel-center>
                 ${this._isAuthenticated ? html`<fb-panel-right></fb-panel-right>` : nothing}
                 
+                ${this._isAuthenticated && this._rightPanelOpen && !this._isMobile ? html`
+                    <fb-resize-handle style="--resize-handle-offset: ${resizeHandleOffset}px;"></fb-resize-handle>
+                ` : nothing}
+                
                 ${this._isMobile && (this._leftPanelOpen || this._rightPanelOpen) ? html`
                     <div class="backdrop" @click=${this._closePanels.bind(this)}></div>
                 ` : nothing}
+                
+                ${this._hasPopoutArtifact ? html`<fb-artifact-modal></fb-artifact-modal>` : nothing}
             </div>
         `;
     }

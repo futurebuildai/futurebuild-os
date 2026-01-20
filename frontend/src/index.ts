@@ -36,6 +36,9 @@ import { FBArtifactInvoice } from './components/artifacts/fb-artifact-invoice';
 // Feature Components (Step 56)
 import { FBFileDrop } from './components/features/fb-file-drop';
 
+// Base Components (Step 58.5: Fortress Hardening)
+import { FBErrorBoundary } from './components/base/fb-error-boundary';
+
 // App shell
 import './app-root';
 
@@ -55,6 +58,7 @@ const registered = registerComponents({
     'fb-artifact-invoice': FBArtifactInvoice,
     'fb-file-drop': FBFileDrop,
     'fb-typing-indicator': FBTypingIndicator,
+    'fb-error-boundary': FBErrorBoundary,
 });
 
 console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);

@@ -94,6 +94,10 @@ const _isTyping$ = signal<boolean>(false);
 const _connectionStatus$ = signal<ConnectionStatus>('disconnected');
 const _activeArtifact$ = signal<ArtifactPayload | null>(null);
 
+// Panel resize state (Step 59.5: UX Enhancements)
+const _rightPanelWidth$ = signal<number>(320);
+const _popoutArtifact$ = signal<ArtifactPayload | null>(null);
+
 // ============================================================================
 // Computed Values
 // ============================================================================
@@ -417,6 +421,66 @@ const actions: StoreActions = {
         // Auto-open right panel when artifact is set
         _rightPanelOpen$.value = true;
     },
+
+    // ---- Panel Resize Actions (Step 59.5: UX Enhancements) ----
+
+    setRightPanelWidth(width: number): void {
+        // Constrain: min 280px, max 600px
+        _rightPanelWidth$.value = Math.max(280, Math.min(600, width));
+    },
+
+    setPopoutArtifact(artifact: ArtifactPayload | null): void {
+        _popoutArtifact$.value = artifact;
+    },
+
+    // ---- Session Reset (Step 58.5: State Hygiene) ----
+
+    resetSession(): void {
+        // Auth
+        _user$.value = null;
+        _token$.value = null;
+        _authLoading$.value = false;
+        _authError$.value = null;
+
+        // Projects
+        _projects$.value = [];
+        _currentProjectId$.value = null;
+        _currentProjectDetail$.value = null;
+        _projectLoading$.value = false;
+        _projectError$.value = null;
+        _activeProjectId$.value = null;
+
+        // Threads
+        _threads$.value = [];
+        _activeThreadId$.value = null;
+        _threadLoading$.value = false;
+
+        // Chat
+        _messages$.value = [];
+        _chatLoading$.value = false;
+        _chatError$.value = null;
+
+        // Focus & Activity
+        _focusTasks$.value = [];
+        _agentActivity$.value = [];
+
+        // Uploads
+        _pendingFiles$.value = [];
+        _isDragging$.value = false;
+
+        // Realtime
+        _isTyping$.value = false;
+        _connectionStatus$.value = 'disconnected';
+        _activeArtifact$.value = null;
+
+        // UI panels (close them)
+        _rightPanelOpen$.value = false;
+        _leftPanelOpen$.value = false;
+        _rightPanelWidth$.value = 320; // Step 59.5: Reset width
+        _popoutArtifact$.value = null; // Step 59.5: Close modal
+
+        // Note: localStorage cleared automatically by token effect
+    },
 };
 
 // ============================================================================
@@ -480,6 +544,10 @@ export const store = {
     isTyping$: _isTyping$ as ReadonlySignal<boolean>,
     connectionStatus$: _connectionStatus$ as ReadonlySignal<ConnectionStatus>,
     activeArtifact$: _activeArtifact$ as ReadonlySignal<ArtifactPayload | null>,
+
+    // ---- Panel Resize State (readonly, Step 59.5) ----
+    rightPanelWidth$: _rightPanelWidth$ as ReadonlySignal<number>,
+    popoutArtifact$: _popoutArtifact$ as ReadonlySignal<ArtifactPayload | null>,
 
     // ---- Actions ----
     actions,

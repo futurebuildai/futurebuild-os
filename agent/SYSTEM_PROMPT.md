@@ -145,68 +145,41 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 7, Step 59: E2E Demo Readiness & Polish
+--------------------------------------------------------------------------------
+Task: Execute Phase 8, Step 60: Load Testing & Strict Mode Validation
 
 Context:
-Step 58 completed successfully. All artifact components are now "Pure Components" receiving data via props from the Store. The `MockRealtimeService` provides typed fixture data, and the right panel dynamically renders artifacts. Shared utilities exist in `src/utils/artifact-helpers.ts`. Skeleton CSS is centralized in `FBElement.ts`.
-
-The frontend is feature-complete for the demo but needs polish and end-to-end verification.
+Step 59 is complete. The frontend "Agent Command Center" is fully functional, demo-ready, and polished. Now begins Phase 8: Production Readiness. use `npm run type-check` (or `tsc --noEmit`) as the source of truth.
 
 Objective:
-Verify all user flows work seamlessly end-to-end. Polish UI edge cases, loading states, and accessibility. Ensure the application is demo-ready for a prospect presentation.
+Harden the frontend codebase by enforcing Strict Mode TypeScript (no `any`, strict null checks) and verifying performance under load.
 
 Spec References:
-- FRONTEND_SCOPE.md Section 3 (3-Panel Layout)
-- FRONTEND_SCOPE.md Section 8 (Artifact System)
-- MASTER_PRD.md Feature Set E (Command Center)
+- PRODUCTION_PLAN.md Step 60
+- FRONTEND_SCOPE.md (Performance Constraints)
 
 Constraints & Standards (Google L7 Quality Floor):
-1.  **Complete User Flow**: Login simulation → File drop → Chat interaction → Artifact display must work seamlessly.
-2.  **Accessibility**: All interactive elements must have proper `aria-*` attributes.
-3.  **Responsive**: Mobile viewport must work correctly with panel overlays.
-4.  **No Errors**: Console must be clean (no warnings, no errors except expected dev notices).
+1.  **Strict Mode Compliance**: `tsconfig.json` should have `"strict": true`. All compilation errors must be resolved. Explicit `any` is forbidden unless absolutely necessary and commented.
+2.  **Performance**: The app must handle 500+ messages and 50+ artifacts without crashing or dropping below 60fps scrolling.
+3.  **Memory**: Ensure no jagged memory leaks during simulated long sessions.
 
 Micro-Sprint Plan:
-
-Sprint 59.1: Full Flow Verification
-    -   **Goal**: Verify the complete user journey works.
-    -   **Action**:
-        -   Start fresh at http://localhost:5174
-        -   Test login simulation (Click to Test)
-        -   Drop a file → verify message appears
-        -   Trigger scenarios via DevTools → verify artifacts render
-        -   Capture screenshots/recordings as verification
-    -   **Check**: All flows work without console errors.
-
-Sprint 59.2: Accessibility Audit
-    -   **Goal**: Ensure WCAG 2.1 AA compliance for key components.
-    -   **Action**:
-        -   Run Lighthouse accessibility audit
-        -   Add missing `aria-label`, `aria-labelledby`, `role` attributes
-        -   Ensure keyboard navigation works for panels
-        -   Check color contrast ratios
-
-Sprint 59.3: Responsive Polish
-    -   **Goal**: Mobile experience is polished.
-    -   **Action**:
-        -   Test at 375px viewport (mobile)
-        -   Verify panels collapse/expand correctly
-        -   Ensure touch targets are 44px minimum
-        -   Test orientation changes
-
-Sprint 59.4: Demo Script Documentation
-    -   **Goal**: Create a demo script for the prospect presentation.
-    -   **Action**:
-        -   Document the exact steps to demonstrate the UI
-        -   Include DevTools commands for triggering scenarios
-        -   Note any setup requirements
+1.  **TypeScript Hardening**:
+    -   Verify/Enable `"strict": true` in `tsconfig.json`.
+    -   Run `npm run type-check` (or `tsc --noEmit`).
+    -   Fix all resulting errors (null checks, implicit any, unbound methods).
+2.  **Load Testing Harness**:
+    -   Create `src/debug/load-test.ts` (triggered via `window.fb.runLoadTest()`).
+    -   Simulate: 500 messages injected, 50 artifacts created.
+    -   Measure: Render time, FPS impact.
+3.  **Optimization (if needed)**:
+    -   Implement virtualization (e.g., `checkVisibility`) if rendering 500+ DOM nodes causes lag.
 
 Definition of Done:
-- [ ] Complete user flow verified (login → drop → chat → artifact)
-- [ ] Lighthouse accessibility score ≥ 90
-- [ ] Mobile viewport works correctly
-- [ ] Console clean (no errors)
-- [ ] Demo script documented
+- [ ] `tsconfig.json` has limit-strict settings enabled.
+- [ ] `npm run build` passes with NO type errors.
+- [ ] Load Test script created and verified (500 items).
+- [ ] App remains responsive (>30fps) during load test.
 --------------------------------------------------------------------------------
 
 execute /prism

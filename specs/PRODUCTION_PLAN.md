@@ -136,7 +136,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 | [x] |
 | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 | [x] |
 | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 | [x] |
-| 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |
+| 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |[x] |
 | 59 | **E2E Demo Readiness**: Full flow verification, accessibility, polish | Step 58 | 2 |
 
 ---

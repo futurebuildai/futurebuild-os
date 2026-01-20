@@ -356,4 +356,11 @@ export interface StoreActions {
     setTyping(isTyping: boolean): void;
     setConnectionStatus(status: 'connected' | 'disconnected' | 'connecting'): void;
     setActiveArtifact(artifact: ArtifactPayload | null): void;
+
+    // Panel resize actions (Step 59.5: UX Enhancements)
+    setRightPanelWidth(width: number): void;
+    setPopoutArtifact(artifact: ArtifactPayload | null): void;
+
+    // Session actions (Step 58.5: State Hygiene)
+    resetSession(): void;
 }

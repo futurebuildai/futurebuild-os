@@ -364,26 +364,38 @@ export class MockRealtimeService implements IRealtimeServiceDevTools {
     }
 
     private _exposeDevTools(): void {
-        // Expose to window.fb for browser console access
-        interface FBDevTools {
-            triggerMessage: (text: string) => void;
-            triggerScenario: (id: string) => void;
-            setTyping: (isTyping: boolean) => void;
-            getScenarios: () => string[];
-            connect: () => void;
-            disconnect: () => void;
-        }
-        const devTools: FBDevTools = {
-            triggerMessage: this.triggerMessage.bind(this),
-            triggerScenario: this.triggerScenario.bind(this),
-            setTyping: this.setTyping.bind(this),
-            getScenarios: this.getAvailableScenarios.bind(this),
-            connect: this.connect.bind(this),
-            disconnect: this.disconnect.bind(this),
-        };
-        (window as unknown as { fb: FBDevTools }).fb = devTools;
-        console.log('[MockRealtime] DevTools exposed at window.fb');
-        console.log('[MockRealtime] Available commands: triggerMessage, triggerScenario, setTyping, getScenarios');
+        // Import store for resetSession access (Step 58.5)
+        // Lazy import to avoid circular dependencies
+        import('../../store/store').then(({ store }) => {
+            // Expose to window.fb for browser console access
+            interface FBDevTools {
+                triggerMessage: (text: string) => void;
+                triggerScenario: (id: string) => void;
+                setTyping: (isTyping: boolean) => void;
+                getScenarios: () => string[];
+                connect: () => void;
+                disconnect: () => void;
+                store: {
+                    resetSession: () => void;
+                };
+            }
+            const devTools: FBDevTools = {
+                triggerMessage: this.triggerMessage.bind(this),
+                triggerScenario: this.triggerScenario.bind(this),
+                setTyping: this.setTyping.bind(this),
+                getScenarios: this.getAvailableScenarios.bind(this),
+                connect: this.connect.bind(this),
+                disconnect: this.disconnect.bind(this),
+                store: {
+                    resetSession: store.actions.resetSession.bind(store.actions),
+                },
+            };
+            (window as unknown as { fb: FBDevTools }).fb = devTools;
+            console.log('[MockRealtime] DevTools exposed at window.fb');
+            console.log('[MockRealtime] Available commands: triggerMessage, triggerScenario, setTyping, getScenarios, store.resetSession');
+        }).catch(() => {
+            console.warn('[MockRealtime] Could not load store for DevTools');
+        });
     }
 }
 
