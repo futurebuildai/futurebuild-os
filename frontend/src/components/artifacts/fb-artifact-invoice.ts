@@ -119,8 +119,14 @@ export class FBArtifactInvoice extends FBElement {
     data: InvoiceArtifactData | null = null;
 
 
-    private _formatCurrency(amount: number): string {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    /**
+     * Formats cents (string or number) to USD currency.
+     * Handles P1 Fix: Backend now sends int64 as string to preserve precision.
+     */
+    private _formatCurrency(cents: string | number): string {
+        const numCents = typeof cents === 'string' ? parseInt(cents, 10) : cents;
+        const dollars = numCents / 100;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(dollars);
     }
 
     private _renderSkeleton(): TemplateResult {
@@ -143,7 +149,7 @@ export class FBArtifactInvoice extends FBElement {
     override render(): TemplateResult {
         if (!this.data) return this._renderSkeleton();
 
-        const total = this.data.total_amount;
+        const totalCents = this.data.total_amount_cents;
 
         return html`
             <div class="invoice-container">
@@ -173,8 +179,8 @@ export class FBArtifactInvoice extends FBElement {
                             <tr>
                                 <td class="col-desc">${item.description}</td>
                                 <td class="col-qty">${item.quantity}</td>
-                                <td class="col-price">${this._formatCurrency(item.unit_price)}</td>
-                                <td class="col-total">${this._formatCurrency(item.total)}</td>
+                                <td class="col-price">${this._formatCurrency(item.unit_price_cents)}</td>
+                                <td class="col-total">${this._formatCurrency(item.total_cents)}</td>
                             </tr>
                         `)}
                     </tbody>
@@ -184,7 +190,7 @@ export class FBArtifactInvoice extends FBElement {
                     <div class="total-box">
                         <div class="total-row grand-total">
                             <span>TOTAL:</span>
-                            <span>${this._formatCurrency(total)}</span>
+                            <span>${this._formatCurrency(totalCents)}</span>
                         </div>
                     </div>
                 </div>

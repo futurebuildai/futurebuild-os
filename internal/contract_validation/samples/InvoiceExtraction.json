@@ -2,13 +2,13 @@
   "vendor": "Steel Co",
   "date": "2026-01-05",
   "invoice_number": "INV-1001",
-  "total_amount_cents": 150050,
+  "total_amount_cents": "150050",
   "line_items": [
     {
       "description": "Steel Beams",
       "quantity": 10,
-      "unit_price_cents": 15005,
-      "total_cents": 150050
+      "unit_price_cents": "15005",
+      "total_cents": "150050"
     }
   ],
   "suggested_wbs_code": "6200-LBR",
