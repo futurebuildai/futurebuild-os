@@ -137,7 +137,7 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 | [x] |
 | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 | [x] |
 | 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |[x] |
-| 59 | **E2E Demo Readiness**: Full flow verification, accessibility, polish | Step 58 | 2 |
+| 59 | **E2E Demo Readiness**: Full flow verification, accessibility, polish | Step 58 | 2 | [x] |
 
 ---
 
@@ -145,7 +145,8 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
-| 60 | Load testing and **Strict Mode TypeScript validation** | All previous | 2 |
+| 60.1 | **Strict Mode & Type Hygiene**: Enforce `no-explicit-any` in ESLint, run strict `tsc` validation, and ensure Contract Tests pass. | Step 59 | 1 |
+| 60.2 | **Load Testing & Virtualization**: Implement `@lit-labs/virtualizer` for the chat list. Create `LoadTestService` to simulate 500+ messages. Verify 60fps scrolling. | Step 60.1 | 2 |
 | 61 | Security audit and **Go Interface mock testing** | All previous | 3 |
 | 62 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
 | 63 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |

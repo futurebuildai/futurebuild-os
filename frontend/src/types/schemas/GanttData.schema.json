@@ -80,6 +80,7 @@
         "Pending",
         "Ready",
         "In_Progress",
+        "Inspection_Pending",
         "Completed",
         "Blocked",
         "Delayed"

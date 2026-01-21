@@ -29,6 +29,19 @@ import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 import { realtimeService, type ConnectionStatus, type ArtifactPayload } from '../services/realtime';
 import { normalizeArtifactType } from '../utils/artifact-helpers';
 
+/**
+ * Formats an ISO timestamp to a display time string (e.g., "2:30 PM").
+ * Pre-computing this avoids Date instantiation inside render loops.
+ * @see Step 60.1 - Performance Hygiene
+ */
+function formatDisplayTime(isoString: string): string {
+    try {
+        return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return '';
+    }
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -381,11 +394,13 @@ const actions: StoreActions = {
 
         // Create user message with attachment info
         const fileNames = newUploads.map((u) => u.file.name).join(', ');
+        const createdAt = new Date().toISOString();
         actions.addMessage({
             id: crypto.randomUUID(),
             role: 'user',
             content: `📎 Uploaded: ${fileNames}`,
-            createdAt: new Date().toISOString(),
+            createdAt,
+            displayTime: formatDisplayTime(createdAt),
         });
 
         // Step 57: Send file message via RealtimeService (replaces setTimeout)
@@ -638,6 +653,7 @@ export function initializeStore(): void {
             role: payload.role,
             content: payload.content,
             createdAt: payload.createdAt,
+            displayTime: formatDisplayTime(payload.createdAt),
         };
         // Map artifact if present
         if (firstArtifact) {

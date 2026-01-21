@@ -99,6 +99,8 @@ export interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
     createdAt: string;
+    /** Pre-formatted display time (e.g., "2:30 PM") to avoid Date instantiation in render loops */
+    displayTime?: string;
     /** Whether this message is still being streamed */
     isStreaming?: boolean;
     /** Optional action card if agent is requesting approval */

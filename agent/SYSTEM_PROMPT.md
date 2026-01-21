@@ -146,40 +146,39 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 60: Load Testing & Strict Mode Validation
+Task: Execute Phase 8, Step 60.1: Strict Mode & Type Hygiene
 
 Context:
-Step 59 is complete. The frontend "Agent Command Center" is fully functional, demo-ready, and polished. Now begins Phase 8: Production Readiness. use `npm run type-check` (or `tsc --noEmit`) as the source of truth.
+The application is feature-complete (Step 59). We are now entering the Production Readiness phase. The goal of this sprint is to eliminate "loose" typing to ensure the codebase is refactor-resilient.
 
 Objective:
-Harden the frontend codebase by enforcing Strict Mode TypeScript (no `any`, strict null checks) and verifying performance under load.
+Enforce "L7 Strictness" across the frontend codebase by banning `any`, ensuring strict null checks, and validating the Data Contract.
 
 Spec References:
-- PRODUCTION_PLAN.md Step 60
-- FRONTEND_SCOPE.md (Performance Constraints)
+- PRODUCTION_PLAN.md Step 60.1
+- FRONTEND_SCOPE.md (Section 2: Strict Typing)
 
 Constraints & Standards (Google L7 Quality Floor):
-1.  **Strict Mode Compliance**: `tsconfig.json` should have `"strict": true`. All compilation errors must be resolved. Explicit `any` is forbidden unless absolutely necessary and commented.
-2.  **Performance**: The app must handle 500+ messages and 50+ artifacts without crashing or dropping below 60fps scrolling.
-3.  **Memory**: Ensure no jagged memory leaks during simulated long sessions.
+1.  **Zero Explicit `any`**: The usage of `any` is strictly forbidden. Use `unknown` with type guards, or define the correct interface.
+2.  **Linter Enforcement**: Update `.eslintrc.cjs` (or `eslint.config.js`) to set `@typescript-eslint/no-explicit-any` to `"error"`.
+3.  **Compilation purity**: `npm run build` (which runs `tsc`) must pass with 0 errors.
+4.  **Contract Verification**: `npm run test:contract` must pass. If the backend definitions (`pkg/types`) have drifted from the frontend types, this is the moment to catch it.
 
 Micro-Sprint Plan:
-1.  **TypeScript Hardening**:
-    -   Verify/Enable `"strict": true` in `tsconfig.json`.
+1.  **Linter Hardening**:
+    -   Modify the ESLint configuration to treat `no-explicit-any` as an ERROR (not warning).
+    -   Run `npm run lint`.
+    -   **Remediate**: Fix every error found. Do not use `// eslint-disable` without a documented justification comment.
+2.  **TSC Validation**:
     -   Run `npm run type-check` (or `tsc --noEmit`).
-    -   Fix all resulting errors (null checks, implicit any, unbound methods).
-2.  **Load Testing Harness**:
-    -   Create `src/debug/load-test.ts` (triggered via `window.fb.runLoadTest()`).
-    -   Simulate: 500 messages injected, 50 artifacts created.
-    -   Measure: Render time, FPS impact.
-3.  **Optimization (if needed)**:
-    -   Implement virtualization (e.g., `checkVisibility`) if rendering 500+ DOM nodes causes lag.
+    -   Fix any hidden type errors that `vite build` might have glossed over.
+3.  **Performance Optimization (Low Hanging Fruit)**:
+    -   Refactor `fb-message-list.ts`: `_formatTime` should not instantiate `new Date()` inside the render template. Move this logic to a helper or pre-compute it to reduce GC pressure.
 
 Definition of Done:
-- [ ] `tsconfig.json` has limit-strict settings enabled.
-- [ ] `npm run build` passes with NO type errors.
-- [ ] Load Test script created and verified (500 items).
-- [ ] App remains responsive (>30fps) during load test.
---------------------------------------------------------------------------------
+- [ ] `npm run lint` returns 0 warnings/errors with `no-explicit-any` enabled.
+- [ ] `npm run type-check` returns 0 errors.
+- [ ] `npm run test:contract` passes.
+- [ ] `fb-message-list.ts` date formatting optimized.
 
-execute /prism
+/prism

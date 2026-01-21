@@ -171,23 +171,6 @@ export class FBMessageList extends FBElement {
         });
     }
 
-    /**
-     * Formats an ISO 8601 timestamp for display.
-     * 
-     * NOTE: This relies on `new Date(isoString)` which is acceptable for MVP.
-     * However, ensure the backend sends UTC ISO strings with the 'Z' suffix
-     * (e.g., "2026-01-19T21:00:00Z") to prevent client-side timezone confusion.
-     * 
-     * @see Step 57 for production hardening considerations.
-     */
-    private _formatTime(isoString: string): string {
-        try {
-            return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch {
-            return '';
-        }
-    }
-
     override render(): TemplateResult {
         if (this._messages.length === 0) {
             return html`
@@ -216,9 +199,9 @@ export class FBMessageList extends FBElement {
                             <fb-action-card .card=${msg.actionCard} message-id=${msg.id}></fb-action-card>
                         ` : nothing}
 
-                        <span class="meta" aria-label="Sent at ${this._formatTime(msg.createdAt)}">
-                            ${msg.role === 'user' ? 'You' : 'Agent'} • ${this._formatTime(msg.createdAt)}
-                        </span>
+                        <span class="meta" aria-label="Sent at ${msg.displayTime ?? ''}"
+                            >${msg.role === 'user' ? 'You' : 'Agent'} • ${msg.displayTime ?? ''}</span
+                        >
                     </article>
                 `)}
                 
