@@ -28,6 +28,34 @@ export class FBAgentActivity extends FBElement {
                 letter-spacing: 0.05em;
             }
 
+            /* Step 60.2.2: DEV-only debug controls */
+            .debug-controls {
+                display: flex;
+                gap: 4px;
+            }
+
+            .debug-btn {
+                padding: 2px 6px;
+                font-size: 10px;
+                border: 1px solid var(--fb-border-light);
+                border-radius: 4px;
+                background: transparent;
+                color: var(--fb-text-muted);
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .debug-btn:hover {
+                background: var(--fb-surface-hover);
+                color: var(--fb-text-primary);
+            }
+
+            .debug-btn--danger:hover {
+                background: var(--fb-error);
+                color: white;
+                border-color: var(--fb-error);
+            }
+
             .activity-list {
                 display: flex;
                 flex-direction: column;
@@ -139,10 +167,73 @@ export class FBAgentActivity extends FBElement {
         }
     }
 
+    // Step 60.2.2: Debug button handlers (arrow functions to satisfy unbound-method lint)
+    private _handleFlood = (): void => {
+        const loadTest = (window as unknown as { fb?: { loadTest?: { flood: (n: number) => void } } }).fb?.loadTest;
+        if (loadTest) {
+            loadTest.flood(1000);
+        } else {
+            console.warn('[FBAgentActivity] LoadTestService not available');
+        }
+    };
+
+    private _handleStream = (): void => {
+        const loadTest = (window as unknown as { fb?: { loadTest?: { stream: (n: number) => void } } }).fb?.loadTest;
+        if (loadTest) {
+            loadTest.stream(20);
+        } else {
+            console.warn('[FBAgentActivity] LoadTestService not available');
+        }
+    };
+
+    private _handleStop = (): void => {
+        const loadTest = (window as unknown as { fb?: { loadTest?: { stop: () => void } } }).fb?.loadTest;
+        if (loadTest) {
+            loadTest.stop();
+        } else {
+            console.warn('[FBAgentActivity] LoadTestService not available');
+        }
+    };
+
+    /** Check if running in DEV mode */
+    private _isDevMode(): boolean {
+        return (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+    }
+
+    /** Renders DEV-only debug controls */
+    private _renderDebugControls(): TemplateResult | null {
+        // Only show in DEV mode
+        if (!this._isDevMode()) return null;
+
+        return html`
+            <div class="debug-controls">
+                <button
+                    class="debug-btn"
+                    id="debug-flood-btn"
+                    @click=${this._handleFlood}
+                    title="Inject 1000 messages"
+                >⚡ Flood 1000</button>
+                <button
+                    class="debug-btn"
+                    id="debug-stream-btn"
+                    @click=${this._handleStream}
+                    title="Stream 20 msg/sec"
+                >🌊 Stream 20/s</button>
+                <button
+                    class="debug-btn debug-btn--danger"
+                    id="debug-stop-btn"
+                    @click=${this._handleStop}
+                    title="Stop all tests"
+                >🛑 Stop</button>
+            </div>
+        `;
+    }
+
     override render(): TemplateResult {
         return html`
             <div class="header">
-                Agent Activity
+                <span>Agent Activity</span>
+                ${this._renderDebugControls()}
             </div>
 
             <div class="activity-list">

@@ -63,3 +63,18 @@ const registered = registerComponents({
 
 console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);
 console.log('[FutureBuild] Frontend initialized');
+
+// Step 60.2.2: Load Test Harness - DEV only
+// Exposes window.fb.loadTest for console stress-testing
+const isDev = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+if (isDev) {
+    import('./services/debug/load-test').then(({ loadTestService }) => {
+        // Extend existing window.fb or create it
+        const fbGlobal = (window as unknown as { fb?: Record<string, unknown> }).fb ?? {};
+        fbGlobal['loadTest'] = loadTestService;
+        (window as unknown as { fb: Record<string, unknown> }).fb = fbGlobal;
+        console.log('[FutureBuild] 🧪 LoadTestService attached to window.fb.loadTest');
+    }).catch((err: unknown) => {
+        console.warn('[FutureBuild] Failed to load LoadTestService', err);
+    });
+}
