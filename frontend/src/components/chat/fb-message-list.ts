@@ -6,6 +6,7 @@ import { store } from '../../store/store';
 import type { ChatMessage } from '../../store/types';
 
 import '@lit-labs/virtualizer';
+import { flow } from '@lit-labs/virtualizer/layouts/flow.js';
 import type { LitVirtualizer, RangeChangedEvent } from '@lit-labs/virtualizer';
 
 import './fb-action-card';
@@ -283,6 +284,7 @@ export class FBMessageList extends FBElement {
                 role="log"
                 aria-label="Conversation messages"
                 aria-live="polite"
+                .layout=${flow({ direction: 'vertical' })}
                 .items=${this._virtualItems}
                 .renderItem=${this._renderItem}
                 @rangeChanged=${this._handleRangeChanged}

@@ -146,8 +146,8 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | Step | Task | Dependencies | Est. Days |
 |------|------|--------------|-----------|
 | 60.1 | **Strict Mode & Type Hygiene**: Enforce `no-explicit-any`... | Step 59 | 1 | [x] |
-| 60.2.1 | **Virtualization Infrastructure**: Implement `@lit-labs/virtualizer` in `fb-message-list`. Refactor auto-scroll logic to rely on virtualizer range events rather than raw DOM geometry. | Step 60.1 | 1 |
-| 60.2.2 | **Load Test Harness**: Create `LoadTestService` to pump 1,000+ messages into the store using `requestIdleCallback`. Add debug controls to trigger floods. | Step 60.2.1 | 0.5 |
+| 60.2.1 | **Virtualization Infrastructure**: Implement `@lit-labs/virtualizer` in `fb-message-list`. Refactor auto-scroll logic to rely on virtualizer range events rather than raw DOM geometry. | Step 60.1 | 1 | [x] |
+| 60.2.2 | **Load Test Harness**: Create `LoadTestService` to pump 1,000+ messages into the store using `requestIdleCallback`. Add debug controls to trigger floods. | Step 60.2.1 | 0.5 | [x] |
 | 60.2.3 | **Performance Tuning**: Profile and tune `overscan` buffers. verify 60fps scrolling on mobile simulation. | Step 60.2.2 | 0.5 |
 | 61 | Security audit and **Go Interface mock testing** | All previous | 3 |
 | 62 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |

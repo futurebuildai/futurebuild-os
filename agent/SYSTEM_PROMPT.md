@@ -145,39 +145,43 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 60.2.3: Performance Tuning (Overscan & Mobile)
+--------------------------------------------------------------------------------
+Task: Execute Phase 8, Step 61: Security Audit & Go Interface Mock Testing
 
 Context:
-We have the virtualizer (60.2.1) and the stress test (60.2.2). Now we must ensure the "feel" is perfect. The default virtualizer settings might be too aggressive (causing white flashing on fast scroll) or too wasteful (rendering too many off-screen nodes).
+We have completed the frontend implementation and verified its performance. Our focus now shifts to hardening the backend and ensuring robust testing before production deployment. We need to perform a deep security audit and implement comprehensive mocks for our core service interfaces.
 
 Objective:
-Profile `fb-message-list` under load and tune the configuration for optimal mobile performance (60fps).
+1.  **Security Audit**: Analyze the backend code for vulnerabilities (SQLi, XSS, insecure auth, race conditions) and remediate.
+2.  **Mock Interfaces**: specific implementations for:
+    *   `WeatherService`
+    *   `VisionService`
+    *   `NotificationService`
+    *   `DirectoryService`
+3.  **Verification**: Write a test suite that uses these mocks to verify service interactions without external dependencies.
 
 Technical Specifications (L7 Quality Bar):
-1.  **Overscan Analysis**:
-    *   Stress Test: Run `window.fb.loadTest.flood(200)` and scroll aggressively up/down.
-    *   Observation: Do you see "blank" space before content renders?
-    *   Action: Locate `<lit-virtualizer>` usage in `fb-message-list.ts`. If flashing occurs, add/adjust the `.layout=${flow({ overscan: '??px' })}` configuration (or equivalent attribute). **Note**: Lit Virtualizer defaults might need explicit tuning for variable height items.
+1.  **Mock Architecture**:
+    *   Use `github.com/stretchr/testify/mock` or standard Go interface emulation.
+    *   Mocks must be located in `internal/mocks/` or `pkg/mocks/`.
+    *   Each mock must allow simulating success, failure, and latency scenarios.
 
-2.  **Mobile Simulation**:
-    *   Use the browser subagent to emulate a mobile viewport (iPhone 12 Pro dimensions).
-    *   Verify touch scrolling feel (via mouse drag simulation if possible, or inspection of scroll event handling).
-    *   Ensure the `LoadTestService` logic (jank meter) reports steady metrics even on restrictive viewports.
+2.  **Security Focus**:
+    *   Check all SQL queries in `internal/db` for parameterization.
+    *   Verify `internal/auth` middleware properly validates JWTs and enforces RBAC.
+    *   Ensure all external API calls have timeouts and proper error wrapping.
 
-3.  **Memory Profiling (Passive)**:
-    *   After a large flood and clear (`window.fb.loadTest.clear()`), ensure DOM node count returns to baseline.
-    *   Verify no retained `ChatMessage` objects in detached DOM nodes.
+3.  **Test Suite**:
+    *   Create `internal/services/service_test.go` (or similar) to run the mock verification.
+    *   Ensure tests run with `go test ./...`.
 
 Implementation Plan:
-1.  **Baseline Profile**: Run a manual scroll test with current settings.
-2.  **Tuning**: Experiment with `layout` configuration in `fb-message-list.ts`.
-    *   Likely target: `flow({ direction: 'vertical', overscan: '1000px' })` (or similar).
-3.  **Verification**: Update `walkthrough.md` with final "smoothness" verdict.
+1.  **Audit**: Scan the codebase and fix immediate vulnerabilities.
+2.  **Mocking**: Generate/Write mock structs for the 4 core services.
+3.  **Testing**: Write the verification suite.
 
 Definition of Done:
-- [ ] No visible "white flashing" during fast scrolling (Desktop & Mobile emulation).
-- [ ] Frame rate consistently >50fps during `stream(20)`.
-- [ ] Memory returns to baseline after `clear()`.
---------------------------------------------------------------------------------
-
-/prism
+- [ ] Security audit completed and critical/high issues fixed.
+- [ ] Mocks implemented for Weather, Vision, Notification, and Directory services.
+- [ ] Test suite passes (`go test`) using the mocks.
+- [ ] `golangci-lint` passes.
