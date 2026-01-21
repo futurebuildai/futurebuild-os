@@ -1,16 +1,37 @@
 import { html, css, TemplateResult, nothing } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, query } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
 import type { ChatMessage } from '../../store/types';
 
+import '@lit-labs/virtualizer';
+import type { LitVirtualizer, RangeChangedEvent } from '@lit-labs/virtualizer';
+
 import './fb-action-card';
 import './fb-typing-indicator';
 
 /**
- * FBMessageList - Renders the chat message stream.
- * Subscribes to store.messages$ and auto-scrolls when new messages arrive.
+ * Virtual item type for the virtualizer.
+ * Can be a real message or a typing indicator placeholder.
+ * See PRODUCTION_PLAN.md Step 60.2.1
+ */
+interface VirtualItem {
+    id: string;
+    role?: 'user' | 'assistant' | 'system';
+    content?: string;
+    createdAt?: string;
+    displayTime?: string;
+    isStreaming?: boolean;
+    actionCard?: ChatMessage['actionCard'];
+    artifactRef?: ChatMessage['artifactRef'];
+    /** True if this is the typing indicator placeholder */
+    isTypingPlaceholder?: boolean;
+}
+
+/**
+ * FBMessageList - Virtualized chat message stream.
+ * Uses @lit-labs/virtualizer for O(1) DOM at 1,000+ messages.
  * @element fb-message-list
  */
 @customElement('fb-message-list')
@@ -18,21 +39,18 @@ export class FBMessageList extends FBElement {
     static override styles = [
         FBElement.styles,
         css`
+            /* Step 60.2.1: Host delegates scrolling to virtualizer */
             :host {
-                display: block;
-                flex: 1;
-                overflow-y: auto;
-                padding: var(--fb-spacing-lg);
-                scroll-behavior: smooth;
-            }
-
-            .list {
                 display: flex;
                 flex-direction: column;
-                gap: var(--fb-spacing-md);
-                max-width: 800px;
-                margin: 0 auto;
-                padding-bottom: var(--fb-spacing-xl);
+                height: 100%;
+                overflow: hidden;
+            }
+
+            lit-virtualizer {
+                flex: 1;
+                /* Padding applied inside virtualizer for scroll edge spacing */
+                padding: var(--fb-spacing-lg);
             }
 
             .message {
@@ -40,6 +58,8 @@ export class FBMessageList extends FBElement {
                 flex-direction: column;
                 max-width: 85%;
                 animation: fadeIn 0.3s ease;
+                /* Replaces flex gap - virtualizer doesn't support gap */
+                margin-bottom: var(--fb-spacing-md);
             }
 
             @keyframes fadeIn {
@@ -106,6 +126,12 @@ export class FBMessageList extends FBElement {
                 opacity: 0.5;
             }
 
+            /* Typing indicator wrapper */
+            .typing-wrapper {
+                align-self: flex-start;
+                margin-bottom: var(--fb-spacing-md);
+            }
+
             /* Screen reader only */
             .sr-only {
                 position: absolute;
@@ -121,26 +147,48 @@ export class FBMessageList extends FBElement {
         `
     ];
 
-    /** Threshold in pixels to consider "near bottom" for auto-scroll */
-    private static readonly SCROLL_THRESHOLD = 100;
+    @query('lit-virtualizer')
+    private _virtualizer?: LitVirtualizer;
 
     @state() private _messages: ChatMessage[] = [];
     @state() private _isTyping = false;
+
+    /** Tracks if user is viewing the bottom of the list */
+    private _isAtBottom = true;
     private _disposeEffects: (() => void)[] = [];
+
+    /**
+     * Computed items for the virtualizer.
+     * Injects typing indicator as a transient virtual item.
+     */
+    private get _virtualItems(): VirtualItem[] {
+        if (this._isTyping) {
+            return [
+                ...this._messages,
+                { id: 'typing-indicator', isTypingPlaceholder: true }
+            ];
+        }
+        return this._messages;
+    }
 
     override connectedCallback(): void {
         super.connectedCallback();
 
         this._disposeEffects.push(
             effect(() => {
+                const prevLength = this._messages.length;
                 this._messages = store.messages$.value;
-                this._scrollToBottomIfNearEnd();
+
+                // Auto-scroll only if user was at bottom before new message
+                if (this._messages.length > prevLength && this._isAtBottom) {
+                    this._scrollToBottom();
+                }
             }),
-            // Step 57: Subscribe to typing state
             effect(() => {
                 this._isTyping = store.isTyping$.value;
-                if (this._isTyping) {
-                    this._scrollToBottomIfNearEnd();
+                // Scroll to show typing indicator if at bottom
+                if (this._isTyping && this._isAtBottom) {
+                    this._scrollToBottom();
                 }
             })
         );
@@ -153,60 +201,92 @@ export class FBMessageList extends FBElement {
     }
 
     /**
-     * Scrolls to the bottom only if the user is already near the bottom.
-     * This prevents disrupting users who have scrolled up to read history.
+     * Handles virtualizer range changes to track scroll position.
+     * Updates _isAtBottom based on whether the last item is visible.
      */
-    private _scrollToBottomIfNearEnd(): void {
-        requestAnimationFrame(() => {
-            const host = this as HTMLElement;
-            const isNearBottom =
-                (host.scrollHeight - host.scrollTop - host.clientHeight) < FBMessageList.SCROLL_THRESHOLD;
+    private _handleRangeChanged = (e: RangeChangedEvent): void => {
+        const items = this._virtualItems;
+        // User is at bottom if the last item is visible
+        this._isAtBottom = e.last >= items.length - 1;
+    };
 
-            if (isNearBottom) {
-                const last = this.shadowRoot?.querySelector('.message:last-child');
-                if (last) {
-                    last.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }
+    /**
+     * Scrolls to the last item using virtualizer API.
+     */
+    private _scrollToBottom(): void {
+        requestAnimationFrame(() => {
+            const items = this._virtualItems;
+            if (this._virtualizer && items.length > 0) {
+                this._virtualizer.scrollToIndex(items.length - 1, 'end');
             }
         });
     }
 
-    override render(): TemplateResult {
-        if (this._messages.length === 0) {
+    /**
+     * Renders individual virtual items (messages or typing indicator).
+     */
+    private _renderItem = (item: VirtualItem): TemplateResult => {
+        // Handle typing indicator placeholder
+        if (item.isTypingPlaceholder) {
             return html`
-                <div class="empty-state" role="status" aria-live="polite">
-                    <div class="empty-icon" aria-hidden="true">💬</div>
-                    <h3>Start a Conversation</h3>
-                    <p>Ask the agent to help you manage your project.</p>
+                <div class="typing-wrapper">
+                    <fb-typing-indicator></fb-typing-indicator>
                 </div>
             `;
         }
 
+        // Render standard message
         return html`
-            <div class="list" role="log" aria-label="Conversation messages" aria-live="polite">
-                <span class="sr-only">${this._messages.length} messages in conversation</span>
-                ${this._messages.map(msg => html`
-                    <article 
-                        class="message ${msg.role}" 
-                        id=${msg.id}
-                        aria-label="${msg.role === 'user' ? 'Your message' : 'Agent response'}"
-                    >
-                        <div class="message-content">
-                            ${msg.content}
-                        </div>
-                        
-                        ${msg.actionCard ? html`
-                            <fb-action-card .card=${msg.actionCard} message-id=${msg.id}></fb-action-card>
-                        ` : nothing}
-
-                        <span class="meta" aria-label="Sent at ${msg.displayTime ?? ''}"
-                            >${msg.role === 'user' ? 'You' : 'Agent'} • ${msg.displayTime ?? ''}</span
-                        >
-                    </article>
-                `)}
+            <article 
+                class="message ${item.role}" 
+                id=${item.id}
+                aria-label="${item.role === 'user' ? 'Your message' : 'Agent response'}"
+            >
+                <div class="message-content">
+                    ${item.content}
+                </div>
                 
-                ${this._isTyping ? html`<fb-typing-indicator></fb-typing-indicator>` : nothing}
+                ${item.actionCard ? html`
+                    <fb-action-card .card=${item.actionCard} message-id=${item.id}></fb-action-card>
+                ` : nothing}
+
+                <span class="meta" aria-label="Sent at ${item.displayTime ?? ''}"
+                    >${item.role === 'user' ? 'You' : 'Agent'} • ${item.displayTime ?? ''}</span
+                >
+            </article>
+        `;
+    };
+
+    /**
+     * Renders the empty state when no messages exist.
+     */
+    private _renderEmptyState(): TemplateResult {
+        return html`
+            <div class="empty-state" role="status" aria-live="polite">
+                <div class="empty-icon" aria-hidden="true">💬</div>
+                <h3>Start a Conversation</h3>
+                <p>Ask the agent to help you manage your project.</p>
             </div>
+        `;
+    }
+
+    override render(): TemplateResult {
+        // Early return for empty state (avoids 0-item sizing glitches)
+        if (this._messages.length === 0) {
+            return this._renderEmptyState();
+        }
+
+        return html`
+            <span class="sr-only">${this._messages.length} messages in conversation</span>
+            <lit-virtualizer
+                scroller
+                role="log"
+                aria-label="Conversation messages"
+                aria-live="polite"
+                .items=${this._virtualItems}
+                .renderItem=${this._renderItem}
+                @rangeChanged=${this._handleRangeChanged}
+            ></lit-virtualizer>
         `;
     }
 }

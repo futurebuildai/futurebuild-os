@@ -16,3 +16,8 @@
 - [x] Step 57: **Real-time WebSocket/SSE Messaging** (RealtimeService, DevTools hooks, Typing indicator)
 - [x] Step 58: **Artifact Fixture Testing** (Pure components, shared helpers, fixture harness)
 - [x] Step 59: **E2E Demo Readiness** (Full flow verification, polish)
+
+## Phase 8: Production Readiness
+
+- [x] Step 60.1: **Strict Mode & Type Hygiene** (displayTime pre-calculation)
+- [x] Step 60.2.1: **Virtualization Infrastructure** (@lit-labs/virtualizer in fb-message-list)

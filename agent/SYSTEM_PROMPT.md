@@ -146,39 +146,36 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 60.1: Strict Mode & Type Hygiene
+Task: Execute Phase 8, Step 60.2.2: Load Test Harness
 
 Context:
-The application is feature-complete (Step 59). We are now entering the Production Readiness phase. The goal of this sprint is to eliminate "loose" typing to ensure the codebase is refactor-resilient.
+Virtualization (Step 60.2.1) is complete. Now we must PROVE it scales. We need a way to reliably inject 1,000+ messages into the system to verify performance limits and tuning.
 
 Objective:
-Enforce "L7 Strictness" across the frontend codebase by banning `any`, ensuring strict null checks, and validating the Data Contract.
+Create a `LoadTestService` and debug UI to verify the system handles massive message volume without crashing or stuttering.
 
-Spec References:
-- PRODUCTION_PLAN.md Step 60.1
-- FRONTEND_SCOPE.md (Section 2: Strict Typing)
+Prerequisites:
+- `fb-message-list.ts` uses `@lit-labs/virtualizer` (COMPLETE).
+- `store.ts` handles message updates.
 
-Constraints & Standards (Google L7 Quality Floor):
-1.  **Zero Explicit `any`**: The usage of `any` is strictly forbidden. Use `unknown` with type guards, or define the correct interface.
-2.  **Linter Enforcement**: Update `.eslintrc.cjs` (or `eslint.config.js`) to set `@typescript-eslint/no-explicit-any` to `"error"`.
-3.  **Compilation purity**: `npm run build` (which runs `tsc`) must pass with 0 errors.
-4.  **Contract Verification**: `npm run test:contract` must pass. If the backend definitions (`pkg/types`) have drifted from the frontend types, this is the moment to catch it.
+Technical Constraints (The "L7" Quality Bar):
+1.  **Backpressure Safety**: You cannot just `while(true)` push messages. Use `requestIdleCallback` or `setTimeout` to yield to the main thread so the UI remains responsive during the "flood".
+2.  **Realistic Data**: Use a dictionary of varying message lengths (short "ok", medium paragraphs, long code blocks) to test the Virtualizer's variable height logic.
+3.  **Debug Controls**: Expose methods on `window.fb.loadTest` for manual triggering from console:
+    - `flood(count: number, delay: number)`
+    - `clear()`
+4.  **FPS Monitoring**: (Optional) Log simple perf metrics to console during flood.
 
-Micro-Sprint Plan:
-1.  **Linter Hardening**:
-    -   Modify the ESLint configuration to treat `no-explicit-any` as an ERROR (not warning).
-    -   Run `npm run lint`.
-    -   **Remediate**: Fix every error found. Do not use `// eslint-disable` without a documented justification comment.
-2.  **TSC Validation**:
-    -   Run `npm run type-check` (or `tsc --noEmit`).
-    -   Fix any hidden type errors that `vite build` might have glossed over.
-3.  **Performance Optimization (Low Hanging Fruit)**:
-    -   Refactor `fb-message-list.ts`: `_formatTime` should not instantiate `new Date()` inside the render template. Move this logic to a helper or pre-compute it to reduce GC pressure.
+Implementation Plan:
+1.  **Create Service**: `frontend/src/services/debug/load-test.ts`.
+2.  **Integrate**: Hook it up in `index.ts` (dev mode only ideally, or just widely available for this phase).
+3.  **Stress Test UI**: Add a temporary "Stress" button in the Activity Log or just rely on Console Commands.
+4.  **Verification**: Pump 1,000 messages. Scroll up/down wildly. Ensure no white screens or jank.
 
 Definition of Done:
-- [ ] `npm run lint` returns 0 warnings/errors with `no-explicit-any` enabled.
-- [ ] `npm run type-check` returns 0 errors.
-- [ ] `npm run test:contract` passes.
-- [ ] `fb-message-list.ts` date formatting optimized.
+- [ ] `LoadTestService` implemented.
+- [ ] `window.fb.loadTest.flood(1000)` executes successfully.
+- [ ] UI remains interactive (buttons clickable) *during* the flood.
+- [ ] Virtualizer maintains strict DOM node count.
 
 /prism
