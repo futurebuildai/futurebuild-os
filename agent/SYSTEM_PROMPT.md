@@ -145,37 +145,39 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 60.2.2: Load Test Harness
+Task: Execute Phase 8, Step 60.2.3: Performance Tuning (Overscan & Mobile)
 
 Context:
-Virtualization (Step 60.2.1) is complete. Now we must PROVE it scales. We need a way to reliably inject 1,000+ messages into the system to verify performance limits and tuning.
+We have the virtualizer (60.2.1) and the stress test (60.2.2). Now we must ensure the "feel" is perfect. The default virtualizer settings might be too aggressive (causing white flashing on fast scroll) or too wasteful (rendering too many off-screen nodes).
 
 Objective:
-Create a `LoadTestService` and debug UI to verify the system handles massive message volume without crashing or stuttering.
+Profile `fb-message-list` under load and tune the configuration for optimal mobile performance (60fps).
 
-Prerequisites:
-- `fb-message-list.ts` uses `@lit-labs/virtualizer` (COMPLETE).
-- `store.ts` handles message updates.
+Technical Specifications (L7 Quality Bar):
+1.  **Overscan Analysis**:
+    *   Stress Test: Run `window.fb.loadTest.flood(200)` and scroll aggressively up/down.
+    *   Observation: Do you see "blank" space before content renders?
+    *   Action: Locate `<lit-virtualizer>` usage in `fb-message-list.ts`. If flashing occurs, add/adjust the `.layout=${flow({ overscan: '??px' })}` configuration (or equivalent attribute). **Note**: Lit Virtualizer defaults might need explicit tuning for variable height items.
 
-Technical Constraints (The "L7" Quality Bar):
-1.  **Backpressure Safety**: You cannot just `while(true)` push messages. Use `requestIdleCallback` or `setTimeout` to yield to the main thread so the UI remains responsive during the "flood".
-2.  **Realistic Data**: Use a dictionary of varying message lengths (short "ok", medium paragraphs, long code blocks) to test the Virtualizer's variable height logic.
-3.  **Debug Controls**: Expose methods on `window.fb.loadTest` for manual triggering from console:
-    - `flood(count: number, delay: number)`
-    - `clear()`
-4.  **FPS Monitoring**: (Optional) Log simple perf metrics to console during flood.
+2.  **Mobile Simulation**:
+    *   Use the browser subagent to emulate a mobile viewport (iPhone 12 Pro dimensions).
+    *   Verify touch scrolling feel (via mouse drag simulation if possible, or inspection of scroll event handling).
+    *   Ensure the `LoadTestService` logic (jank meter) reports steady metrics even on restrictive viewports.
+
+3.  **Memory Profiling (Passive)**:
+    *   After a large flood and clear (`window.fb.loadTest.clear()`), ensure DOM node count returns to baseline.
+    *   Verify no retained `ChatMessage` objects in detached DOM nodes.
 
 Implementation Plan:
-1.  **Create Service**: `frontend/src/services/debug/load-test.ts`.
-2.  **Integrate**: Hook it up in `index.ts` (dev mode only ideally, or just widely available for this phase).
-3.  **Stress Test UI**: Add a temporary "Stress" button in the Activity Log or just rely on Console Commands.
-4.  **Verification**: Pump 1,000 messages. Scroll up/down wildly. Ensure no white screens or jank.
+1.  **Baseline Profile**: Run a manual scroll test with current settings.
+2.  **Tuning**: Experiment with `layout` configuration in `fb-message-list.ts`.
+    *   Likely target: `flow({ direction: 'vertical', overscan: '1000px' })` (or similar).
+3.  **Verification**: Update `walkthrough.md` with final "smoothness" verdict.
 
 Definition of Done:
-- [ ] `LoadTestService` implemented.
-- [ ] `window.fb.loadTest.flood(1000)` executes successfully.
-- [ ] UI remains interactive (buttons clickable) *during* the flood.
-- [ ] Virtualizer maintains strict DOM node count.
+- [ ] No visible "white flashing" during fast scrolling (Desktop & Mobile emulation).
+- [ ] Frame rate consistently >50fps during `stream(20)`.
+- [ ] Memory returns to baseline after `clear()`.
+--------------------------------------------------------------------------------
 
 /prism

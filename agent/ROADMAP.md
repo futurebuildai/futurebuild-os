@@ -21,3 +21,4 @@
 
 - [x] Step 60.1: **Strict Mode & Type Hygiene** (displayTime pre-calculation)
 - [x] Step 60.2.1: **Virtualization Infrastructure** (@lit-labs/virtualizer in fb-message-list)
+- [x] Step 60.2.2: **Load Test Harness** (LoadTestService, debug buttons)
