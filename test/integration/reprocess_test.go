@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -37,7 +39,7 @@ func TestDocument_Reprocess(t *testing.T) {
 	// 1. Setup Services (Mock Client for consistent AI response)
 	mockClient := &MockVertexClient{}
 	docService := service.NewDocumentService(db, mockClient)
-	invoiceService := service.NewInvoiceService(db, mockClient)
+	invoiceService := service.NewInvoiceService(db, mockClient, cfg)
 
 	// 2. Setup Test Data
 	orgID := uuid.New()

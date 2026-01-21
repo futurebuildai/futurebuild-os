@@ -10,12 +10,18 @@ audit:
 	@echo "--- Auditing Frontend ---"
 	npm --prefix frontend run build
 
-# Test: Run all unit tests
+# Test: Run all unit tests (excludes integration tests)
 test:
-	@echo "--- Running Backend Tests ---"
+	@echo "--- Running Backend Unit Tests ---"
 	go test -v ./...
 	@echo "--- Running Frontend Tests ---"
 	@if [ -d "frontend" ]; then npm --prefix frontend test || echo "No frontend tests defined"; fi
+
+# Test: Run integration tests (requires running database)
+# L7 Code Review: Test Isolation fix
+test-integration:
+	@echo "--- Running Backend Integration Tests ---"
+	go test -v -tags=integration ./test/integration/...
 
 # Auth Test: Verify JWT logic and claims
 test-auth:

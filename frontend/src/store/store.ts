@@ -569,38 +569,32 @@ export const store = {
 } as const;
 
 // ============================================================================
-// Effects (Side Effects)
-// ============================================================================
-
-/**
- * Effect: Persist auth token to localStorage.
- */
-effect(() => {
-    const token = _token$.value;
-    if (token) {
-        localStorage.setItem(STORAGE_KEY_TOKEN, token);
-    } else {
-        localStorage.removeItem(STORAGE_KEY_TOKEN);
-    }
-});
-
-/**
- * Effect: Persist theme preference to localStorage.
- */
-effect(() => {
-    const theme = _theme$.value;
-    localStorage.setItem(STORAGE_KEY_THEME, theme);
-});
-
-// ============================================================================
 // Initialization
 // ============================================================================
 
 /**
  * Initialize the store with persisted state.
  * Call this once at application bootstrap.
+ *
+ * L7 Fix: Side-effect effects are registered here instead of at module level.
+ * This prevents localStorage access during import (e.g., JSDOM tests).
  */
 export function initializeStore(): void {
+    // Effect: Persist auth token to localStorage.
+    effect(() => {
+        const token = _token$.value;
+        if (token) {
+            localStorage.setItem(STORAGE_KEY_TOKEN, token);
+        } else {
+            localStorage.removeItem(STORAGE_KEY_TOKEN);
+        }
+    });
+
+    // Effect: Persist theme preference to localStorage.
+    effect(() => {
+        const theme = _theme$.value;
+        localStorage.setItem(STORAGE_KEY_THEME, theme);
+    });
     // Restore token from localStorage
     const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
     if (storedToken) {

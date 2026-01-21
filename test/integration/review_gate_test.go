@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -36,7 +38,7 @@ func TestReviewGate_ConfidenceThreshold(t *testing.T) {
 	}
 
 	// Setup Service (client isn't used for SaveExtraction)
-	invoiceService := service.NewInvoiceService(db, nil)
+	invoiceService := service.NewInvoiceService(db, nil, cfg)
 
 	// Setup Test Data
 	orgID := uuid.New()

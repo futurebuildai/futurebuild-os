@@ -75,6 +75,11 @@
   --fb-z-backdrop: 50;
   --fb-z-rail: 100;
   --fb-z-header: 200;
+
+  /* Message List (Step 60.3 - L7 Code Review) */
+  --fb-msg-max-width: 85%;
+  --fb-anim-slide-up: translateY(10px);
+  --fb-anim-duration-fade: 0.3s;
 }
 
 /* Light Theme Override */

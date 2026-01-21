@@ -57,14 +57,14 @@ export class FBMessageList extends FBElement {
             .message {
                 display: flex;
                 flex-direction: column;
-                max-width: 85%;
-                animation: fadeIn 0.3s ease;
+                max-width: var(--fb-msg-max-width, 85%);
+                animation: fadeIn var(--fb-anim-duration-fade, 0.3s) ease;
                 /* Replaces flex gap - virtualizer doesn't support gap */
                 margin-bottom: var(--fb-spacing-md);
             }
 
             @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
+                from { opacity: 0; transform: var(--fb-anim-slide-up, translateY(10px)); }
                 to { opacity: 1; transform: translateY(0); }
             }
 
@@ -157,6 +157,8 @@ export class FBMessageList extends FBElement {
     /** Tracks if user is viewing the bottom of the list */
     private _isAtBottom = true;
     private _disposeEffects: (() => void)[] = [];
+    /** L7 Fix: ResizeObserver for virtualizer layout recalculation */
+    private _resizeObserver: ResizeObserver | null = null;
 
     /**
      * Computed items for the virtualizer.
@@ -193,11 +195,24 @@ export class FBMessageList extends FBElement {
                 }
             })
         );
+
+        // L7 Fix: ResizeObserver to trigger virtualizer layout on container resize
+        this._resizeObserver = new ResizeObserver(() => {
+            // Force the virtualizer to remeasure item heights
+            if (this._virtualizer) {
+                this._virtualizer.requestUpdate();
+            }
+        });
+        this._resizeObserver.observe(this);
     }
 
     override disconnectedCallback(): void {
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
         super.disconnectedCallback();
     }
 

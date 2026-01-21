@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/colton/futurebuild/internal/api/response"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/middleware"
+	"github.com/colton/futurebuild/internal/platform/metrics"
 	"github.com/google/uuid"
 )
 
@@ -108,6 +110,11 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		"intent", resp.Intent,
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
+
+	// L7 Code Review: Emit metrics for observability
+	duration := time.Since(start).Seconds()
+	metrics.RequestDuration.WithLabelValues("chat").Observe(duration)
+	metrics.RequestsTotal.WithLabelValues("chat", strconv.Itoa(http.StatusOK)).Inc()
 
 	// 5. Return Response
 	w.Header().Set("Content-Type", "application/json")

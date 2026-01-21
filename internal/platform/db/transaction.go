@@ -25,3 +25,29 @@ func ExtractTx(ctx context.Context) (pgx.Tx, bool) {
 	tx, ok := ctx.Value(txKey{}).(pgx.Tx)
 	return tx, ok
 }
+
+// Transactor defines the interface for beginning transactions.
+// *pgxpool.Pool satisfies this interface.
+type Transactor interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+// RunInTx executes fn within a transaction.
+// Standardizes Begin, Defer Rollback, Commit pattern to prevent copy-paste errors.
+// L7 Code Review: Transaction Ergonomics fix.
+func RunInTx(ctx context.Context, pool Transactor, fn func(pgx.Tx) error) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	// Defer rollback - no-op if already committed
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}

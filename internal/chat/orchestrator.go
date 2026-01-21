@@ -342,33 +342,19 @@ func (s *PgxMessageStore) Pool() Transactor {
 // Distributed Transaction Support (Step 45 Zombie Write Fix):
 //   - If a transaction is injected via context (db.InjectTx), uses that transaction.
 //     Caller owns Commit/Rollback lifecycle.
-//   - Otherwise, starts its own transaction (legacy behavior).
+//   - Otherwise, uses db.RunInTx for standardized transaction handling.
+//
+// L7 Code Review: Refactored to use db.RunInTx helper.
 func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessage) error {
 	// Check for context-propagated transaction (caller owns Tx lifecycle)
 	if tx, ok := db.ExtractTx(ctx); ok {
 		return s.saveMessageWithTx(ctx, tx, msg)
 	}
 
-	// Legacy behavior: start own transaction
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	// Defer rollback - no-op if already committed
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-
-	if err := s.saveMessageWithTx(ctx, tx, msg); err != nil {
-		return err
-	}
-
-	// Commit transaction (we own it)
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	// Use standardized transaction helper (L7 Code Review fix)
+	return db.RunInTx(ctx, s.pool, func(tx pgx.Tx) error {
+		return s.saveMessageWithTx(ctx, tx, msg)
+	})
 }
 
 // saveMessageWithTx performs the actual message save using the provided transaction.

@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -44,7 +46,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	}
 
 	// 2. Setup Service (with no-op client as we won't call AI)
-	invoiceService := service.NewInvoiceService(db, &noOpClient{})
+	invoiceService := service.NewInvoiceService(db, &noOpClient{}, cfg)
 
 	// 3. Prepare Database State (Org & Project)
 	orgID := uuid.New()

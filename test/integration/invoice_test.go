@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 import (
@@ -56,7 +58,7 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 	defer client.Close()
 
 	// 3. Setup Service
-	invoiceService := service.NewInvoiceService(db, client)
+	invoiceService := service.NewInvoiceService(db, client, cfg)
 
 	// 4. Test Data Setup
 	orgID := uuid.New()
