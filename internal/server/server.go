@@ -145,6 +145,7 @@ func (s *Server) routes() {
 			r.Get("/verify", s.AuthHandler.Verify)
 		})
 		r.Route("/projects", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			r.Post("/", s.ProjectHandler.CreateProject)
 			r.Get("/{id}", s.ProjectHandler.GetProject)
 
@@ -156,6 +157,7 @@ func (s *Server) routes() {
 			})
 		})
 		r.Route("/documents", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			r.Post("/analyze", s.DocumentHandler.AnalyzeDocument)
 			// See PRODUCTION_PLAN.md Step 41
 			r.Post("/{id}/reprocess", s.DocumentHandler.ReprocessDocument)

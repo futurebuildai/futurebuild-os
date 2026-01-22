@@ -148,8 +148,9 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 60.1 | **Strict Mode & Type Hygiene**: Enforce `no-explicit-any`... | Step 59 | 1 | [x] |
 | 60.2.1 | **Virtualization Infrastructure**: Implement `@lit-labs/virtualizer` in `fb-message-list`. Refactor auto-scroll logic to rely on virtualizer range events rather than raw DOM geometry. | Step 60.1 | 1 | [x] |
 | 60.2.2 | **Load Test Harness**: Create `LoadTestService` to pump 1,000+ messages into the store using `requestIdleCallback`. Add debug controls to trigger floods. | Step 60.2.1 | 0.5 | [x] |
-| 60.2.3 | **Performance Tuning**: Profile and tune `overscan` buffers. verify 60fps scrolling on mobile simulation. | Step 60.2.2 | 0.5 |
-| 61 | Security audit and **Go Interface mock testing** | All previous | 3 |
+| 60.2.3 | **Performance Tuning**: Profile and tune `overscan` buffers. verify 60fps scrolling on mobile simulation. | Step 60.2.2 | 0.5 | [x] |
+| 61.1 | **Security Audit & Hardening**: Run static analysis (gosec), audit SQL queries for parameterization, verify RBAC middleware coverage, and implement XSS sanitization for the Dynamic UI renderer. | All previous | 1.5 |
+| 61.2 | **Go Service Mocking**: Implement "Spy" and "Stub" mocks for Weather, Vision, and Directory services. Write `service_test.go` to verify core business logic without external dependencies. | 61.1 | 1.5 |
 | 62 | Set up production monitoring and blue-green deployment | Step 5, 8 | 2 |
 | 63 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
 

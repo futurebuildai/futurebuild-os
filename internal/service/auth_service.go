@@ -118,7 +118,17 @@ func (s *AuthService) VerifyToken(ctx context.Context, plaintextToken string) (m
 	}
 
 	// Mark token as used
-	updateQuery := fmt.Sprintf("UPDATE %s SET used = true WHERE token_hash = $1", tokenTable)
+	// L7 Hardening: Explicit table selection avoids static analyzer flags (gosec G201)
+	// See PRODUCTION_PLAN.md Step 61.1
+	var updateQuery string
+	switch tokenTable {
+	case "auth_tokens":
+		updateQuery = "UPDATE auth_tokens SET used = true WHERE token_hash = $1"
+	case "portal_tokens":
+		updateQuery = "UPDATE portal_tokens SET used = true WHERE token_hash = $1"
+	default:
+		return nil, fmt.Errorf("invalid token table: %s", tokenTable)
+	}
 	_, err = s.db.Exec(ctx, updateQuery, tokenHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to invalidate token: %w", err)

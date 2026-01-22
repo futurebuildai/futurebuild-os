@@ -41,6 +41,12 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 56: Drag-and-Drop Ingestion (COMPLETED)
         ▪ Step 57: Real-Time Messaging Architecture (COMPLETED)
         ▪ Step 58: Artifact Fixture Testing & Component Wiring (COMPLETED)
+        ▪ Step 59: E2E Demo Readiness (COMPLETED)
+    ◦ Phase 8 (Steps 60-62): Backend - Go + TypeScript: IN PROGRESS.
+        ▪ Step 60: Strict Mode & Type Hygiene (completed)
+        ▪ Step 61: Security Audit & Hardening (Current Step)
+        ▪ Step 62: Mocking & Testing (not started)
+    
     ◦ Current Focus: Phase 7, Step 59 (E2E Demo Readiness).
 .
 OPERATIONAL PROTOCOL:
@@ -146,42 +152,43 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 61: Security Audit & Go Interface Mock Testing
+Task: Execute Phase 8, Step 61.2: Go Service Mocking
 
 Context:
-We have completed the frontend implementation and verified its performance. Our focus now shifts to hardening the backend and ensuring robust testing before production deployment. We need to perform a deep security audit and implement comprehensive mocks for our core service interfaces.
+The system is functionally complete (Frontend & Backend). We are now in the "Hardening Phase." Security Audit (Step 61.1) is complete. We are now preparing for mock testing (Step 61.2) by extracting service interfaces.
 
 Objective:
-1.  **Security Audit**: Analyze the backend code for vulnerabilities (SQLi, XSS, insecure auth, race conditions) and remediate.
-2.  **Mock Interfaces**: specific implementations for:
-    *   `WeatherService`
-    *   `VisionService`
-    *   `NotificationService`
-    *   `DirectoryService`
-3.  **Verification**: Write a test suite that uses these mocks to verify service interactions without external dependencies.
+1.  **Backend Security Audit (The "Fortress" Pass):**
+    * **SQL Injection:** Audit ALL `pgx` queries in `internal/agents` and `internal/platform/db`. Ensure NO string concatenation is used for parameters.
+    * **Broken Object Level Authorization (BOLA):** Verify `ProjectID` in URL parameters is checked against the authenticated user's `OrganizationID` in `internal/middleware/auth_middleware.go`.
+    * **Concurrency Leaks:** Audit `go` keywords. Ensure every goroutine has a `context` or lifecycle management (WaitGroup).
+2.  **Frontend Security Patching:**
+    * **XSS Protection:** Review `fb-message-list.ts` and the Dynamic Renderer. Ensure user content is properly escaped before rendering HTML.
+3.  **Secret Management:** Verify no API keys are hardcoded. Ensure `internal/config` loads strictly from ENV.
 
 Technical Specifications (L7 Quality Bar):
-1.  **Mock Architecture**:
-    *   Use `github.com/stretchr/testify/mock` or standard Go interface emulation.
-    *   Mocks must be located in `internal/mocks/` or `pkg/mocks/`.
-    *   Each mock must allow simulating success, failure, and latency scenarios.
-
-2.  **Security Focus**:
-    *   Check all SQL queries in `internal/db` for parameterization.
-    *   Verify `internal/auth` middleware properly validates JWTs and enforces RBAC.
-    *   Ensure all external API calls have timeouts and proper error wrapping.
-
-3.  **Test Suite**:
-    *   Create `internal/services/service_test.go` (or similar) to run the mock verification.
-    *   Ensure tests run with `go test ./...`.
+1.  **SQL Safety:**
+    * REJECT: `fmt.Sprintf("SELECT * FROM %s", table)`
+    * ACCEPT: `conn.Query(ctx, "SELECT * FROM projects WHERE id=$1", id)`
+2.  **Middleware Chain:**
+    * Ensure `AuthMiddleware` is applied to ALL protected routes in `internal/server/routes.go`.
+    * Ensure `RateLimitMiddleware` is active on public endpoints (Login/MagicLink).
+3.  **Sanitization:**
+    * Use `bluemonday` or similar logic (if applicable) or strict `text()` interpolation in Lit for user-generated strings.
 
 Implementation Plan:
-1.  **Audit**: Scan the codebase and fix immediate vulnerabilities.
-2.  **Mocking**: Generate/Write mock structs for the 4 core services.
-3.  **Testing**: Write the verification suite.
+1.  **Scan:** Read `internal/api`, `internal/db`, and `frontend/src/components/chat`.
+2.  **Report:** Generate a prioritized list of vulnerabilities found.
+3.  **Remediate:** Apply fixes immediately.
+    * Fix 1: Add missing RBAC checks for Artifact retrieval.
+    * Fix 2: Sanitize `DynamicComponent` props.
+    * Fix 3: Ensure context timeouts on all DB transactions.
 
 Definition of Done:
-- [ ] Security audit completed and critical/high issues fixed.
-- [ ] Mocks implemented for Weather, Vision, Notification, and Directory services.
-- [ ] Test suite passes (`go test`) using the mocks.
-- [ ] `golangci-lint` passes.
+- [ ] Vulnerability Report generated and all Critical/High issues resolved.
+- [ ] RBAC verified: Users cannot fetch data for projects they don't own.
+- [ ] SQL Injection vector check: 100% Parameterized queries.
+- [ ] XSS check: Dynamic UI does not execute arbitrary JS.
+- [ ] `gosec` (simulated) pass.
+
+/prism

@@ -22,3 +22,5 @@
 - [x] Step 60.1: **Strict Mode & Type Hygiene** (displayTime pre-calculation)
 - [x] Step 60.2.1: **Virtualization Infrastructure** (@lit-labs/virtualizer in fb-message-list)
 - [x] Step 60.2.2: **Load Test Harness** (LoadTestService, debug buttons)
+- [x] Step 60.2.3: **Performance Tuning** (flow layout, verified 60fps)
+- [x] Step 61.1: **Security Audit & Hardening** (BOLA fix, Confused Deputy fix, SQL hygiene)

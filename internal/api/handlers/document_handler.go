@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -32,18 +33,20 @@ type AnalyzeDocumentRequest struct {
 
 // AnalyzeDocument handles POST /api/v1/documents/analyze
 // See API_AND_TYPES_SPEC.md Section 3.1
+// L7 Security Fix: Uses JWT claims for multi-tenancy, NOT headers (Confused Deputy prevention)
 func (h *DocumentHandler) AnalyzeDocument(w http.ResponseWriter, r *http.Request) {
-	// 1. Multi-tenancy gate: Extract X-Org-ID header
-	orgIDStr := r.Header.Get("X-Org-ID")
-	if orgIDStr == "" {
-		slog.Warn("doc: X-Org-ID header missing", "method", r.Method)
-		http.Error(w, "X-Org-ID header is required", http.StatusBadRequest)
+	// 1. Multi-tenancy gate: Extract OrgID from validated JWT claims
+	// See PRODUCTION_PLAN.md Step 61.1 (Confused Deputy Remediation)
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		slog.Warn("doc: missing authentication context", "method", r.Method, "error", err)
+		http.Error(w, "Unauthorized: missing authentication", http.StatusUnauthorized)
 		return
 	}
-	orgID, err := uuid.Parse(orgIDStr)
+	orgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
-		slog.Warn("doc: invalid X-Org-ID", "raw_org_id", orgIDStr, "error", err)
-		http.Error(w, "Invalid X-Org-ID", http.StatusBadRequest)
+		slog.Warn("doc: invalid OrgID in JWT claims", "raw_org_id", claims.OrgID, "error", err)
+		http.Error(w, "Unauthorized: invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
@@ -97,18 +100,20 @@ type ReprocessDocumentResponse struct {
 // ReprocessDocument handles POST /api/v1/documents/{id}/reprocess
 // Triggers re-analysis of a document with updated content.
 // See PRODUCTION_PLAN.md Step 41
+// L7 Security Fix: Uses JWT claims for multi-tenancy, NOT headers (Confused Deputy prevention)
 func (h *DocumentHandler) ReprocessDocument(w http.ResponseWriter, r *http.Request) {
-	// 1. Multi-tenancy gate: Extract X-Org-ID header
-	orgIDStr := r.Header.Get("X-Org-ID")
-	if orgIDStr == "" {
-		slog.Warn("doc: X-Org-ID header missing for reprocess", "method", r.Method)
-		http.Error(w, "X-Org-ID header is required", http.StatusBadRequest)
+	// 1. Multi-tenancy gate: Extract OrgID from validated JWT claims
+	// See PRODUCTION_PLAN.md Step 61.1 (Confused Deputy Remediation)
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		slog.Warn("doc: missing authentication context for reprocess", "method", r.Method, "error", err)
+		http.Error(w, "Unauthorized: missing authentication", http.StatusUnauthorized)
 		return
 	}
-	orgID, err := uuid.Parse(orgIDStr)
+	orgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
-		slog.Warn("doc: invalid X-Org-ID for reprocess", "raw_org_id", orgIDStr, "error", err)
-		http.Error(w, "Invalid X-Org-ID", http.StatusBadRequest)
+		slog.Warn("doc: invalid OrgID in JWT claims for reprocess", "raw_org_id", claims.OrgID, "error", err)
+		http.Error(w, "Unauthorized: invalid credentials", http.StatusUnauthorized)
 		return
 	}
 

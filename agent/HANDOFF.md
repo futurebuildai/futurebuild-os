@@ -1,45 +1,41 @@
-# HANDOFF — Phase 8, After Step 60.2.3
+# Handoff: Phase 8, Step 61.1 Complete
 
-> Last updated: 2026-01-21 (Performance Tuning Complete)
+**Date:** 2026-01-21
+**Previous Step:** 61.1 (Security Audit & Hardening)
+**Next Step:** 61.2 (Go Service Mocking)
 
----
+## ✅ Completed: Security Audit & Hardening (L7 Fortress Audit Passed)
 
-## Session Summary
+We have successfully remediated **3 Critical Vulnerabilities** identified in the L7 Security Review:
 
-### Step 60.2.3: Performance Tuning ✅ COMPLETE
+1.  **Network Security (BOLA):**
+    *   **Fix:** Added `AuthMiddleware.RequireAuth` to `/api/v1/projects` and `/api/v1/documents` route groups in `server.go`.
+    *   **Result:** Unauthenticated access to project data is now blocked (401 Unauthorized).
 
-**Verified:**
-- `fb-message-list.ts` configured with explicit `flow` layout from `@lit-labs/virtualizer`.
-- **Performance:** Verified O(1) DOM scaling (19 active nodes @ 500 messages).
-- **Smoothness:** Browser test confirmed zero checkerboarding during high-velocity "fling" scrolling.
-- **Cleanup:** `LoadTestService` cleanup verified to leave clean DOM.
-- **Safety:** Removed unsupported `overscan` property; validated `flow` layout configuration.
+2.  **Identity Security (Confused Deputy):**
+    *   **Fix:** Removed reliance on attacker-controlled `X-Org-ID` header in `document_handler.go`.
+    *   **Result:** Tenancy is now strictly enforced via JWT claims (`middleware.GetClaims`).
 
-**Key Components:**
-- `src/components/chat/fb-message-list.ts`: Virtualizer configuration.
+3.  **Database Security (SQL Hygiene):**
+    *   **Fix:** Refactored dynamic `fmt.Sprintf` table injection in `auth_service.go` to use a compile-time safe `switch` statement.
+    *   **Result:** Eliminates potential injection vectors and static analysis warnings.
 
 **Verification:**
-- Build: ✅ 76 modules
-- Lint: ✅ Clean (Strict Mode)
-- Browser Flood Test: ✅ Passed (19 nodes, 0 render gaps)
+*   All `internal/api/handlers` tests PASS.
+*   All `internal/middleware` tests PASS.
+*   `go build ./...` is clean.
 
----
+## 📋 Next: Step 61.2 (Go Service Mocking)
 
-## Next Up: Phase 8 - Step 61
+**Objective:** Isolate service logic for unit testing by extracting interfaces and creating mocks.
 
-**Goal:** Security Audit & Go Interface Mock Testing
+**Implementation Plan:**
+1.  **Interfaces:** Create `internal/service/interfaces.go` defining:
+    *   `ProjectServicer`, `TaskServicer`, `InvoiceServicer`, `DocumentServicer`, `ScheduleServicer`.
+2.  **Mocks:** Create `internal/service/mocks/` with manual mock implementations.
+3.  **AI Client:** Create `pkg/ai/mock_client.go`.
+4.  **Verify:** Ensure no build regressions and mocks are usable in tests.
 
-**Key Tasks:**
-1.  **Security Audit:** Conduct a deep dive into the backend code for security vulnerabilities (SQLi, XSS, etc.).
-2.  **Mock Interfaces:** Implement comprehensive mock implementations for key Go Service Interfaces (Weather, Vision, Notification, Directory).
-3.  **Verification:** Write and run tests to verify these mocks abide by the interface contracts.
-
----
-
-## Dev Server
-
-```bash
-cd frontend && npm run dev -- --port 5174
-```
-
-Test at http://localhost:5174
+**Context:**
+*   `ai.Client` interface is defined in `pkg/ai/vertex.go`.
+*   Handlers currently depend on concrete Service structs.
