@@ -152,49 +152,50 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 62: Integration Testing & E2E Verification
+Task: Execute Phase 8, Steps 62.1 & 62.2 (Integration Infrastructure & Core API Tests)
 
 Context:
-The system is now secure (Step 61.1) and testable via mocks (Step 61.2). The next step is to verify that all components work together correctly through integration and E2E testing.
+We have unit tests (mocks), but we lack "Integration Truth". We need to verify that our Handlers talk to our Services, which talk to our Repositories, which talk to a REAL Postgres database.
+We are establishing the "Testing Pyramid" base layer.
 
-Previous Achievements (Step 61.2):
-- Created `internal/service/interfaces.go` with strict contracts
-- Created thread-safe mocks in `internal/service/mocks/service_mocks.go`
-- Created `pkg/ai/mock_client.go`
-- Refactored handlers to use interface-based DI
-- Added 3 Proof-of-Value tests in `procurement_logic_test.go`
-- Fixed `db.RunInTx` error wrapping
-- All 11 test packages pass
+Objectives:
+1.  **Remediate L7 Flags:**
+    * Create `pkg/types/errors.go` with Sentinel Errors (`ErrConflict`, `ErrNotFound`, `ErrUnauthorized`).
+    * Refactor `internal/service/*` to return these Sentinels.
+    * Refactor `internal/api/handlers/*` to check `errors.Is()` instead of string matching.
+    * Apply `http.MaxBytesReader` in the base handler or middleware.
+2.  **Infrastructure (Step 62.1):**
+    * Create `test/testhelpers/containers.go`: A singleton helper to spin up a Postgres container using `testcontainers-go`.
+    * Ensure migrations are applied automatically to the test container.
+    * Implement a `TruncateAll` helper to clean the DB between tests.
+3.  **Core Integration Tests (Step 62.2):**
+    * Create `test/integration/project_flow_test.go`.
+    * **The Test Pattern:**
+        * Setup: Spin up Container, Initialize Real Service, Initialize Real Handler.
+        * Execution: `httptest.NewRecorder` -> `router.ServeHTTP`.
+        * Assertion: Check HTTP Status AND check DB content (using raw SQL or Helper).
 
-Objective:
-1. **Integration Tests:** Create tests that verify component interactions (e.g., handler → service → repository).
-2. **E2E Tests:** Verify full request/response flows through the API.
-3. **Test Coverage Report:** Generate and analyze coverage gaps.
-4. **CI/CD Integration:** Ensure all tests run reliably in GitHub Actions.
+Technical Constraints (The L7 Standard):
+* **No Mocks in Integration:** Use REAL Postgres. Use REAL Services. Only mock external APIs (Vertex AI, SendGrid) via the interfaces established in Step 61.2.
+* **Parallelism:** Tests must be safe to run with `t.Parallel()`. (Unique OrgIDs/ProjectIDs per test help here).
+* **Test Main:** Use `TestMain` to spin up the container ONCE per package (not once per test function) to keep suite duration under 10s.
+* **No Sleep:** Do not use `time.Sleep`. Use polling with timeouts if waiting for async ops (though 62.2 should be mostly synchronous).
 
-Technical Specifications:
-1. **Test Database:**
-   - Use testcontainers-go or docker-compose for isolated Postgres instances
-   - Ensure each test has a clean database state
+Reference Files:
+* `go.mod` (Already has testcontainers)
+* `internal/api/handlers/project_handler.go` (Target for refactor)
+* `migrations/` (Must be applied to container)
 
-2. **API Integration Tests:**
-   - Test authenticated flows with real JWT tokens
-   - Verify multi-tenancy isolation (Org A cannot see Org B data)
-
-3. **Agent Integration Tests:**
-   - Test ProcurementAgent with real (mocked) WeatherService
-   - Test DailyFocusAgent project streaming
-
-4. **Coverage Goals:**
-   - Target: 80%+ line coverage for critical packages
-   - Focus: `internal/service`, `internal/api/handlers`, `internal/agents`
+Execution Order:
+1.  **Fix the Code (Flags):** Define Sentinels -> Refactor Service -> Refactor Handler.
+2.  **Build the Rig:** Setup `testcontainers` and migration applying logic.
+3.  **Write the Tests:** Project CRUD and Task Scheduling integration tests.
+4.  **Verify:** Run `go test -v -tags=integration ./...`
 
 Definition of Done:
-- [ ] Integration test suite exists for critical paths
-- [ ] E2E tests verify API contract compliance
-- [ ] Coverage report generated (`go test -cover`)
-- [ ] All tests pass in CI (GitHub Actions)
-- [ ] No flaky tests (deterministic, no time.Sleep)
+* [x] `pkg/types/errors.go` exists and is used.
+* [x] `project_handler.go` has NO string matching for errors.
+* [x] `test/integration` package created.
+* [x] `go test ./test/integration/...` passes with a real Dockerized Postgres.
 
 /prism

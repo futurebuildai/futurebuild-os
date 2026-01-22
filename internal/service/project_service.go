@@ -7,7 +7,9 @@ import (
 	"log/slog"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -57,7 +59,8 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return fmt.Errorf("project with name '%s' already exists in this organization", p.Name)
+			// L7 Fix: Return typed sentinel
+			return fmt.Errorf("%w: project with name '%s' already exists", types.ErrConflict, p.Name)
 		}
 		return fmt.Errorf("failed to create project: %w", err)
 	}
@@ -88,6 +91,10 @@ func (s *ProjectService) GetProject(ctx context.Context, id uuid.UUID, orgID uui
 	err := s.db.QueryRow(ctx, query, id, orgID).Scan(
 		&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.GSF, &p.Status)
 	if err != nil {
+		// L7 Fix: Return typed sentinel
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: project %s", types.ErrNotFound, id)
+		}
 		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
 

@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -34,6 +35,8 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var p models.Project
+	// L7 Security: Prevent DoS via unbounded body
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // 1MB limit
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -54,16 +57,11 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.CreateProject(r.Context(), &p); err != nil {
-		if err.Error() == "project already exists" { // Simplified check or use custom error type
+		if errors.Is(err, types.ErrConflict) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		// Better: check for "already exists" in error message
-		if strings.Contains(err.Error(), "already exists") {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -94,7 +92,11 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	p, err := h.service.GetProject(r.Context(), projectID, orgID)
 	if err != nil {
-		http.Error(w, "Project not found or access denied", http.StatusNotFound)
+		if errors.Is(err, types.ErrNotFound) {
+			http.Error(w, "Project not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

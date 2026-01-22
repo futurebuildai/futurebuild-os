@@ -13,8 +13,8 @@ const (
 // Claims represents the standard JWT claims for FutureBuild.
 // REQUIRED per Data Spine and API Spec.
 type Claims struct {
-	UserID string   `json:"user_id"`
-	OrgID  string   `json:"org_id"` // REQUIRED per Data Spine for multi-tenancy
+	UserID      string      `json:"user_id"`
+	OrgID       string      `json:"org_id"`       // REQUIRED per Data Spine for multi-tenancy
 	Role        UserRole    `json:"role"`         // REQUIRED per API Spec for role enforcement
 	SubjectType SubjectType `json:"subject_type"` // REQUIRED to distinguish between USERS and CONTACTS
 	jwt.RegisteredClaims

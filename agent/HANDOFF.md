@@ -1,57 +1,40 @@
-# Handoff: Phase 8, Step 61.2 Complete
+# Handoff: Phase 8, Step 62 Complete
 
 **Date:** 2026-01-21  
-**Completed Step:** 61.2 (Go Service Mocking & Decoupling)  
-**Next Step:** 61.3 / TBD (Continue Production Readiness)
+**Completed Step:** 62 (Integration Testing & E2E Verification)  
+**Next Step:** 63 (Performance Profiling) or Deployment Prep
 
-## ✅ Completed: Go Service Mocking & Decoupling (L7 Verified)
+## ✅ Completed: Integration Testing & L7 Remediation
 
-We have successfully implemented interface-based dependency injection for all major services:
+### 1. L7 Flag Remediation
+- **Sentinel Errors:** Created `pkg/types/errors.go` with typed errors (`ErrNotFound`, `ErrConflict`, etc.)
+- **Service Refactoring:** `ProjectService` now returns wrapped sentinel errors
+- **Handler Refactoring:** `ProjectHandler` uses `errors.Is()` for robust checks
+- **Security Fix:** `http.MaxBytesReader` (1MB limit) applied to `CreateProject`
 
-### 1. Service Interfaces Created
-- **File:** `internal/service/interfaces.go`
-- **Interfaces:** `ProjectServicer`, `ScheduleServicer`, `InvoiceServicer`, `DocumentServicer`, `DirectoryServicer`, `NotificationServicer`, `WeatherServicer`, `VisionServicer`
+### 2. Integration Infrastructure
+- **Factory Pattern:** `test/testhelpers/factory.go` with `NewIntegrationStack`
+- **TestContainers:** Leverages `postgres.go` (pgvector:pg16, auto-migrations)
+- **Isolation:** `TruncateAll` helper with **dynamic table discovery** for robust cleanup
 
-### 2. Thread-Safe Mock Implementations
-- **File:** `internal/service/mocks/service_mocks.go`
-- **Features:**
-  - `sync.Mutex` on all methods
-  - Call recording (Spy pattern)
-  - Error injection fields
-  - Compile-time interface assertions
-
-### 3. AI Client Mock
-- **File:** `pkg/ai/mock_client.go`
-
-### 4. Handler Refactoring
-- **Files:** `project_handler.go`, `task_handler.go`, `document_handler.go`
-- All handlers now depend on interfaces, not concrete structs.
-
-### 5. Proof-of-Value Tests
-- **File:** `internal/agents/procurement_logic_test.go`
-- **Tests:**
-  - `TestProcurementAgent_WeatherBuffer_Storm` (+2 buffer on rain)
-  - `TestProcurementAgent_WeatherBuffer_Baseline` (no buffer on clear)
-  - `TestProcurementAgent_MissingZipCode` (ConfigError status)
-
-### 6. Bug Fixes
-- `db.RunInTx`: Added error wrapping for Begin failures
-- `document_handler_test.go`: Updated expectations for JWT auth
+### 3. Core API Tests
+- **File:** `test/integration/project_flow_test.go`
+- **Test:** `TestProjectLifecycle_HappyPath` (POST/GET verified against real DB)
+- **Auth Mocking:** `middleware.WithClaims` injection
 
 ### Verification
 ```
-go build ./...   → Clean
-go test ./...    → 11/11 packages pass
+go test -v ./test/integration/...
+--- PASS: TestProjectLifecycle_HappyPath (2.11s)
 ```
 
 ## 📋 Next Steps
 
-**Potential Next Steps for Phase 8:**
-1. **Step 62:** Integration Testing & E2E Verification
-2. **Step 63:** Performance Profiling & Optimization
-3. **Deployment Prep:** Docker images, staging verification
+1. **Step 62.3:** Async Task Generation & Verification (Asynq integration)
+2. **Step 63:** Performance Profiling (pprof, benchmarks)
+3. **Deployment Prep:** Docker images, staging CI
 
-**Context for Next Session:**
-- All services are now mockable
-- Handlers use interface-based DI
-- Test coverage includes "Pure Logic Testing" capability
+## Context for Next Session
+- Integration test infrastructure is production-ready
+- L7 flags remediated for Project API
+- Extend pattern to Invoice/Document handlers as needed

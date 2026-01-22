@@ -25,3 +25,7 @@
 - [x] Step 60.2.3: **Performance Tuning** (flow layout, verified 60fps)
 - [x] Step 61.1: **Security Audit & Hardening** (BOLA fix, Confused Deputy fix, SQL hygiene)
 - [x] Step 61.2: **Go Service Mocking & Decoupling** (Interfaces, Mocks, Handler Refactoring, Proof-of-Value Tests)
+- [x] Step 62.1: **Infrastructure Setup** (testcontainers, factory, migrations)
+- [x] Step 62.2: **Core Integration Tests** (Project Lifecycle Happy Path)
+- [ ] Step 62.3: **Async Logic Verification** (Task hydration via Asynq)
+- [ ] Step 63: **Performance Profiling & Optimization**
