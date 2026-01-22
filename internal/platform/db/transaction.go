@@ -3,6 +3,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -38,7 +39,7 @@ type Transactor interface {
 func RunInTx(ctx context.Context, pool Transactor, fn func(pgx.Tx) error) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	// Defer rollback - no-op if already committed
 	defer func() {

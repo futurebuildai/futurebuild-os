@@ -30,16 +30,21 @@ type MockProcurementRepository struct {
 
 	// ShouldSendNotification return value (default true)
 	ShouldSendNotifResult bool
+
+	// GetNotificationHistoryForBatch return value
+	GetNotificationHistoryForBatchResult map[uuid.UUID]bool
+	GetNotificationHistoryForBatchErr    error
 }
 
 // NewMockProcurementRepository creates a mock repository with sensible defaults.
 func NewMockProcurementRepository() *MockProcurementRepository {
 	return &MockProcurementRepository{
-		Items:                 []procurementRow{},
-		UpdatedBatches:        [][]alertResult{},
-		LoggedNotifs:          []alertResult{},
-		HydratedProjects:      []uuid.UUID{},
-		ShouldSendNotifResult: true, // Default: allow notifications
+		Items:                                []procurementRow{},
+		UpdatedBatches:                       [][]alertResult{},
+		LoggedNotifs:                         []alertResult{},
+		HydratedProjects:                     []uuid.UUID{},
+		ShouldSendNotifResult:                true, // Default: allow notifications
+		GetNotificationHistoryForBatchResult: map[uuid.UUID]bool{},
 	}
 }
 
@@ -123,4 +128,12 @@ func (m *MockProcurementRepository) LogNotificationsBatch(ctx context.Context, r
 	}
 	m.LoggedNotifs = append(m.LoggedNotifs, results...)
 	return nil
+}
+
+// GetNotificationHistoryForBatch returns the configured result.
+func (m *MockProcurementRepository) GetNotificationHistoryForBatch(ctx context.Context, itemIDs []uuid.UUID, now time.Time) (map[uuid.UUID]bool, error) {
+	if m.GetNotificationHistoryForBatchErr != nil {
+		return nil, m.GetNotificationHistoryForBatchErr
+	}
+	return m.GetNotificationHistoryForBatchResult, nil
 }

@@ -1,41 +1,57 @@
-# Handoff: Phase 8, Step 61.1 Complete
+# Handoff: Phase 8, Step 61.2 Complete
 
-**Date:** 2026-01-21
-**Previous Step:** 61.1 (Security Audit & Hardening)
-**Next Step:** 61.2 (Go Service Mocking)
+**Date:** 2026-01-21  
+**Completed Step:** 61.2 (Go Service Mocking & Decoupling)  
+**Next Step:** 61.3 / TBD (Continue Production Readiness)
 
-## ✅ Completed: Security Audit & Hardening (L7 Fortress Audit Passed)
+## ✅ Completed: Go Service Mocking & Decoupling (L7 Verified)
 
-We have successfully remediated **3 Critical Vulnerabilities** identified in the L7 Security Review:
+We have successfully implemented interface-based dependency injection for all major services:
 
-1.  **Network Security (BOLA):**
-    *   **Fix:** Added `AuthMiddleware.RequireAuth` to `/api/v1/projects` and `/api/v1/documents` route groups in `server.go`.
-    *   **Result:** Unauthenticated access to project data is now blocked (401 Unauthorized).
+### 1. Service Interfaces Created
+- **File:** `internal/service/interfaces.go`
+- **Interfaces:** `ProjectServicer`, `ScheduleServicer`, `InvoiceServicer`, `DocumentServicer`, `DirectoryServicer`, `NotificationServicer`, `WeatherServicer`, `VisionServicer`
 
-2.  **Identity Security (Confused Deputy):**
-    *   **Fix:** Removed reliance on attacker-controlled `X-Org-ID` header in `document_handler.go`.
-    *   **Result:** Tenancy is now strictly enforced via JWT claims (`middleware.GetClaims`).
+### 2. Thread-Safe Mock Implementations
+- **File:** `internal/service/mocks/service_mocks.go`
+- **Features:**
+  - `sync.Mutex` on all methods
+  - Call recording (Spy pattern)
+  - Error injection fields
+  - Compile-time interface assertions
 
-3.  **Database Security (SQL Hygiene):**
-    *   **Fix:** Refactored dynamic `fmt.Sprintf` table injection in `auth_service.go` to use a compile-time safe `switch` statement.
-    *   **Result:** Eliminates potential injection vectors and static analysis warnings.
+### 3. AI Client Mock
+- **File:** `pkg/ai/mock_client.go`
 
-**Verification:**
-*   All `internal/api/handlers` tests PASS.
-*   All `internal/middleware` tests PASS.
-*   `go build ./...` is clean.
+### 4. Handler Refactoring
+- **Files:** `project_handler.go`, `task_handler.go`, `document_handler.go`
+- All handlers now depend on interfaces, not concrete structs.
 
-## 📋 Next: Step 61.2 (Go Service Mocking)
+### 5. Proof-of-Value Tests
+- **File:** `internal/agents/procurement_logic_test.go`
+- **Tests:**
+  - `TestProcurementAgent_WeatherBuffer_Storm` (+2 buffer on rain)
+  - `TestProcurementAgent_WeatherBuffer_Baseline` (no buffer on clear)
+  - `TestProcurementAgent_MissingZipCode` (ConfigError status)
 
-**Objective:** Isolate service logic for unit testing by extracting interfaces and creating mocks.
+### 6. Bug Fixes
+- `db.RunInTx`: Added error wrapping for Begin failures
+- `document_handler_test.go`: Updated expectations for JWT auth
 
-**Implementation Plan:**
-1.  **Interfaces:** Create `internal/service/interfaces.go` defining:
-    *   `ProjectServicer`, `TaskServicer`, `InvoiceServicer`, `DocumentServicer`, `ScheduleServicer`.
-2.  **Mocks:** Create `internal/service/mocks/` with manual mock implementations.
-3.  **AI Client:** Create `pkg/ai/mock_client.go`.
-4.  **Verify:** Ensure no build regressions and mocks are usable in tests.
+### Verification
+```
+go build ./...   → Clean
+go test ./...    → 11/11 packages pass
+```
 
-**Context:**
-*   `ai.Client` interface is defined in `pkg/ai/vertex.go`.
-*   Handlers currently depend on concrete Service structs.
+## 📋 Next Steps
+
+**Potential Next Steps for Phase 8:**
+1. **Step 62:** Integration Testing & E2E Verification
+2. **Step 63:** Performance Profiling & Optimization
+3. **Deployment Prep:** Docker images, staging verification
+
+**Context for Next Session:**
+- All services are now mockable
+- Handlers use interface-based DI
+- Test coverage includes "Pure Logic Testing" capability

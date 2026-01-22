@@ -29,7 +29,7 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 47: Sub Liaison Agent (COMPLETED)
         ▪ Step 48: Inbound Message Processing (COMPLETED)
         ▪ Step 49: Time-Travel Agent Simulation (COMPLETED)
-    ◦ Phase 7 (Steps 50-56): Frontend - Lit + TypeScript: IN PROGRESS.
+    ◦ Phase 7 (Steps 50-59): Frontend - Lit + TypeScript: COMPLETED.
         ▪ Step 50: Project Init (Vite+Lit+TS) (COMPLETED)
         ▪ Step 51.1: Frontend Core Architecture (FBElement & Styles) (COMPLETED)
         ▪ Step 51.2: Reactive State Engine (Signals Store) (COMPLETED)
@@ -42,12 +42,14 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 57: Real-Time Messaging Architecture (COMPLETED)
         ▪ Step 58: Artifact Fixture Testing & Component Wiring (COMPLETED)
         ▪ Step 59: E2E Demo Readiness (COMPLETED)
-    ◦ Phase 8 (Steps 60-62): Backend - Go + TypeScript: IN PROGRESS.
-        ▪ Step 60: Strict Mode & Type Hygiene (completed)
-        ▪ Step 61: Security Audit & Hardening (Current Step)
-        ▪ Step 62: Mocking & Testing (not started)
+    ◦ Phase 8 (Steps 60-62): Production Readiness: IN PROGRESS.
+        ▪ Step 60.1: Strict Mode & Type Hygiene (COMPLETED)
+        ▪ Step 60.2: Performance Optimization (COMPLETED)
+        ▪ Step 61.1: Security Audit & Hardening (COMPLETED)
+        ▪ Step 61.2: Go Service Mocking & Decoupling (COMPLETED)
+        ▪ Step 62: Integration Testing / E2E Verification (NOT STARTED)
     
-    ◦ Current Focus: Phase 7, Step 59 (E2E Demo Readiness).
+    ◦ Current Focus: Phase 8, Step 62 (Integration Testing / E2E Verification).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -151,44 +153,48 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-Task: Execute Phase 8, Step 61.2: Go Service Mocking
+Task: Execute Phase 8, Step 62: Integration Testing & E2E Verification
 
 Context:
-The system is functionally complete (Frontend & Backend). We are now in the "Hardening Phase." Security Audit (Step 61.1) is complete. We are now preparing for mock testing (Step 61.2) by extracting service interfaces.
+The system is now secure (Step 61.1) and testable via mocks (Step 61.2). The next step is to verify that all components work together correctly through integration and E2E testing.
+
+Previous Achievements (Step 61.2):
+- Created `internal/service/interfaces.go` with strict contracts
+- Created thread-safe mocks in `internal/service/mocks/service_mocks.go`
+- Created `pkg/ai/mock_client.go`
+- Refactored handlers to use interface-based DI
+- Added 3 Proof-of-Value tests in `procurement_logic_test.go`
+- Fixed `db.RunInTx` error wrapping
+- All 11 test packages pass
 
 Objective:
-1.  **Backend Security Audit (The "Fortress" Pass):**
-    * **SQL Injection:** Audit ALL `pgx` queries in `internal/agents` and `internal/platform/db`. Ensure NO string concatenation is used for parameters.
-    * **Broken Object Level Authorization (BOLA):** Verify `ProjectID` in URL parameters is checked against the authenticated user's `OrganizationID` in `internal/middleware/auth_middleware.go`.
-    * **Concurrency Leaks:** Audit `go` keywords. Ensure every goroutine has a `context` or lifecycle management (WaitGroup).
-2.  **Frontend Security Patching:**
-    * **XSS Protection:** Review `fb-message-list.ts` and the Dynamic Renderer. Ensure user content is properly escaped before rendering HTML.
-3.  **Secret Management:** Verify no API keys are hardcoded. Ensure `internal/config` loads strictly from ENV.
+1. **Integration Tests:** Create tests that verify component interactions (e.g., handler → service → repository).
+2. **E2E Tests:** Verify full request/response flows through the API.
+3. **Test Coverage Report:** Generate and analyze coverage gaps.
+4. **CI/CD Integration:** Ensure all tests run reliably in GitHub Actions.
 
-Technical Specifications (L7 Quality Bar):
-1.  **SQL Safety:**
-    * REJECT: `fmt.Sprintf("SELECT * FROM %s", table)`
-    * ACCEPT: `conn.Query(ctx, "SELECT * FROM projects WHERE id=$1", id)`
-2.  **Middleware Chain:**
-    * Ensure `AuthMiddleware` is applied to ALL protected routes in `internal/server/routes.go`.
-    * Ensure `RateLimitMiddleware` is active on public endpoints (Login/MagicLink).
-3.  **Sanitization:**
-    * Use `bluemonday` or similar logic (if applicable) or strict `text()` interpolation in Lit for user-generated strings.
+Technical Specifications:
+1. **Test Database:**
+   - Use testcontainers-go or docker-compose for isolated Postgres instances
+   - Ensure each test has a clean database state
 
-Implementation Plan:
-1.  **Scan:** Read `internal/api`, `internal/db`, and `frontend/src/components/chat`.
-2.  **Report:** Generate a prioritized list of vulnerabilities found.
-3.  **Remediate:** Apply fixes immediately.
-    * Fix 1: Add missing RBAC checks for Artifact retrieval.
-    * Fix 2: Sanitize `DynamicComponent` props.
-    * Fix 3: Ensure context timeouts on all DB transactions.
+2. **API Integration Tests:**
+   - Test authenticated flows with real JWT tokens
+   - Verify multi-tenancy isolation (Org A cannot see Org B data)
+
+3. **Agent Integration Tests:**
+   - Test ProcurementAgent with real (mocked) WeatherService
+   - Test DailyFocusAgent project streaming
+
+4. **Coverage Goals:**
+   - Target: 80%+ line coverage for critical packages
+   - Focus: `internal/service`, `internal/api/handlers`, `internal/agents`
 
 Definition of Done:
-- [ ] Vulnerability Report generated and all Critical/High issues resolved.
-- [ ] RBAC verified: Users cannot fetch data for projects they don't own.
-- [ ] SQL Injection vector check: 100% Parameterized queries.
-- [ ] XSS check: Dynamic UI does not execute arbitrary JS.
-- [ ] `gosec` (simulated) pass.
+- [ ] Integration test suite exists for critical paths
+- [ ] E2E tests verify API contract compliance
+- [ ] Coverage report generated (`go test -cover`)
+- [ ] All tests pass in CI (GitHub Actions)
+- [ ] No flaky tests (deterministic, no time.Sleep)
 
 /prism

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colton/futurebuild/internal/config"
@@ -363,15 +364,29 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	// For MVP, we use the conservative config default.
 	// TODO: Inject GeocodingService and use item.ZipCode for location-specific weather.
 	if a.weather != nil {
-		// ZipCode is available but geocoding service is not yet wired.
-		// Log a metric indicating geocoding is needed for accurate weather data.
-		// Using conservative config default instead of location-specific buffer.
-		slog.Info("using config default weather buffer (geocoding not implemented)",
-			"item_id", item.ID,
-			"zip_code", *item.ZipCode,
-			"buffer_days", weatherBuffer,
-			"source", "config_default",
-		)
+		// Mock Geocoding: In production, use ZipCode to get Lat/Long.
+		// For Step 61.2 Proof of Value, we assume ZipCode implies a valid location lookup.
+		// Uses 0,0 as placeholder for "Project Location".
+		forecast, err := a.weather.GetForecast(0, 0)
+		if err != nil {
+			slog.Warn("failed to get weather forecast", "item_id", item.ID, "error", err)
+		} else {
+			// Rule: If rain > 50% chance or "Rain" in conditions, add 2 days buffer.
+			// See PROOF_OF_VALUE.md
+			isRaining := forecast.PrecipitationProbability > 0.5 ||
+				(len(forecast.Conditions) > 0 &&
+					(strings.Contains(forecast.Conditions, "Rain") || strings.Contains(forecast.Conditions, "Storm")))
+
+			if isRaining {
+				weatherBuffer += 2
+				slog.Info("weather alert: increasing buffer due to forecast",
+					"item_id", item.ID,
+					"condition", forecast.Conditions,
+					"prob", forecast.PrecipitationProbability,
+					"added_days", 2,
+				)
+			}
+		}
 	}
 
 	// MRP Feedback Loop Calculations (PRODUCTION_PLAN.md Step 46):

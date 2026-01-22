@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -16,11 +17,11 @@ import (
 // TaskHandler handles task-related API endpoints.
 // See PRODUCTION_PLAN.md Step 32
 type TaskHandler struct {
-	scheduleService ScheduleServiceInterface
+	scheduleService service.ScheduleServicer
 }
 
 // NewTaskHandler creates a new TaskHandler instance.
-func NewTaskHandler(ss ScheduleServiceInterface) *TaskHandler {
+func NewTaskHandler(ss service.ScheduleServicer) *TaskHandler {
 	return &TaskHandler{scheduleService: ss}
 }
 

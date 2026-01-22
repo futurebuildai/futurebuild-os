@@ -14,12 +14,12 @@ import (
 // DocumentHandler handles requests related to document processing.
 // See PRODUCTION_PLAN.md Phase 5
 type DocumentHandler struct {
-	invoiceService  *service.InvoiceService
-	documentService *service.DocumentService // See PRODUCTION_PLAN.md Step 41
+	invoiceService  service.InvoiceServicer
+	documentService service.DocumentServicer // See PRODUCTION_PLAN.md Step 41
 }
 
 // NewDocumentHandler creates a new DocumentHandler.
-func NewDocumentHandler(invoiceSvc *service.InvoiceService, docSvc *service.DocumentService) *DocumentHandler {
+func NewDocumentHandler(invoiceSvc service.InvoiceServicer, docSvc service.DocumentServicer) *DocumentHandler {
 	return &DocumentHandler{
 		invoiceService:  invoiceSvc,
 		documentService: docSvc,

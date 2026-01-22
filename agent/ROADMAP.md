@@ -24,3 +24,4 @@
 - [x] Step 60.2.2: **Load Test Harness** (LoadTestService, debug buttons)
 - [x] Step 60.2.3: **Performance Tuning** (flow layout, verified 60fps)
 - [x] Step 61.1: **Security Audit & Hardening** (BOLA fix, Confused Deputy fix, SQL hygiene)
+- [x] Step 61.2: **Go Service Mocking & Decoupling** (Interfaces, Mocks, Handler Refactoring, Proof-of-Value Tests)

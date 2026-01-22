@@ -13,6 +13,7 @@ import (
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/physics"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -51,6 +52,10 @@ func (m *mockProjectService) GetProject(ctx context.Context, projectID, orgID uu
 		return nil, m.getErr
 	}
 	return m.getProject, nil
+}
+
+func (m *mockProjectService) StreamActiveProjects(ctx context.Context, process service.ProjectProcessor) error {
+	return nil
 }
 
 // --- ProjectHandler Tests ---
@@ -303,6 +308,14 @@ func (m *taskHandlerMockScheduleService) CreateInspectionRecord(ctx context.Cont
 func (m *taskHandlerMockScheduleService) RecalculateSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*physics.CPMResult, error) {
 	m.recalcCalled = true
 	return m.recalcResult, m.recalcErr
+}
+
+func (m *taskHandlerMockScheduleService) GetProjectSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*service.ProjectScheduleSummary, error) {
+	return nil, nil
+}
+
+func (m *taskHandlerMockScheduleService) GetAgentFocusTasks(ctx context.Context, projectID uuid.UUID) ([]models.ProjectTask, error) {
+	return nil, nil
 }
 
 // --- TaskHandler Tests ---

@@ -41,7 +41,7 @@ func TestAnalyzeDocument(t *testing.T) {
 	orgID := uuid.New()
 	docID := uuid.New()
 
-	t.Run("Missing X-Org-ID Header", func(t *testing.T) {
+	t.Run("Missing Auth", func(t *testing.T) {
 		s := server.NewServer(nil, cfg, nil)
 		ts := httptest.NewServer(s.Router)
 		defer ts.Close()
@@ -50,19 +50,21 @@ func TestAnalyzeDocument(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		resp, err := http.Post(ts.URL+"/api/v1/documents/analyze", "application/json", bytes.NewBuffer(body))
 		assert.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		// L7 Security Hardening: JWT auth required before body parsing
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
-	t.Run("Invalid Body", func(t *testing.T) {
+	t.Run("Invalid Body after Auth fails", func(t *testing.T) {
 		s := server.NewServer(nil, cfg, nil)
 		ts := httptest.NewServer(s.Router)
 		defer ts.Close()
 
 		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/documents/analyze", bytes.NewBuffer([]byte("invalid json")))
-		req.Header.Set("X-Org-ID", orgID.String())
+		req.Header.Set("X-Org-ID", orgID.String()) // Header is now ignored; JWT required
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		// L7 Security Hardening: JWT auth required before body parsing
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	// Note: Fully testing Success path requires a DB mock or test DB setup
