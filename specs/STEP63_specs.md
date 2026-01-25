@@ -4,7 +4,7 @@
 | :--- | :--- |
 | **Feature ID** | STAT-63 (Shadow Site) |
 | **Author** | DevTeam (Architect, Backend, DevOps, Security) |
-| **Status** | **READY_FOR_EXECUTION** |
+| **Status** | **COMPLETED** |
 | **Input** | `docs/STEP63_PRD.md` |
 
 ---
@@ -22,10 +22,11 @@ To support the repository structure, we will establish **two** distinct shadow r
     *   **Mapping Rule**: `frontend/src/path/to/File.ts` -> `frontend/shadow/path/to/File.md`
     *   **Example**: `frontend/src/components/Button.ts` -> `frontend/shadow/components/Button.md`
 
-2.  **Backend Shadow Root**: `server/shadow/`
-    *   **Source Mirrors**: `internal/`, `cmd/`, `pkg/`, `api/`
-    *   **Mapping Rule**: `[source_root]/path/to/File.go` -> `server/shadow/[source_root]/path/to/File.md`
-    *   **Example**: `internal/auth/handler.go` -> `server/shadow/internal/auth/handler.md`
+2.  **Backend Shadow Root**: `backend/shadow/`
+    *   **Source Mirrors**: `internal/`, `cmd/`, `pkg/`
+    *   **Mapping Rule**: `[source_root]/path/to/File.go` -> `backend/shadow/[source_root]/path/to/File.md`
+    *   **Example**: `internal/auth/handler.go` -> `backend/shadow/internal/auth/handler.md`
+    *   **Note**: Using `backend/shadow` instead of `server/shadow` because `server` is a compiled binary file in the repo root.
 
 ### 2.2 The Shadow Object Model (L7 Template)
 Each Shadow File MUST adhere to this exact markdown schema to ensure consistency for future AI agents (FutureShade).
@@ -59,10 +60,9 @@ We will implement the tooling in **Node.js** (TypeScript/JavaScript). This avoid
 **Algorithm:**
 1.  **Configuration**: Define a map of `Source Root` -> `Shadow Root`.
     *   `frontend/src` -> `frontend/shadow`
-    *   `internal` -> `server/shadow/internal`
-    *   `cmd` -> `server/shadow/cmd`
-    *   `pkg` -> `server/shadow/pkg`
-    *   `api` -> `server/shadow/api`
+    *   `internal` -> `backend/shadow/internal`
+    *   `cmd` -> `backend/shadow/cmd`
+    *   `pkg` -> `backend/shadow/pkg`
 2.  **Traversal**: Recursively walk each `Source Root`.
 3.  **Filtering (Inclusion Criteria)**:
     *   **Include**: Files ending in `.ts`, `.tsx`, `.go`, `.js`, `.py`.
@@ -117,8 +117,15 @@ The following scripts must be added to `package.json` to integrate with the stan
 ## 5. Verification Checklist
 
 The Software Engineer executing this spec must verify:
-- [ ] `npm run shadow:scaffold` creates the `shadow/` folder structure.
-- [ ] `npm run shadow:scaffold` populates it with `.md` files mirroring source logic.
-- [ ] `npm run shadow:check` passes (Exit 0) after scaffolding.
-- [ ] `npm run shadow:check` fails (Exit 1) if a shadow file is manually deleted.
-- [ ] No `.test.ts` or `_test.go` files have shadow copies.
+- [x] `npm run shadow:scaffold` creates the `shadow/` folder structure.
+- [x] `npm run shadow:scaffold` populates it with `.md` files mirroring source logic.
+- [x] `npm run shadow:check` passes (Exit 0) after scaffolding.
+- [x] `npm run shadow:check` fails (Exit 1) if a shadow file is manually deleted.
+- [x] No `.test.ts` or `_test.go` files have shadow copies.
+- [x] Scaffold does NOT overwrite existing shadow files.
+- [x] CSS/styles and assets directories are excluded.
+
+**Implementation Status**: COMPLETED (2026-01-25)
+- Frontend shadow: 48 files in `frontend/shadow/`
+- Backend shadow: 82 files in `backend/shadow/`
+- Total: 130 shadow documentation files

@@ -154,7 +154,7 @@ This plan outlines 69 sequential steps to take FutureBuild from zero to producti
 | [x] | 62.2 | **Core API Integration Suite**: Write `handler_test.go` suites for Projects and Tasks | Step 62.1 | 1 |
 | [x] | 62.3 | **Agent Loop Verification**: Integration tests for Asynq workers | Step 62.2 | 1.5 |
 | [x] | 62.4 | **The "Golden Thread" E2E**: A single "Life of a Project" end-to-end test | Step 62.3 | 1.5 |
-| [ ] | 63 | **Implement Shadow Site & Protocol**: Deploy internal documentation portal | All previous | 3 |
+| [x] | 63 | **Implement Shadow Site & Protocol**: Deploy internal documentation portal | All previous | 3 |
 
 ## Phase 9: FutureShade - The Intelligence Layer (Steps 64-69)
 
