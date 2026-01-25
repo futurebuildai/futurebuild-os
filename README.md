@@ -52,6 +52,28 @@ FutureBuild is an AI-powered construction project management platform that helps
    npm --prefix frontend run dev
    ```
 
+## Agent Workflow (Prism Protocol)
+
+This repository uses the **Prism Protocol** with a hybrid Antigravity + Claude Code workflow.
+
+### Setup
+1. **Install Claude Code**: `npm install -g @anthropic-ai/claude-code`
+2. **Authenticate**: Run `claude login` in your terminal
+3. **Configure Project**: Ensure a `CLAUDE.md` exists in your root
+
+### The Execution Loop
+1. **Plan (Antigravity)**: Ask DevTeam to "Prepare Step X". It generates a **Context Prompt**.
+2. **Execute (Terminal)**: Copy the Context Prompt, run `claude -p "[Paste Context Prompt]"`
+3. **Audit (Antigravity)**: Paste terminal output back, run `/CTO` for Triple Review
+
+### Available Skills
+| Skill | Purpose |
+|-------|---------|
+| `/product` | Discovery & Definition - Creates PRDs from ideas |
+| `/devteam` | Engineering Orchestrator - Implements from specs |
+| `/ops` | Operations - Reliability, security, incident response |
+| `/software_engineer` | Context Prompt generation for Claude Code |
+
 ## Development
 
 ### Running Tests
@@ -82,9 +104,10 @@ make audit
 
 ## Documentation
 
-- [Backend Scope](docs/BACKEND_SCOPE.md)
-- [Frontend Scope](docs/FRONTEND_SCOPE.md)
-- [Production Plan](docs/PRODUCTION_PLAN.md)
+- [Backend Scope](specs/BACKEND_SCOPE.md)
+- [Frontend Scope](specs/FRONTEND_SCOPE.md)
+- [Roadmap](planning/ROADMAP.md)
+- [System Prompt](agent/SYSTEM_PROMPT.md)
 
 ## License
 

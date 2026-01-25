@@ -1,15 +1,37 @@
 ---
-description: Initialize the context for a new session using the Prism Protocol.
+description: The Atomic Step Loop (Hybrid) for the Prism Protocol.
 ---
 
-1. Read the current project state:
-   - View [SYSTEM_PROMPT.md](file:///home/colton/Desktop/FutureBuild_HQ/dev/futurebuild-repo/agent/SYSTEM_PROMPT.md) to understand the project identity and the current task.
-   - View [HANDOFF.md](file:///home/colton/Desktop/FutureBuild_HQ/dev/futurebuild-repo/agent/HANDOFF.md) for the latest session summary and technical depth.
-   - View [ROADMAP.md](file:///home/colton/Desktop/FutureBuild_HQ/dev/futurebuild-repo/agent/ROADMAP.md) to confirm the active phase and completed steps.
+# Prism Protocol Workflow
 
-2. Verify the production plan:
-   - View [PRODUCTION_PLAN.md](file:///home/colton/Desktop/FutureBuild_HQ/dev/futurebuild-repo/specs/PRODUCTION_PLAN.md) to locate the current step and its requirements.
+## The Prism Atomic Step Loop (Hybrid)
 
-3. Initialize the task:
-   - Create a new `task.md` artifact based on the current step requirements.
-   - Acknowledge the start of the task to the user with an "Executive Superintendent Briefing" as defined in the protocol.
+1. **Initiate (The Architect & Product Owner)**
+   - **Trigger**: User requests a task via `/devteam` or roadmap step.
+   - **Architect Action**: Reviews `SPECS` and defines the technical design/constraints.
+   - **Product Owner Action**: Defines the acceptance criteria.
+
+2. **Prepare (The Software Engineer)**
+   - **Action**: Consumes the Architect's design.
+   - **Output**: Generates a **Context Prompt** (not code).
+   - **Context Prompt Includes**:
+     - The Goal (e.g., "Implement JWT Auth").
+     - The Constraints (from Specs).
+     - The Acceptance Criteria (Test requirements).
+     - **USER ACTION REQUIRED**: "Paste this into your terminal to execute."
+
+3. **Execute (External Executor)**
+   - **Trigger**: User pastes the **Context Prompt** into the terminal.
+   - **Command**: `claude "[Context Prompt]"`
+   - **Agent Action (Claude)**: Edits files, runs tests, fixes bugs, and verifies strict compilation.
+
+4. **Audit (The QA & Security Engineer)**
+   - **Trigger**: User pastes the terminal output back into Antigravity.
+   - **QA Action**: Verifies the test output matches the acceptance criteria.
+   - **Security Action**: Reviews the changes for vulnerabilities.
+   - **Outcome**: 
+     - *Pass*: Agent updates `ROADMAP.md` and generates `HANDOFF.md`.
+     - *Fail*: Agent generates a "Correction Prompt" for Claude Code.
+
+5. **Finalize**
+   - User triggers `/NEXT` to commit state and move to the next logical step.
