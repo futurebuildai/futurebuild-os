@@ -60,6 +60,34 @@ All tasks MUST have a `[TASKNAME]` identifier established in the Product phase.
   - *Pass*: Agent updates `ROADMAP.md` and generates `HANDOFF.md`.
   - *Fail*: Agent generates a "Correction Prompt" for Claude Code.
 
-### 5. Finalize
+### 5. Finalize (The /NEXT Command)
 
-- User triggers `/NEXT` to commit state and move to the next logical step.
+- **Trigger**: User invokes `/NEXT [TASKNAME]` after successful Audit phase.
+
+#### Validation Gate
+Before finalizing, verify:
+1. `[TASKNAME]` work is committed and pushed to GitHub
+2. All tests pass (from Audit phase)
+3. Zero-Trust Review checklist completed
+
+#### Roadmap Update
+- Mark `[TASKNAME]` as 100% complete in `planning/ROADMAP.md`
+- Update status: `[ ]` → `[x]`
+- Add completion timestamp
+
+#### Dual Archival Protocol
+Move completed artifacts to committed archives:
+
+| Source | Destination |
+|--------|-------------|
+| `docs/[TASKNAME]_PRD.md` | `docs/committed/[TASKNAME]_PRD.md` |
+| `specs/[TASKNAME]_specs.md` | `specs/committed/[TASKNAME]_specs.md` |
+
+#### Clean-up
+- Remove temporary artifacts
+- Clear any local branch references
+- Generate `HANDOFF.md` for next task
+
+#### Confirmation
+> "Task `[TASKNAME]` finalized. PRD and specs archived to committed/."
+> "ROADMAP updated. Ready for next task."
