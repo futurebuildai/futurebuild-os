@@ -20,30 +20,25 @@ import (
 )
 
 func main() {
-	// 1. Load Environment
+	// 1. Load Configuration (Centralized)
 	if err := godotenv.Load(); err != nil {
 		log.Println("WARN: No .env file found, relying on environment variables")
 	}
 
-	// 2. Validate Required Configuration
-	// See BACKEND_SCOPE.md Section 1 (Technology Stack)
-	redisAddr := os.Getenv("REDIS_URL")
-	dbURL := os.Getenv("DATABASE_URL")
-	projectID := os.Getenv("GCP_PROJECT_ID")
-	location := os.Getenv("GCP_LOCATION")
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("FATAL: Failed to load configuration: %v", err)
+	}
 
-	if redisAddr == "" {
-		log.Fatal("FATAL: REDIS_URL is required")
-	}
-	if dbURL == "" {
-		log.Fatal("FATAL: DATABASE_URL is required")
-	}
-	if projectID == "" || location == "" {
+	// 2. Setup Dependencies
+	// See BACKEND_SCOPE.md Section 1 (Technology Stack)
+	// AI Features Check
+	if cfg.VertexProjectID == "" || cfg.VertexLocation == "" {
 		log.Println("WARN: GCP_PROJECT_ID or GCP_LOCATION not set. AI features will be disabled.")
 	}
 
 	// 3. Initialize Database
-	dbPool, err := pgxpool.New(context.Background(), dbURL)
+	dbPool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
@@ -52,14 +47,14 @@ func main() {
 	// 4. Initialize AI Client (Optional - graceful degradation)
 	// See BACKEND_SCOPE.md Section 3.2 (Context Engine)
 	modelIDs := map[ai.ModelType]string{
-		ai.ModelTypeFlash:     "gemini-2.0-flash-exp",
-		ai.ModelTypePro:       "gemini-1.5-pro",
-		ai.ModelTypeEmbedding: "text-embedding-004",
+		ai.ModelTypeFlash:     cfg.VertexModelFlashID,
+		ai.ModelTypePro:       cfg.VertexModelProID,
+		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
 	}
 
 	var aiClient ai.Client
-	if projectID != "" && location != "" {
-		aiClient, err = ai.NewVertexClient(context.Background(), projectID, location, modelIDs)
+	if cfg.VertexProjectID != "" && cfg.VertexLocation != "" {
+		aiClient, err = ai.NewVertexClient(context.Background(), cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
 		if err != nil {
 			log.Printf("WARN: Failed to create Vertex Client: %v (AI features will fail)", err)
 		}
@@ -101,7 +96,7 @@ func main() {
 
 	// 8. Initialize Scheduler (The Clock)
 	// See PRODUCTION_PLAN.md Step 45 (Daily Briefing Job)
-	scheduler := worker.NewScheduler(redisAddr)
+	scheduler := worker.NewScheduler(cfg.RedisURL)
 
 	if _, err := scheduler.RegisterEntry("0 6 * * *", worker.NewDailyBriefingTask()); err != nil {
 		log.Fatalf("could not register daily briefing cron: %v", err)
@@ -114,7 +109,17 @@ func main() {
 	}
 
 	// 9. Initialize Worker Server (The Processor)
-	srv := worker.NewServer(redisAddr, 10)
+	// L7 Config: Use configured priorities. Default to 10 concurrency if not set (though config loader sets default)
+	concurrency := 10
+	if cfg.Worker.Concurrency > 0 {
+		concurrency = cfg.Worker.Concurrency
+	}
+	// Fallback to defaults if map is nil/empty (safety)
+	queues := cfg.Worker.QueuePriorities
+	if len(queues) == 0 {
+		queues = map[string]int{"critical": 6, "default": 3, "low": 1}
+	}
+	srv := worker.NewServer(cfg.RedisURL, concurrency, queues)
 
 	// Register the actual handler function
 	srv.RegisterHandlerFunc(worker.TypeDailyBriefing, workerHandler.HandleDailyBriefing)

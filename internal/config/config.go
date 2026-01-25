@@ -34,6 +34,13 @@ type Config struct {
 	// InvoiceConfidenceThreshold defines the minimum AI confidence required to bypass human review.
 	// Defaults to 0.85. See Code Review Issue 3B.
 	InvoiceConfidenceThreshold float64
+
+	Worker WorkerConfig
+}
+
+type WorkerConfig struct {
+	QueuePriorities map[string]int
+	Concurrency     int
 }
 
 // LoadConfig loads configuration from environment variables.
@@ -63,24 +70,32 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DatabaseURL:            os.Getenv("DATABASE_URL"),
-		RedisURL:               getEnvOrDefault("REDIS_URL", "localhost:6379"),
-		AppPort:                port,
-		JWTSecret:              os.Getenv("JWT_SECRET"),
-		JWTExpiry:              expiry,
-		TrustedProxies:         strings.Split(os.Getenv("TRUSTED_PROXIES"), ","),
-		VertexProjectID:        os.Getenv("VERTEX_PROJECT_ID"),
-		VertexLocation:         os.Getenv("VERTEX_LOCATION"),
-		VertexModelFlashID:     getEnvOrDefault("VERTEX_MODEL_FLASH_ID", "gemini-2.5-flash"),
-		VertexModelProID:       getEnvOrDefault("VERTEX_MODEL_PRO_ID", "gemini-1.5-pro"),
-		VertexModelEmbeddingID: getEnvOrDefault("VERTEX_MODEL_EMBEDDING_ID", "text-embedding-004"),
-		S3Endpoint:             os.Getenv("S3_ENDPOINT"),
-		S3Bucket:               os.Getenv("S3_BUCKET"),
-		S3AccessKey:            os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey:            os.Getenv("S3_SECRET_KEY"),
-		WebhookSecret:          os.Getenv("WEBHOOK_SECRET"),
-		Environment:            getEnvOrDefault("APP_ENV", "development"),
+		DatabaseURL:                os.Getenv("DATABASE_URL"),
+		RedisURL:                   getEnvOrDefault("REDIS_URL", "localhost:6379"),
+		AppPort:                    port,
+		JWTSecret:                  os.Getenv("JWT_SECRET"),
+		JWTExpiry:                  expiry,
+		TrustedProxies:             strings.Split(os.Getenv("TRUSTED_PROXIES"), ","),
+		VertexProjectID:            os.Getenv("VERTEX_PROJECT_ID"),
+		VertexLocation:             os.Getenv("VERTEX_LOCATION"),
+		VertexModelFlashID:         getEnvOrDefault("VERTEX_MODEL_FLASH_ID", "gemini-2.5-flash"),
+		VertexModelProID:           getEnvOrDefault("VERTEX_MODEL_PRO_ID", "gemini-1.5-pro"),
+		VertexModelEmbeddingID:     getEnvOrDefault("VERTEX_MODEL_EMBEDDING_ID", "text-embedding-004"),
+		S3Endpoint:                 os.Getenv("S3_ENDPOINT"),
+		S3Bucket:                   os.Getenv("S3_BUCKET"),
+		S3AccessKey:                os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:                os.Getenv("S3_SECRET_KEY"),
+		WebhookSecret:              os.Getenv("WEBHOOK_SECRET"),
+		Environment:                getEnvOrDefault("APP_ENV", "development"),
 		InvoiceConfidenceThreshold: confidenceThreshold,
+		Worker: WorkerConfig{
+			Concurrency: 10,
+			QueuePriorities: map[string]int{
+				"critical": getEnvInt("WORKER_QUEUE_CRITICAL", 6),
+				"default":  getEnvInt("WORKER_QUEUE_DEFAULT", 3),
+				"low":      getEnvInt("WORKER_QUEUE_LOW", 1),
+			},
+		},
 	}
 
 	// Fail Fast: Validate critical configuration
@@ -105,6 +120,15 @@ func (c *Config) Validate() error {
 func getEnvOrDefault(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if valStr := os.Getenv(key); valStr != "" {
+		if val, err := strconv.Atoi(valStr); err == nil {
+			return val
+		}
 	}
 	return fallback
 }

@@ -15,6 +15,7 @@ type ProjectServicer interface {
 	CreateProject(ctx context.Context, p *models.Project) error
 	GetProject(ctx context.Context, id uuid.UUID, orgID uuid.UUID) (*models.Project, error)
 	StreamActiveProjects(ctx context.Context, process ProjectProcessor) error
+	ListProcurementItems(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProcurementItem, error)
 }
 
 // ScheduleServicer defines the contract for schedule and task management.

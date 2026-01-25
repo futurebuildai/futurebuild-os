@@ -151,10 +151,10 @@ This plan outlines 59 sequential steps to take FutureBuild from zero to producti
 | 60.2.3 | **Performance Tuning**: Profile and tune `overscan` buffers. verify 60fps scrolling on mobile simulation. | Step 60.2.2 | 0.5 | [x] |
 | 61.1 | **Security Audit & Hardening**: Run static analysis (gosec), audit SQL queries for parameterization, verify RBAC middleware coverage, and implement XSS sanitization for the Dynamic UI renderer. | All previous | 1.5 | [x] |
 | 61.2 | **Go Service Mocking**: Implement "Spy" and "Stub" mocks for Weather, Vision, and Directory services. Write `service_test.go` to verify core business logic without external dependencies. | 61.1 | 1.5 | [x] |
-| 62.1 | **Integration Test Infrastructure**: Set up `TestMain` with `testcontainers-go` (Postgres), database cleaner, and "ServiceFactory" for test isolation. | Step 61.2 | 1 |
-| 62.2 | **Core API Integration Suite**: Write `handler_test.go` suites for Projects and Tasks that assert HTTP status codes against the real DB (via Docker). Fix Error Sentinel drift. | Step 62.1 | 1 |
-| 62.3 | **Agent Loop Verification**: Integration tests for Asynq workers. Verify `ProcurementAgent` correctly creates Invoices/Logs when triggered. | Step 62.2 | 1.5 |
-| 62.4 | **The "Golden Thread" E2E**: A single "Life of a Project" end-to-end test (API -> DB -> Worker -> API) ensuring the entire system breathes together. | Step 62.3 | 1.5 |
+| 62.1 | **Integration Test Infrastructure**: Set up `TestMain` with `testcontainers-go` (Postgres), database cleaner, and "ServiceFactory" for test isolation. | Step 61.2 | 1 | [x] |
+| 62.2 | **Core API Integration Suite**: Write `handler_test.go` suites for Projects and Tasks that assert HTTP status codes against the real DB (via Docker). Fix Error Sentinel drift. | Step 62.1 | 1 | [x] |
+| 62.3 | **Agent Loop Verification**: Integration tests for Asynq workers. Verify `ProcurementAgent` correctly creates Invoices/Logs when triggered. | Step 62.2 | 1.5 | [x] |
+| 62.4 | **The "Golden Thread" E2E**: A single "Life of a Project" end-to-end test (API -> DB -> Worker -> API) ensuring the entire system breathes together. | Step 62.3 | 1.5 | [x] |
 | 63 | **Implement Shadow Site & Protocol**: Deploy the internal documentation portal based on `specs/SHADOW_SITE_SPEC.md`. Configure CI/CD to enforce the "Dual-Write" rule (Code + Shadow parity). Index Shadow content for the internal QA Chatbot. | All previous | 3 |
 
 ## Phase 9: FutureShade - The Intelligence Layer (Steps 64-69)

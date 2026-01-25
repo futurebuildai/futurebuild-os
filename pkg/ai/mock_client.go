@@ -3,28 +3,48 @@ package ai
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // MockClient is a thread-safe mock for the AI Client interface.
+// L7 Quality: Uses mutex to prevent data races on spy slices.
 type MockClient struct {
+	mu sync.Mutex
+
 	// Mock responses
 	GenerateResponse *GenerateResponse
 	GenerateError    error
 
 	// Spies
-	GenerateCalls []GenerateRequest
+	GenerateCalls  []GenerateRequest
+	EmbeddingCalls []string
+
+	EmbeddingResponse []float32
+	EmbeddingErr      error
+}
+
+// GenerateEmbedding records the call and returns the pre-configured response.
+// Thread-safe via mutex.
+func (m *MockClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.EmbeddingCalls = append(m.EmbeddingCalls, text)
+	return m.EmbeddingResponse, m.EmbeddingErr
 }
 
 // GenerateContent records the call and returns the pre-configured response.
-func (m *MockClient) GenerateContent(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+// Thread-safe via mutex.
+func (m *MockClient) GenerateContent(ctx context.Context, req GenerateRequest) (GenerateResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.GenerateCalls = append(m.GenerateCalls, req)
 	if m.GenerateError != nil {
-		return nil, m.GenerateError
+		return GenerateResponse{}, m.GenerateError
 	}
 	if m.GenerateResponse == nil {
-		return nil, fmt.Errorf("mock response not configured")
+		return GenerateResponse{}, fmt.Errorf("mock response not configured")
 	}
-	return m.GenerateResponse, nil
+	return *m.GenerateResponse, nil
 }
 
 // Close is a no-op for the mock.

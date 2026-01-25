@@ -23,6 +23,12 @@ type MockProjectService struct {
 
 	CreateProjectCalls []*models.Project
 	GetProjectCalls    []struct{ OrgID, ProjectID uuid.UUID }
+
+	ListProcurementItemsResp []models.ProcurementItem
+	ListProcurementItemsErr  error
+
+	// ActiveProjects is the data source for the StreamActiveProjects iterator
+	ActiveProjects []*models.Project
 }
 
 func (m *MockProjectService) CreateProject(ctx context.Context, p *models.Project) error {
@@ -39,9 +45,28 @@ func (m *MockProjectService) GetProject(ctx context.Context, id, orgID uuid.UUID
 	return m.GetProjectResp, m.GetProjectErr
 }
 
+func (m *MockProjectService) ListProcurementItems(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProcurementItem, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.ListProcurementItemsResp, m.ListProcurementItemsErr
+}
+
 func (m *MockProjectService) StreamActiveProjects(ctx context.Context, process service.ProjectProcessor) error {
-	// Simple mock: assumes we don't need to stream in tests most of the time
-	// or we can iterate over a predefined list if needed.
+	m.mu.Lock()
+	// Copy slice to avoid holding lock during iteration (callback might call other methods)
+	// L7 Quality: Prevent deadlocks in mock
+	projects := make([]*models.Project, len(m.ActiveProjects))
+	copy(projects, m.ActiveProjects)
+	m.mu.Unlock()
+
+	for _, p := range projects {
+		if p == nil {
+			continue // Defensive: skip nil entries in test data
+		}
+		if err := process(*p); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -235,10 +260,15 @@ func (m *MockDirectoryService) GetProjectManager(ctx context.Context, projectID,
 
 // MockNotificationService is a spy.
 type MockNotificationService struct {
-	mu         sync.Mutex
-	SentEmails []struct{ To, Subject, Body string }
-	SentSMS    []struct{ ContactID, Message string }
-	SendErr    error
+	mu           sync.Mutex
+	SentEmails   []struct{ To, Subject, Body string }
+	SentSMS      []struct{ ContactID, Message string }
+	EnqueueCalls []struct {
+		ItemID    uuid.UUID
+		Message   string
+		Timestamp time.Time
+	}
+	SendErr error
 }
 
 func (m *MockNotificationService) SendSMS(contactID string, message string) error {
@@ -252,6 +282,17 @@ func (m *MockNotificationService) SendEmail(to string, subject string, body stri
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.SentEmails = append(m.SentEmails, struct{ To, Subject, Body string }{to, subject, body})
+	return m.SendErr
+}
+
+func (m *MockNotificationService) EnqueueNotification(ctx context.Context, itemID uuid.UUID, message string, ts time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.EnqueueCalls = append(m.EnqueueCalls, struct {
+		ItemID    uuid.UUID
+		Message   string
+		Timestamp time.Time
+	}{itemID, message, ts})
 	return m.SendErr
 }
 

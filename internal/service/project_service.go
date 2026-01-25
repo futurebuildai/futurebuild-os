@@ -80,7 +80,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 }
 
 // GetProject retrieves a project by ID, ensuring multi-tenancy via orgID.
-// // See DATA_SPINE_SPEC.md Section 3.1
+// See DATA_SPINE_SPEC.md Section 3.1
 func (s *ProjectService) GetProject(ctx context.Context, id uuid.UUID, orgID uuid.UUID) (*models.Project, error) {
 	query := `
 		SELECT id, org_id, name, address, permit_issued_date, target_end_date, gsf, status
@@ -160,4 +160,44 @@ func (s *ProjectService) StreamActiveProjects(ctx context.Context, process Proje
 		}
 	}
 	return rows.Err()
+}
+
+// ListProcurementItems fetches all procurement items for a project.
+// See BACKEND_SCOPE.md Section 2.5 (Long-Lead Procurement Items)
+// Multi-tenancy enforced via JOIN on projects.org_id (single query, no N+1).
+func (s *ProjectService) ListProcurementItems(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProcurementItem, error) {
+	// Single query with multi-tenancy enforcement via JOIN
+	// Eliminates the double round-trip of calling GetProject first (P1-3 fix)
+	query := `
+		SELECT 
+			pi.id, pt.project_id, pt.wbs_code, pi.name, 
+			pi.lead_time_weeks, pi.status, pi.calculated_order_date, 
+			pi.expected_delivery_date, pi.created_at
+		FROM procurement_items pi
+		JOIN project_tasks pt ON pi.project_task_id = pt.id
+		JOIN projects p ON pt.project_id = p.id
+		WHERE pt.project_id = $1 AND p.org_id = $2
+		ORDER BY pi.created_at DESC
+	`
+	rows, err := s.db.Query(ctx, query, projectID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list procurement items: %w", err)
+	}
+	defer rows.Close()
+
+	// P1-4 fix: Initialize as empty slice, not nil, to return [] instead of null in JSON
+	items := make([]models.ProcurementItem, 0)
+	for rows.Next() {
+		var item models.ProcurementItem
+		err := rows.Scan(
+			&item.ID, &item.ProjectID, &item.WBSCode, &item.ItemName,
+			&item.LeadTimeWeeks, &item.Status, &item.CalculatedOrderDate,
+			&item.ExpectedDeliveryDate, &item.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan procurement item: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }

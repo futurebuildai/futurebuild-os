@@ -6,14 +6,55 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/modules/redis"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+// StartRedisContainer starts an ephemeral Redis container for Asynq.
+// Returns the connection string (host:port) and a cleanup function.
+func StartRedisContainer(t *testing.T) (string, func()) {
+	t.Helper()
+
+	if os.Getenv("SKIP_TESTCONTAINERS") == "1" {
+		addr := os.Getenv("REDIS_ADDR")
+		if addr == "" {
+			addr = "localhost:6379"
+		}
+		return addr, func() {}
+	}
+
+	ctx := context.Background()
+	container, err := redis.Run(ctx,
+		"redis:7-alpine",
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("Ready to accept connections"),
+		),
+	)
+	if err != nil {
+		t.Fatalf("Failed to start Redis container: %v", err)
+	}
+
+	endpoint, err := container.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get Redis connection string: %v", err)
+	}
+
+	// Strip scheme for go-redis Addr compatibility
+	endpoint = strings.TrimPrefix(endpoint, "redis://")
+
+	return endpoint, func() {
+		if err := container.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate Redis container: %v", err)
+		}
+	}
+}
 
 // StartPostgresContainer starts an ephemeral PostgreSQL container for integration tests.
 // Automatically applies all migrations from db/migrations/.
@@ -73,6 +114,17 @@ func StartPostgresContainer(t *testing.T) (*pgxpool.Pool, func()) {
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		t.Fatalf("Failed to create connection pool: %v", err)
+	}
+
+	// L7 Hardening: Validate pgvector extension is available
+	// Panic early if the wrong Postgres image is used (without vector support)
+	var extExists bool
+	err = pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')").Scan(&extExists)
+	if err != nil {
+		t.Fatalf("Failed to check pgvector extension: %v", err)
+	}
+	if !extExists {
+		t.Fatalf("pgvector extension missing in test container")
 	}
 
 	// Return cleanup function

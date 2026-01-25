@@ -148,6 +148,7 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			r.Post("/", s.ProjectHandler.CreateProject)
 			r.Get("/{id}", s.ProjectHandler.GetProject)
+			r.Get("/{id}/procurement", s.ProjectHandler.GetProcurementItems)
 
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/pkg/clock"
@@ -30,22 +30,22 @@ func NewWorkerHandler(focusAgent *agents.DailyFocusAgent, procurementAgent *agen
 
 // HandleDailyBriefing executes the daily briefing agent logic.
 func (h *WorkerHandler) HandleDailyBriefing(ctx context.Context, task *asynq.Task) error {
-	log.Println("Handling Daily Briefing Task...")
+	slog.Info("Handling Daily Briefing Task...")
 	if err := h.focusAgent.Execute(ctx); err != nil {
 		return fmt.Errorf("daily briefing agent failed: %w", err)
 	}
-	log.Println("Daily Briefing Task Completed Successfully.")
+	slog.Info("Daily Briefing Task Completed Successfully.")
 	return nil
 }
 
 // HandleProcurementCheck executes the procurement agent logic.
 // See PRODUCTION_PLAN.md Step 46
 func (h *WorkerHandler) HandleProcurementCheck(ctx context.Context, task *asynq.Task) error {
-	log.Println("Handling Procurement Check Task...")
+	slog.Info("Handling Procurement Check Task...")
 	if err := h.procurementAgent.Execute(ctx); err != nil {
 		return fmt.Errorf("procurement agent failed: %w", err)
 	}
-	log.Println("Procurement Check Task Completed Successfully.")
+	slog.Info("Procurement Check Task Completed Successfully.")
 	return nil
 }
 
@@ -58,11 +58,12 @@ func (h *WorkerHandler) HandleHydrateProject(ctx context.Context, task *asynq.Ta
 		return fmt.Errorf("invalid hydrate project payload: %w", err)
 	}
 
-	log.Printf("Handling Hydrate Project Task for project: %s", payload.ProjectID)
+	logArgs := []any{"project_id", payload.ProjectID}
+	slog.Info("Handling Hydrate Project Task", logArgs...)
 	if err := h.procurementAgent.HydrateProject(ctx, payload.ProjectID); err != nil {
 		return fmt.Errorf("hydrate project failed: %w", err)
 	}
-	log.Printf("Hydrate Project Task Completed Successfully for project: %s", payload.ProjectID)
+	slog.Info("Hydrate Project Task Completed Successfully", logArgs...)
 	return nil
 }
 
@@ -75,7 +76,7 @@ func (h *WorkerHandler) HandleProcurementNotification(ctx context.Context, task 
 		return fmt.Errorf("invalid notification payload: %w", err)
 	}
 
-	log.Printf("Handling Procurement Notification for item: %s", payload.ItemID)
+	slog.Info("Handling Procurement Notification", "item_id", payload.ItemID)
 
 	// Dampening check: Skip if notification was sent in last 72 hours
 	shouldSend, err := h.shouldSendNotification(ctx, payload.ItemID, payload.Timestamp)
@@ -83,7 +84,7 @@ func (h *WorkerHandler) HandleProcurementNotification(ctx context.Context, task 
 		return fmt.Errorf("dampening check failed: %w", err)
 	}
 	if !shouldSend {
-		log.Printf("Notification dampened for item: %s (already sent within 72h)", payload.ItemID)
+		slog.Info("Notification dampened (already sent within 72h)", "item_id", payload.ItemID)
 		return nil
 	}
 
@@ -92,7 +93,7 @@ func (h *WorkerHandler) HandleProcurementNotification(ctx context.Context, task 
 		return fmt.Errorf("log notification failed: %w", err)
 	}
 
-	log.Printf("Procurement Notification sent for item: %s", payload.ItemID)
+	slog.Info("Procurement Notification sent", "item_id", payload.ItemID)
 	return nil
 }
 

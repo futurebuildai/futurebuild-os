@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/hibiken/asynq"
 )
@@ -14,18 +14,14 @@ type Server struct {
 }
 
 // NewServer creates a new worker server instance
-func NewServer(redisAddr string, concurrency int) *Server {
+func NewServer(redisAddr string, concurrency int, queues map[string]int) *Server {
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{
 			Concurrency: concurrency,
-			Queues: map[string]int{
-				"critical": 6,
-				"default":  3,
-				"low":      1,
-			},
+			Queues:      queues,
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				log.Printf("ERROR: task processing failed: type=%q payload=%q err=%v", task.Type(), task.Payload(), err)
+				slog.Error("task processing failed", "type", task.Type(), "payload", string(task.Payload()), "error", err)
 			}),
 		},
 	)
@@ -48,7 +44,7 @@ func (s *Server) RegisterHandlerFunc(pattern string, handler func(context.Contex
 
 // Start starts the worker server
 func (s *Server) Run() error {
-	log.Println("Starting Asynq Worker Server...")
+	slog.Info("Starting Asynq Worker Server...")
 	return s.srv.Run(s.mux)
 }
 

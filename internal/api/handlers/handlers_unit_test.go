@@ -32,12 +32,14 @@ func ctxWithClaims(orgID uuid.UUID) context.Context {
 // --- Mock ProjectService ---
 
 type mockProjectService struct {
-	createErr     error
-	getErr        error
-	getProject    *models.Project
-	createCalled  bool
-	getCalled     bool
-	lastCreatedID uuid.UUID
+	createErr                error
+	getErr                   error
+	getProject               *models.Project
+	createCalled             bool
+	getCalled                bool
+	lastCreatedID            uuid.UUID
+	listProcurementItemsResp []models.ProcurementItem
+	listProcurementItemsErr  error
 }
 
 func (m *mockProjectService) CreateProject(ctx context.Context, p *models.Project) error {
@@ -56,6 +58,10 @@ func (m *mockProjectService) GetProject(ctx context.Context, projectID, orgID uu
 
 func (m *mockProjectService) StreamActiveProjects(ctx context.Context, process service.ProjectProcessor) error {
 	return nil
+}
+
+func (m *mockProjectService) ListProcurementItems(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProcurementItem, error) {
+	return m.listProcurementItemsResp, m.listProcurementItemsErr
 }
 
 // --- ProjectHandler Tests ---
@@ -161,7 +167,7 @@ func TestProjectHandler_CreateProject_ServiceError(t *testing.T) {
 }
 
 func TestProjectHandler_CreateProject_Conflict(t *testing.T) {
-	mock := &mockProjectService{createErr: errors.New("project already exists")}
+	mock := &mockProjectService{createErr: types.ErrConflict}
 	handler := NewProjectHandler(mock)
 
 	orgID := uuid.New()
@@ -201,7 +207,7 @@ func TestProjectHandler_GetProject_Success(t *testing.T) {
 }
 
 func TestProjectHandler_GetProject_NotFound(t *testing.T) {
-	mock := &mockProjectService{getErr: errors.New("not found")}
+	mock := &mockProjectService{getErr: types.ErrNotFound}
 	handler := NewProjectHandler(mock)
 
 	projectID := uuid.New()
@@ -583,7 +589,7 @@ func TestTaskHandler_UpdateTask_TaskNotFound(t *testing.T) {
 	orgID := uuid.New()
 
 	mock := &taskHandlerMockScheduleService{
-		getTaskErr: errors.New("not found"),
+		getTaskErr: types.ErrNotFound,
 	}
 	handler := NewTaskHandler(mock)
 
@@ -735,7 +741,7 @@ func TestTaskHandler_RecordProgress_TaskNotFound(t *testing.T) {
 	orgID := uuid.New()
 
 	mock := &taskHandlerMockScheduleService{
-		getTaskErr: errors.New("not found"),
+		getTaskErr: types.ErrNotFound,
 	}
 	handler := NewTaskHandler(mock)
 

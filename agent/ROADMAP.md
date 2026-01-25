@@ -27,5 +27,15 @@
 - [x] Step 61.2: **Go Service Mocking & Decoupling** (Interfaces, Mocks, Handler Refactoring, Proof-of-Value Tests)
 - [x] Step 62.1: **Infrastructure Setup** (testcontainers, factory, migrations)
 - [x] Step 62.2: **Core Integration Tests** (Project Lifecycle Happy Path)
-- [ ] Step 62.3: **Async Logic Verification** (Task hydration via Asynq)
-- [ ] Step 63: **Performance Profiling & Optimization**
+- [x] Step 62.3: **Async Logic Verification** (Task hydration via Asynq)
+- [x] Step 62.4: **The "Golden Thread" E2E** (API -> DB -> Worker -> API integration)
+- [ ] Step 63: **Shadow Site & Protocol** (Internal documentation portal, Dual-Write enforcement)
+
+## Phase 9: FutureShade - The Intelligence Layer
+
+- [ ] Step 64: **Initialize FutureShade Service** (internal/futureshade, Event Bus integration)
+- [ ] Step 65: **Implement "The Tribunal" Interfaces** (Multi-Model Client, Consensus Logic)
+- [ ] Step 66: **Build The Shadow Viewer** (ShadowDocs + Tribunal Decision Logs UI)
+- [ ] Step 67: **Integrate Antigravity Skills** (Agent code execution)
+- [ ] Step 68: **Implement Automated PR Review** (GitHub Webhook -> Tribunal -> PR Comment)
+- [ ] Step 69: **The "Tree Planting" Ceremony** (Full autonomous bug fix integration test)

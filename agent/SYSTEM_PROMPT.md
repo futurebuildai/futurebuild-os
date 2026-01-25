@@ -42,14 +42,17 @@ HIERARCHY OF TRUTH (Immutable Constraints): You are working on a strict specific
         ▪ Step 57: Real-Time Messaging Architecture (COMPLETED)
         ▪ Step 58: Artifact Fixture Testing & Component Wiring (COMPLETED)
         ▪ Step 59: E2E Demo Readiness (COMPLETED)
-    ◦ Phase 8 (Steps 60-62): Production Readiness: IN PROGRESS.
+    ◦ Phase 8 (Steps 60-62): Production Readiness: COMPLETED.
         ▪ Step 60.1: Strict Mode & Type Hygiene (COMPLETED)
         ▪ Step 60.2: Performance Optimization (COMPLETED)
         ▪ Step 61.1: Security Audit & Hardening (COMPLETED)
         ▪ Step 61.2: Go Service Mocking & Decoupling (COMPLETED)
-        ▪ Step 62: Integration Testing / E2E Verification (NOT STARTED)
+        ▪ Step 62.1: Infrastructure Setup (COMPLETED)
+        ▪ Step 62.2: Core Integration Tests (COMPLETED)
+        ▪ Step 62.3: Async Logic Verification (COMPLETED)
+        ▪ Step 62.4: The "Golden Thread" E2E (COMPLETED)
     
-    ◦ Current Focus: Phase 8, Step 62 (Integration Testing / E2E Verification).
+    ◦ Current Focus: Step 63 (Shadow Site & Protocol).
 .
 OPERATIONAL PROTOCOL:
 • Drift Check: Before writing code, check agent/ROADMAP.md.
@@ -152,50 +155,39 @@ Trigger: When the user types /prism (usually as the first command in a new threa
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
-Task: Execute Phase 8, Steps 62.1 & 62.2 (Integration Infrastructure & Core API Tests)
+Task: Execute Step 63 (Shadow Site & Protocol)
 
 Context:
-We have unit tests (mocks), but we lack "Integration Truth". We need to verify that our Handlers talk to our Services, which talk to our Repositories, which talk to a REAL Postgres database.
-We are establishing the "Testing Pyramid" base layer.
+Phase 8 is complete. All integration tests pass, including the "Golden Thread" E2E test. The codebase is production-ready. Now we shift focus to internal tooling and documentation infrastructure.
 
-Objectives:
-1.  **Remediate L7 Flags:**
-    * Create `pkg/types/errors.go` with Sentinel Errors (`ErrConflict`, `ErrNotFound`, `ErrUnauthorized`).
-    * Refactor `internal/service/*` to return these Sentinels.
-    * Refactor `internal/api/handlers/*` to check `errors.Is()` instead of string matching.
-    * Apply `http.MaxBytesReader` in the base handler or middleware.
-2.  **Infrastructure (Step 62.1):**
-    * Create `test/testhelpers/containers.go`: A singleton helper to spin up a Postgres container using `testcontainers-go`.
-    * Ensure migrations are applied automatically to the test container.
-    * Implement a `TruncateAll` helper to clean the DB between tests.
-3.  **Core Integration Tests (Step 62.2):**
-    * Create `test/integration/project_flow_test.go`.
-    * **The Test Pattern:**
-        * Setup: Spin up Container, Initialize Real Service, Initialize Real Handler.
-        * Execution: `httptest.NewRecorder` -> `router.ServeHTTP`.
-        * Assertion: Check HTTP Status AND check DB content (using raw SQL or Helper).
+The "Shadow Site" is an internal documentation portal that mirrors the production codebase file-for-file. It provides natural language explanations of the system, allowing non-engineers and AI agents to navigate and understand the product.
 
-Technical Constraints (The L7 Standard):
-* **No Mocks in Integration:** Use REAL Postgres. Use REAL Services. Only mock external APIs (Vertex AI, SendGrid) via the interfaces established in Step 61.2.
-* **Parallelism:** Tests must be safe to run with `t.Parallel()`. (Unique OrgIDs/ProjectIDs per test help here).
-* **Test Main:** Use `TestMain` to spin up the container ONCE per package (not once per test function) to keep suite duration under 10s.
-* **No Sleep:** Do not use `time.Sleep`. Use polling with timeouts if waiting for async ops (though 62.2 should be mostly synchronous).
+Objectives (from PRODUCTION_PLAN.md Step 63):
+1.  **Deploy Internal Documentation Portal:**
+    * Create a `shadow/` directory structure that mirrors `src/` (frontend) and `internal/` (backend).
+    * Each structural element (directory or key component) must have a corresponding `.md` file.
+    * Shadow files contain: Intent, Responsibility, Dependencies (NO code snippets).
+2.  **CI/CD Enforcement (Dual-Write Rule):**
+    * Configure GitHub Actions to reject PRs that modify `src/` or `internal/` without corresponding `shadow/` updates.
+    * Implement hash-based parity check or timestamp validation.
+3.  **Index for QA Chatbot:**
+    * Prepare the shadow content for indexing by an internal QA chatbot.
+    * Consider pgvector embeddings or a simple file-based search index.
 
-Reference Files:
-* `go.mod` (Already has testcontainers)
-* `internal/api/handlers/project_handler.go` (Target for refactor)
-* `migrations/` (Must be applied to container)
+Reference Specifications:
+* `specs/SHADOW_SITE_SPEC.md` - The Dual-Write Protocol and directory structure
+* `specs/PRODUCTION_PLAN.md` Step 63 - Deliverables
 
-Execution Order:
-1.  **Fix the Code (Flags):** Define Sentinels -> Refactor Service -> Refactor Handler.
-2.  **Build the Rig:** Setup `testcontainers` and migration applying logic.
-3.  **Write the Tests:** Project CRUD and Task Scheduling integration tests.
-4.  **Verify:** Run `go test -v -tags=integration ./...`
+Technical Constraints (L7 Standard):
+* **No External Hosting:** Shadow Site is internal (not deployed to public CDN).
+* **Markdown-First:** All documentation in standard Markdown.
+* **CI Enforcement:** Must block PRs, not just warn.
 
 Definition of Done:
-* [x] `pkg/types/errors.go` exists and is used.
-* [x] `project_handler.go` has NO string matching for errors.
-* [x] `test/integration` package created.
-* [x] `go test ./test/integration/...` passes with a real Dockerized Postgres.
+* [ ] `shadow/` directory structure created for frontend components.
+* [ ] `shadow/` directory structure created for backend services.
+* [ ] At least 5 key components have proper Shadow documentation.
+* [ ] GitHub Actions workflow enforces Dual-Write rule.
+* [ ] Documentation indexed for chatbot (basic implementation).
 
 /prism

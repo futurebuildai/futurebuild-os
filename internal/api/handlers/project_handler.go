@@ -8,10 +8,25 @@ import (
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+// getAuthOrgID extracts and validates the organization ID from JWT claims.
+// Returns an error if claims are missing or orgID is invalid.
+func getAuthOrgID(r *http.Request) (uuid.UUID, error) {
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		return uuid.Nil, errors.New("missing authentication context")
+	}
+	orgID, err := uuid.Parse(claims.OrgID)
+	if err != nil {
+		return uuid.Nil, errors.New("invalid OrgID in token")
+	}
+	return orgID, nil
+}
 
 type ProjectHandler struct {
 	service service.ProjectServicer
@@ -23,20 +38,15 @@ func NewProjectHandler(s service.ProjectServicer) *ProjectHandler {
 
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	// Extract OrgID from authenticated JWT claims (secure, not from header)
-	claims, err := middleware.GetClaims(r.Context())
+	authOrgID, err := getAuthOrgID(r)
 	if err != nil {
-		http.Error(w, "Internal server error: missing authentication context", http.StatusInternalServerError)
-		return
-	}
-	authOrgID, err := uuid.Parse(claims.OrgID)
-	if err != nil {
-		http.Error(w, "Internal server error: invalid OrgID in token", http.StatusInternalServerError)
+		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	var p models.Project
 	// L7 Security: Prevent DoS via unbounded body
-	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize) // 1MB limit
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -79,14 +89,9 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract OrgID from authenticated JWT claims (secure, not from header)
-	claims, err := middleware.GetClaims(r.Context())
+	orgID, err := getAuthOrgID(r)
 	if err != nil {
-		http.Error(w, "Internal server error: missing authentication context", http.StatusInternalServerError)
-		return
-	}
-	orgID, err := uuid.Parse(claims.OrgID)
-	if err != nil {
-		http.Error(w, "Internal server error: invalid OrgID in token", http.StatusInternalServerError)
+		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -102,4 +107,31 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(p)
+}
+
+func (h *ProjectHandler) GetProcurementItems(w http.ResponseWriter, r *http.Request) {
+	projectIDStr := chi.URLParam(r, "id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	// Extract OrgID from authenticated JWT claims
+	orgID, err := getAuthOrgID(r)
+	if err != nil {
+		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	items, err := h.service.ListProcurementItems(r.Context(), projectID, orgID)
+	if err != nil {
+		// Note: ListProcurementItems enforces multi-tenancy via JOIN;
+		// it returns empty list (not ErrNotFound) if project doesn't exist or belongs to another org
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(items)
 }
