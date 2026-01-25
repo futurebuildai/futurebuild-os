@@ -73,3 +73,21 @@ migrate-create:
 	@echo "--- Creating Migration: $(name) ---"
 	migrate create -ext sql -dir migrations -seq $(name)
 
+# --- Deployment & CI Verification ---
+# See deployment/staging/README.md (implied)
+
+# Verify Docker build works locally
+deploy-check:
+	@echo "--- Verifying Docker Build ---"
+	docker build . -f Dockerfile
+
+# Validate config files
+validate-ci:
+	@echo "--- Validating Workflow Syntax (yq required) ---"
+	@if command -v yq >/dev/null; then \
+		yq . .github/workflows/ci.yml > /dev/null && echo "CI.yml valid"; \
+		yq . .github/workflows/deploy-staging.yml > /dev/null && echo "Deploy.yml valid"; \
+		yq . deployment/staging/app.yaml > /dev/null && echo "App.yaml valid"; \
+	else \
+		echo "yq not installed, skipping syntax check"; \
+	fi

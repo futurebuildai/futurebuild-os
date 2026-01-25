@@ -1,48 +1,52 @@
-name: CI Quality Gate
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ "main", "staging" ]
 
 jobs:
-  backend:
-    name: Backend Audit (Go)
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Go
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
           cache: true
 
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Run Vet
-        run: go vet ./...
-
-      - name: Run Tests
-        run: go test -v ./...
-
-  frontend:
-    name: Frontend Audit (Lit/TS)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: npm --prefix frontend ci
+      - name: Install Frontend Deps
+        run: npm ci
+        working-directory: ./frontend
 
-      - name: Type Check & Build
-        run: npm --prefix frontend run build
+      # Linting
+      - name: Lint Frontend
+        run: npm run lint
+        working-directory: ./frontend
+
+      - name: Lint Backend
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m
+          skip-cache: true 
+
+      # Testing
+      - name: Test Frontend
+        run: npm run test
+        working-directory: ./frontend
+
+      - name: Test Backend
+        run: go test -v ./...

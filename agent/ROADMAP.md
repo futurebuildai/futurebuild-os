@@ -29,11 +29,11 @@
 - [x] Step 62.2: **Core Integration Tests** (Project Lifecycle Happy Path)
 - [x] Step 62.3: **Async Logic Verification** (Task hydration via Asynq)
 - [x] Step 62.4: **The "Golden Thread" E2E** (API -> DB -> Worker -> API integration)
-- [ ] Step 63: **Shadow Site & Protocol** (Internal documentation portal, Dual-Write enforcement)
+- [x] Step 63: **Shadow Site & Protocol** (Internal documentation portal, Dual-Write enforcement)
 
 ## Phase 9: FutureShade - The Intelligence Layer
 
-- [ ] Step 64: **Initialize FutureShade Service** (internal/futureshade, Event Bus integration)
+- [x] Step 64: **Initialize FutureShade Service** (internal/futureshade, Event Bus integration)
 - [ ] Step 65: **Implement "The Tribunal" Interfaces** (Multi-Model Client, Consensus Logic)
 - [ ] Step 66: **Build The Shadow Viewer** (ShadowDocs + Tribunal Decision Logs UI)
 - [ ] Step 67: **Integrate Antigravity Skills** (Agent code execution)
