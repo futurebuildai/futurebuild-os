@@ -35,6 +35,14 @@ type Config struct {
 	// Defaults to 0.85. See Code Review Issue 3B.
 	InvoiceConfidenceThreshold float64
 
+	// FutureShade configuration. See FUTURESHADE_INIT_specs.md.
+	// FutureShadeEnabled toggles the FutureShade intelligence layer.
+	FutureShadeEnabled bool
+	// FutureShadeAPIKey is the API key for the AI provider used by FutureShade.
+	FutureShadeAPIKey string
+	// FutureShadeModelID is the model ID for FutureShade analysis.
+	FutureShadeModelID string
+
 	Worker WorkerConfig
 }
 
@@ -88,6 +96,9 @@ func LoadConfig() (*Config, error) {
 		WebhookSecret:              os.Getenv("WEBHOOK_SECRET"),
 		Environment:                getEnvOrDefault("APP_ENV", "development"),
 		InvoiceConfidenceThreshold: confidenceThreshold,
+		FutureShadeEnabled:         getEnvBool("FUTURESHADE_ENABLED", false),
+		FutureShadeAPIKey:          os.Getenv("FUTURESHADE_API_KEY"),
+		FutureShadeModelID:         getEnvOrDefault("FUTURESHADE_MODEL_ID", "gemini-2.5-flash"),
 		Worker: WorkerConfig{
 			Concurrency: 10,
 			QueuePriorities: map[string]int{
@@ -127,6 +138,16 @@ func getEnvOrDefault(key, fallback string) string {
 func getEnvInt(key string, fallback int) int {
 	if valStr := os.Getenv(key); valStr != "" {
 		if val, err := strconv.Atoi(valStr); err == nil {
+			return val
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if valStr := os.Getenv(key); valStr != "" {
+		val, err := strconv.ParseBool(valStr)
+		if err == nil {
 			return val
 		}
 	}

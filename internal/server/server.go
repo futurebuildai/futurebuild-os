@@ -10,10 +10,12 @@ import (
 	"github.com/colton/futurebuild/internal/api/handlers"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
+	"github.com/colton/futurebuild/internal/futureshade"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/clock"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,10 +31,11 @@ type Server struct {
 	TaskHandler     *handlers.TaskHandler
 	AuthHandler     *handlers.AuthHandler
 	DocumentHandler *handlers.DocumentHandler
-	ChatHandler     *handlers.ChatHandler    // See PRODUCTION_PLAN.md Step 43.5
-	WebhookHandler  *handlers.WebhookHandler // See PRODUCTION_PLAN.md Step 48
-	AuthMiddleware  *middleware.AuthMiddleware
-	AuthRateLimiter *middleware.IPRateLimiter
+	ChatHandler       *handlers.ChatHandler       // See PRODUCTION_PLAN.md Step 43.5
+	WebhookHandler    *handlers.WebhookHandler    // See PRODUCTION_PLAN.md Step 48
+	FutureShadeHandler *handlers.FutureShadeHandler // See FUTURESHADE_INIT_specs.md
+	AuthMiddleware    *middleware.AuthMiddleware
+	AuthRateLimiter   *middleware.IPRateLimiter
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -114,6 +117,16 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	authRateLimiter := middleware.NewIPRateLimiter(rate.Every(12*time.Second), 2, cfg.TrustedProxies)
 
+	// See FUTURESHADE_INIT_specs.md: Initialize FutureShade with Fail Open strategy.
+	// If configuration is missing, the service returns a disabled NoOp instance.
+	futureShadeConfig := &futureshade.Config{
+		Enabled: cfg.FutureShadeEnabled,
+		APIKey:  cfg.FutureShadeAPIKey,
+		ModelID: cfg.FutureShadeModelID,
+	}
+	futureShadeService := futureshade.NewService(futureShadeConfig)
+	futureShadeHandler := handlers.NewFutureShadeHandler(futureShadeService)
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -122,10 +135,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		TaskHandler:     taskHandler,
 		AuthHandler:     authHandler,
 		DocumentHandler: documentHandler,
-		ChatHandler:     chatHandler,    // See PRODUCTION_PLAN.md Step 43.5
-		WebhookHandler:  webhookHandler, // See PRODUCTION_PLAN.md Step 48
-		AuthMiddleware:  authMiddleware,
-		AuthRateLimiter: authRateLimiter,
+		ChatHandler:        chatHandler,        // See PRODUCTION_PLAN.md Step 43.5
+		WebhookHandler:     webhookHandler,     // See PRODUCTION_PLAN.md Step 48
+		FutureShadeHandler: futureShadeHandler, // See FUTURESHADE_INIT_specs.md
+		AuthMiddleware:     authMiddleware,
+		AuthRateLimiter:    authRateLimiter,
 	}
 
 	s.routes()
@@ -174,6 +188,13 @@ func (s *Server) routes() {
 		r.Route("/webhooks", func(r chi.Router) {
 			r.Post("/sms", s.WebhookHandler.HandleSMS)
 			r.Post("/email", s.WebhookHandler.HandleEmail)
+		})
+
+		// See FUTURESHADE_INIT_specs.md Section 3.2: FutureShade endpoints (Admin only)
+		r.Route("/futureshade", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/health", s.FutureShadeHandler.HandleHealth)
 		})
 	})
 
