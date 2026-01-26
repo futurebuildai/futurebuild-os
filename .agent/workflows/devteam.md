@@ -11,5 +11,5 @@ description: Invoke the Dev Team to execute engineering work, build features, an
    - If no PRD exists for a large feature, **REJECT** and tell user to use `/product`.
    - If valid, create `specs/[TASKNAME]_specs.md` and start the sprint.
 4. **Handoff**: Provide inter-thread transition instruction:
-   > "Specs complete. Invoke `/software_engineer [TASKNAME]` to proceed."
-   > "Input Artifact: `specs/[TASKNAME]_specs.md`"
+   > "Specs complete in `specs/[TASKNAME]_specs.md`. Please review the technical design."
+   > "When ready, invoke `/plan_review [TASKNAME]` to generate the implementation context."
