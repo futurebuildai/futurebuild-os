@@ -24,20 +24,3 @@ jobs:
             APP_ID: ${{ secrets.DO_APP_ID_DEMO }}
         run: |
           doctl apps update $APP_ID --spec deployment/demo/app.yaml
-
-      - name: Seed Demo Data
-        # We need a way to run the seed script against the remote DB.
-        # Since the DB is private/vpc-only usually, we might need a "job" in the App Spec or run a one-off task.
-        # Ideally, we used `doctl apps create-deployment` with a force rebuild, 
-        # but for seeding, we can run a one-off component if defined, or assume the app handles it on boot if configured.
-        # HOWEVER, the plan asked for a workflow step.
-        # Option A: Connect to DB directly (requires trusted source or proxy).
-        # Option B: Trigger an exec command in the running container (doctl apps exec ... not fully supported for all app types easily in CI).
-        # Option C: The App has a "Job" component.
-        # For this setup, let's assume we can set an env var FORCE_SEED=true for a single deployment, or we skip this automatic step if connectivity is hard 
-        # and rely on the app to seed itself if empty, or use a "Job" resource in App Platform.
-        #
-        # Simpler approach for now: We won't automate the seeding in the *deployment* step blindly because of VPC restrictions, 
-        # unless we add a "worker" or "job" to the app.yaml. 
-        # Let's add a comment for the user to configure the DB connectivity or run a job.
-        run: echo "Demo deployment triggered. Note: Automatic remote seeding requires a Job component or VPC access. Please verify data state."
