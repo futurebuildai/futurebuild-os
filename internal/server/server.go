@@ -38,11 +38,12 @@ type Server struct {
 	FutureShadeHandler *handlers.FutureShadeHandler // See FUTURESHADE_INIT_specs.md
 	TribunalHandler    *handlers.TribunalHandler    // See SHADOW_VIEWER_specs.md
 	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
-	InviteHandler      *handlers.InviteHandler      // See LAUNCH_STRATEGY.md Task B2
-	UserHandler        *handlers.UserHandler        // See LAUNCH_PLAN.md User Profile Endpoint
-	PortalHandler      *handlers.PortalHandler      // See LAUNCH_PLAN.md P2: Field Portal
-	AuthMiddleware    *middleware.AuthMiddleware
-	AuthRateLimiter   *middleware.IPRateLimiter
+	InviteHandler        *handlers.InviteHandler        // See LAUNCH_STRATEGY.md Task B2
+	UserHandler          *handlers.UserHandler          // See LAUNCH_PLAN.md User Profile Endpoint
+	PortalHandler        *handlers.PortalHandler        // See LAUNCH_PLAN.md P2: Field Portal
+	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
+	AuthMiddleware       *middleware.AuthMiddleware
+	AuthRateLimiter      *middleware.IPRateLimiter
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -170,6 +171,13 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	portalService := service.NewPortalService(db, notificationService, cfg.BaseURL)
 	portalHandler := handlers.NewPortalHandler(portalService)
 
+	// See docs/AUTOMATED_PR_REVIEW_PRD.md: GitHub Webhook Handler
+	// Only initialize if webhook secret is configured (fail-closed handled in handler)
+	var githubWebhookHandler *handlers.GitHubWebhookHandler
+	if cfg.GitHubWebhookSecret != "" {
+		githubWebhookHandler = handlers.NewGitHubWebhookHandler(cfg.GitHubWebhookSecret, cfg.RedisURL)
+	}
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -183,11 +191,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		FutureShadeHandler: futureShadeHandler, // See FUTURESHADE_INIT_specs.md
 		TribunalHandler:    tribunalHandler,    // See SHADOW_VIEWER_specs.md
 		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
-		InviteHandler:      inviteHandler,      // See LAUNCH_STRATEGY.md Task B2
-		UserHandler:        userHandler,        // See LAUNCH_PLAN.md User Profile Endpoint
-		PortalHandler:      portalHandler,      // See LAUNCH_PLAN.md P2: Field Portal
-		AuthMiddleware:     authMiddleware,
-		AuthRateLimiter:    authRateLimiter,
+		InviteHandler:        inviteHandler,        // See LAUNCH_STRATEGY.md Task B2
+		UserHandler:          userHandler,          // See LAUNCH_PLAN.md User Profile Endpoint
+		PortalHandler:        portalHandler,        // See LAUNCH_PLAN.md P2: Field Portal
+		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
+		AuthMiddleware:       authMiddleware,
+		AuthRateLimiter:      authRateLimiter,
 	}
 
 	s.routes()
@@ -274,6 +283,10 @@ func (s *Server) routes() {
 		r.Route("/webhooks", func(r chi.Router) {
 			r.Post("/sms", s.WebhookHandler.HandleSMS)
 			r.Post("/email", s.WebhookHandler.HandleEmail)
+			// See docs/AUTOMATED_PR_REVIEW_PRD.md: GitHub PR Review Webhook
+			if s.GitHubWebhookHandler != nil {
+				r.Post("/github", s.GitHubWebhookHandler.HandleGitHubWebhook)
+			}
 		})
 
 		// See FUTURESHADE_INIT_specs.md Section 3.2: FutureShade endpoints (Admin only)

@@ -65,6 +65,11 @@ type Config struct {
 	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
 	AuditWALPath string
 
+	// GitHub configuration for Automated PR Review.
+	// See docs/AUTOMATED_PR_REVIEW_PRD.md
+	GitHubWebhookSecret string // GITHUB_WEBHOOK_SECRET - HMAC verification
+	GitHubPAT           string // GITHUB_PAT - API authentication
+
 	Worker WorkerConfig
 }
 
@@ -130,6 +135,8 @@ func LoadConfig() (*Config, error) {
 		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/log/futurebuild/audit.wal"),
+		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
+		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{
 			Concurrency: 10,
 			QueuePriorities: map[string]int{

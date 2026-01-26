@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/futureshade"
 	"github.com/colton/futurebuild/internal/futureshade/gateway"
 	"github.com/colton/futurebuild/internal/futureshade/skills"
+	"github.com/colton/futurebuild/internal/futureshade/tribunal"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,6 +27,10 @@ type WorkerHandler struct {
 	skillRegistry     *skills.Registry
 	executionRepo     *gateway.Repository
 	futureShadeConfig futureshade.Config
+	// Automated PR Review fields (optional - initialized via WithPRReview)
+	githubService service.GitHubServicer
+	tribunalEngine *tribunal.ConsensusEngine
+	tribunalRepo   *tribunal.Repository
 }
 
 func NewWorkerHandler(focusAgent *agents.DailyFocusAgent, procurementAgent *agents.ProcurementAgent, db *pgxpool.Pool, clk clock.Clock) *WorkerHandler {
@@ -41,6 +48,15 @@ func (h *WorkerHandler) WithSkillExecution(registry *skills.Registry, repo *gate
 	h.skillRegistry = registry
 	h.executionRepo = repo
 	h.futureShadeConfig = config
+	return h
+}
+
+// WithPRReview configures the handler for Automated PR Review.
+// See docs/AUTOMATED_PR_REVIEW_PRD.md
+func (h *WorkerHandler) WithPRReview(githubService service.GitHubServicer, engine *tribunal.ConsensusEngine, repo *tribunal.Repository) *WorkerHandler {
+	h.githubService = githubService
+	h.tribunalEngine = engine
+	h.tribunalRepo = repo
 	return h
 }
 
@@ -233,4 +249,132 @@ func (h *WorkerHandler) HandleSkillExecution(ctx context.Context, task *asynq.Ta
 		append(logArgs, "summary", result.Summary)...)
 
 	return nil
+}
+
+// HandleReviewPR processes Automated PR Review tasks.
+// Fetches PR diff, consults Tribunal, and posts verdict as PR comment.
+// See docs/AUTOMATED_PR_REVIEW_PRD.md
+func (h *WorkerHandler) HandleReviewPR(ctx context.Context, task *asynq.Task) error {
+	var payload ReviewPRPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("invalid review_pr payload: %w", err)
+	}
+
+	logArgs := []any{
+		"case_id", payload.CaseID,
+		"owner", payload.Owner,
+		"repo", payload.Repo,
+		"pr_number", payload.PRNumber,
+	}
+
+	// Validate handler configuration
+	if h.githubService == nil || h.tribunalEngine == nil || h.tribunalRepo == nil {
+		slog.Error("worker/review_pr: handler not configured", logArgs...)
+		return fmt.Errorf("PR review handler not configured")
+	}
+
+	// Step 1: Idempotency check - skip if already processed
+	exists, err := h.tribunalRepo.DecisionExistsByCaseID(ctx, payload.CaseID)
+	if err != nil {
+		slog.Error("worker/review_pr: idempotency check failed", append(logArgs, "error", err)...)
+		return fmt.Errorf("idempotency check failed: %w", err)
+	}
+	if exists {
+		slog.Info("worker/review_pr: skipping duplicate", logArgs...)
+		return nil
+	}
+
+	slog.Info("worker/review_pr: processing PR", logArgs...)
+
+	// Step 2: Fetch PR diff
+	diff, err := h.githubService.FetchPRDiff(ctx, payload.Owner, payload.Repo, payload.PRNumber)
+	if err != nil {
+		slog.Error("worker/review_pr: fetch diff failed", append(logArgs, "error", err)...)
+		return fmt.Errorf("fetch PR diff: %w", err)
+	}
+
+	// Step 3: Sanitize diff (additional layer - service already sanitizes)
+	sanitizedDiff := sanitizePRDiff(diff)
+
+	// Step 4: Build Tribunal request
+	req := tribunal.TribunalRequest{
+		CaseID:  payload.CaseID,
+		Intent:  fmt.Sprintf("Automated security and consistency audit for PR #%d: %s", payload.PRNumber, payload.PRTitle),
+		Context: sanitizedDiff,
+	}
+
+	// Step 5: Consult Tribunal
+	resp, err := h.tribunalEngine.Review(ctx, req)
+	if err != nil {
+		slog.Error("worker/review_pr: tribunal review failed", append(logArgs, "error", err)...)
+		return fmt.Errorf("tribunal review: %w", err)
+	}
+
+	slog.Info("worker/review_pr: tribunal decision",
+		append(logArgs,
+			"decision_id", resp.DecisionID,
+			"status", resp.Status,
+			"consensus_score", resp.ConsensusScore,
+		)...)
+
+	// Step 6: Format and post PR comment
+	comment := formatPRComment(resp)
+	if err := h.githubService.PostPRComment(ctx, payload.Owner, payload.Repo, payload.PRNumber, comment); err != nil {
+		slog.Error("worker/review_pr: post comment failed", append(logArgs, "error", err)...)
+		return fmt.Errorf("post PR comment: %w", err)
+	}
+
+	slog.Info("worker/review_pr: completed successfully", logArgs...)
+	return nil
+}
+
+// sanitizePRDiff performs additional sanitization on PR diff content.
+// Removes potential prompt injection patterns.
+func sanitizePRDiff(diff string) string {
+	// Remove standalone delimiter lines that could confuse AI models
+	lines := strings.Split(diff, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" || trimmed == "===" || trimmed == ">>>" {
+			lines[i] = "[separator]"
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// formatPRComment formats the Tribunal response as a GitHub PR comment.
+// See docs/AUTOMATED_PR_REVIEW_PRD.md "PR Comment Format"
+func formatPRComment(resp *tribunal.TribunalResponse) string {
+	var statusEmoji string
+	switch resp.Status {
+	case tribunal.DecisionApproved:
+		statusEmoji = ":white_check_mark:"
+	case tribunal.DecisionRejected:
+		statusEmoji = ":x:"
+	case tribunal.DecisionConflict:
+		statusEmoji = ":warning:"
+	default:
+		statusEmoji = ":question:"
+	}
+
+	return fmt.Sprintf(`## FutureBuild AI Review %s
+
+**Status**: %s
+**Consensus Score**: %.2f
+
+### Summary
+%s
+
+### Recommendations
+%s
+
+---
+*Generated by [The Tribunal](https://github.com/colton/futurebuild) | Decision ID: %s*`,
+		statusEmoji,
+		resp.Status,
+		resp.ConsensusScore,
+		resp.Summary,
+		resp.Plan,
+		resp.DecisionID.String(),
+	)
 }

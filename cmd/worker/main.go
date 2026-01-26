@@ -15,6 +15,7 @@ import (
 	"github.com/colton/futurebuild/internal/futureshade"
 	"github.com/colton/futurebuild/internal/futureshade/gateway"
 	"github.com/colton/futurebuild/internal/futureshade/skills"
+	"github.com/colton/futurebuild/internal/futureshade/tribunal"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -118,6 +119,28 @@ func main() {
 	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock).
 		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig)
 
+	// 7.5 Automated PR Review: Initialize GitHub service and Tribunal integration
+	// See docs/AUTOMATED_PR_REVIEW_PRD.md
+	if cfg.GitHubPAT != "" && cfg.GitHubWebhookSecret != "" {
+		log.Println("INFO: Automated PR Review is ENABLED")
+		githubService := service.NewGitHubService(cfg.GitHubPAT)
+		tribunalRepo := tribunal.NewRepository(dbPool)
+
+		// Initialize Tribunal Jury with AI clients (reuses existing aiClient for Flash)
+		// Note: In full implementation, would initialize separate clients for Opus/CodeAssist
+		// For now, use the same client with different model types
+		jury := tribunal.Jury{
+			Coordinator: aiClient, // Gemini Flash
+			Architect:   aiClient, // Would be Claude Opus in production
+			Historian:   aiClient, // Would be Gemini Code Assist in production
+		}
+		tribunalEngine := tribunal.NewConsensusEngine(jury, tribunalRepo)
+
+		workerHandler = workerHandler.WithPRReview(githubService, tribunalEngine, tribunalRepo)
+	} else {
+		log.Println("INFO: Automated PR Review is DISABLED (set GITHUB_PAT and GITHUB_WEBHOOK_SECRET to enable)")
+	}
+
 	// 8. Initialize Scheduler (The Clock)
 	// See PRODUCTION_PLAN.md Step 45 (Daily Briefing Job)
 	scheduler := worker.NewScheduler(cfg.RedisURL)
@@ -153,6 +176,8 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeProcurementNotification, workerHandler.HandleProcurementNotification)
 	// FutureShade Action Bridge: Register skill execution handler
 	srv.RegisterHandlerFunc(worker.TypeSkillExecution, workerHandler.HandleSkillExecution)
+	// Automated PR Review: Register PR review handler
+	srv.RegisterHandlerFunc(worker.TypeReviewPR, workerHandler.HandleReviewPR)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

@@ -16,6 +16,7 @@ const (
 	TypeHydrateProject          = "task:hydrate_project"
 	TypeProcurementNotification = "task:procurement_notification"
 	TypeSkillExecution          = "task:skill_execution" // FutureShade Action Bridge
+	TypeReviewPR                = "task:review_pr"       // Automated PR Review
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -91,4 +92,25 @@ func NewSkillExecutionTask(decisionID, executionID uuid.UUID, skillID string, pa
 		return nil, err
 	}
 	return asynq.NewTask(TypeSkillExecution, payload, asynq.Queue("default")), nil
+}
+
+// ReviewPRPayload contains data for GitHub PR review tasks.
+// See docs/AUTOMATED_PR_REVIEW_PRD.md
+type ReviewPRPayload struct {
+	CaseID   string `json:"case_id"`    // Format: GH_{owner}/{repo}#{number}_{sha}
+	Owner    string `json:"owner"`      // Repository owner
+	Repo     string `json:"repo"`       // Repository name
+	PRNumber int    `json:"pr_number"`  // Pull request number
+	HeadSHA  string `json:"head_sha"`   // HEAD commit SHA
+	PRTitle  string `json:"pr_title"`   // Pull request title
+}
+
+// NewReviewPRTask creates a task for Automated PR Review.
+// Enqueued by GitHub webhook handler when a PR is opened/synchronized/reopened.
+func NewReviewPRTask(payload ReviewPRPayload) (*asynq.Task, error) {
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeReviewPR, payloadBytes, asynq.Queue("default")), nil
 }

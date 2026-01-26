@@ -257,3 +257,15 @@ func (r *Repository) CreateVote(ctx context.Context, v ModelVote) error {
 	}
 	return nil
 }
+
+// DecisionExistsByCaseID checks if a decision with the given case_id already exists.
+// Used for idempotency in Automated PR Review. See docs/AUTOMATED_PR_REVIEW_PRD.md
+func (r *Repository) DecisionExistsByCaseID(ctx context.Context, caseID string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM tribunal_decisions WHERE case_id = $1)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, caseID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check decision exists: %w", err)
+	}
+	return exists, nil
+}

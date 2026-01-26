@@ -69,3 +69,10 @@ type WeatherServicer interface {
 type VisionServicer interface {
 	VerifyTask(ctx context.Context, imageURL string, taskDescription string) (bool, float64, error)
 }
+
+// GitHubServicer defines the contract for GitHub API operations.
+// Used for Automated PR Review. See docs/AUTOMATED_PR_REVIEW_PRD.md
+type GitHubServicer interface {
+	FetchPRDiff(ctx context.Context, owner, repo string, prNumber int) (string, error)
+	PostPRComment(ctx context.Context, owner, repo string, prNumber int, body string) error
+}
