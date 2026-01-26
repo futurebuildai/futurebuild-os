@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -109,4 +110,32 @@ type Jury struct {
 	Coordinator ai.Client // Gemini 3 Flash
 	Architect   ai.Client // Claude Opus
 	Historian   ai.Client // Gemini Code Assist
+}
+
+// DiagnosisRequest contains input for self-healing diagnosis.
+// Used by the Tree Planting integration test.
+type DiagnosisRequest struct {
+	// ErrorTrace is the error message and context from the failure.
+	ErrorTrace string `json:"error_trace"`
+
+	// MethodContext identifies which operation failed.
+	MethodContext string `json:"method_context"`
+
+	// SystemState contains current configuration values for context.
+	SystemState map[string]string `json:"system_state"`
+}
+
+// DiagnosisResponse contains the result of a self-healing diagnosis.
+type DiagnosisResponse struct {
+	// Decision is the parsed TribunalDecision from the AI.
+	Decision types.TribunalDecision `json:"decision"`
+
+	// SessionID tracks this diagnosis session.
+	SessionID uuid.UUID `json:"session_id"`
+
+	// LatencyMs is the time taken to complete the diagnosis.
+	LatencyMs int `json:"latency_ms"`
+
+	// ModelUsed identifies which model performed the diagnosis.
+	ModelUsed string `json:"model_used"`
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/colton/futurebuild/internal/chaos"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ type HydrationEnqueuer interface {
 type ProjectService struct {
 	db               *pgxpool.Pool
 	hydrationEnqueue HydrationEnqueuer // Optional: nil means no async hydration
+	chaosInjector    chaos.Injector    // Optional: nil in production, used for self-healing tests
 }
 
 // NewProjectService creates a new ProjectService instance.
@@ -37,10 +39,24 @@ func NewProjectServiceWithHydration(db *pgxpool.Pool, enqueue HydrationEnqueuer)
 	return &ProjectService{db: db, hydrationEnqueue: enqueue}
 }
 
+// NewProjectServiceWithChaos creates a ProjectService with chaos injection support.
+// Used for self-healing integration tests (Tree Planting).
+// SAFETY: Only use in test environments; production should use NewProjectService.
+func NewProjectServiceWithChaos(db *pgxpool.Pool, injector chaos.Injector) *ProjectService {
+	return &ProjectService{db: db, chaosInjector: injector}
+}
+
 // CreateProject persists a new project to the database.
 // See DATA_SPINE_SPEC.md Section 3.1
 // P1 Performance Fix: Enqueues hydration task after successful creation.
 func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) error {
+	// Chaos injection hook for self-healing tests
+	if s.chaosInjector != nil {
+		if shouldFail, err := s.chaosInjector.ShouldFail(ctx, "CreateProject"); shouldFail {
+			return err
+		}
+	}
+
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
 	}

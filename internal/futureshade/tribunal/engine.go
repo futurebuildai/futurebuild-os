@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -187,4 +188,72 @@ func (e *ConsensusEngine) saveDecision(ctx context.Context, id uuid.UUID, req Tr
 func (e *ConsensusEngine) saveVote(ctx context.Context, v ModelVote) error {
 	// P0 Fix: Wire up repository call
 	return e.repo.CreateVote(ctx, v)
+}
+
+// Diagnose performs self-healing analysis on a runtime error.
+// Uses Gemini Flash with Temperature=0 for deterministic output.
+// See Tree Planting integration test for usage.
+func (e *ConsensusEngine) Diagnose(ctx context.Context, req DiagnosisRequest) (*DiagnosisResponse, error) {
+	sessionID := uuid.New()
+	start := time.Now()
+
+	// Build the diagnostic prompt
+	var stateStr strings.Builder
+	for k, v := range req.SystemState {
+		stateStr.WriteString(fmt.Sprintf("- %s: %s\n", k, v))
+	}
+
+	prompt := fmt.Sprintf(`%s
+
+---
+Error Trace:
+%s
+
+Method Context: %s
+
+System State:
+%s
+---
+
+Output the JSON diagnosis:`, DiagnosticianSystemPrompt, req.ErrorTrace, req.MethodContext, stateStr.String())
+
+	// Use Gemini Flash with Temperature=0 for determinism
+	aiReq := ai.GenerateRequest{
+		Model:       ai.ModelTypeFlashPreview,
+		Parts:       []ai.ContentPart{{Text: prompt}},
+		Temperature: 0.0, // Deterministic output
+	}
+
+	// Enforce timeout
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := e.jury.Coordinator.GenerateContent(ctxWithTimeout, aiReq)
+	if err != nil {
+		return nil, fmt.Errorf("diagnosis failed: %w", err)
+	}
+
+	duration := time.Since(start)
+
+	// Parse the JSON response
+	cleanText := strings.TrimPrefix(resp.Text, "```json")
+	cleanText = strings.TrimSuffix(cleanText, "```")
+	cleanText = strings.TrimSpace(cleanText)
+
+	var decision types.TribunalDecision
+	if err := json.Unmarshal([]byte(cleanText), &decision); err != nil {
+		return nil, fmt.Errorf("failed to parse diagnosis JSON: %w (raw: %s)", err, cleanText)
+	}
+
+	// Validate the proposed action type
+	if !types.IsValidActionType(string(decision.ProposedAction.Type)) {
+		return nil, fmt.Errorf("invalid action type proposed: %s", decision.ProposedAction.Type)
+	}
+
+	return &DiagnosisResponse{
+		Decision:  decision,
+		SessionID: sessionID,
+		LatencyMs: int(duration.Milliseconds()),
+		ModelUsed: "gemini-flash",
+	}, nil
 }
