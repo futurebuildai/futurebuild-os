@@ -55,7 +55,8 @@ Implement [Feature X] by refactoring [File A] and [File B].
 - **Spec**: `specs/[TASKNAME]_specs.md`
 
 > [!IMPORTANT]
-> Read BOTH the PRD and Spec files above before starting the implementation to ensure full context of the requirements and technical design.
+> - Read BOTH the PRD and Spec files above before starting the implementation to ensure full context of the requirements and technical design.
+> - **Skills**: You must consult the relevant skill instructions in `.claude/skills/` for domain-specific guidelines (e.g., `.claude/skills/backend_developer/SKILL.md`).
 
 ### Constraints
 - Use [Pattern Y] as established in the codebase.
