@@ -47,6 +47,19 @@ type Config struct {
 	// Used by ShadowDocs to serve documentation files. See SHADOW_VIEWER_specs.md.
 	ProjectRoot string
 
+	// SendGrid email configuration. See LAUNCH_STRATEGY.md A3.
+	SendGridAPIKey   string
+	EmailFromAddress string
+	EmailFromName    string
+
+	// BaseURL is the public URL of the application (e.g., https://app.futurebuild.app).
+	// Used for constructing magic links and other URLs.
+	BaseURL string
+
+	// AuditWALPath is the file path for the audit Write-Ahead Log.
+	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
+	AuditWALPath string
+
 	Worker WorkerConfig
 }
 
@@ -104,6 +117,11 @@ func LoadConfig() (*Config, error) {
 		FutureShadeAPIKey:          os.Getenv("FUTURESHADE_API_KEY"),
 		FutureShadeModelID:         getEnvOrDefault("FUTURESHADE_MODEL_ID", "gemini-2.5-flash"),
 		ProjectRoot:                getEnvOrDefault("PROJECT_ROOT", "."),
+		SendGridAPIKey:             os.Getenv("SENDGRID_API_KEY"),
+		EmailFromAddress:           getEnvOrDefault("EMAIL_FROM_ADDRESS", "noreply@futurebuild.ai"),
+		EmailFromName:              getEnvOrDefault("EMAIL_FROM_NAME", "FutureBuild"),
+		BaseURL:                    getEnvOrDefault("BASE_URL", "http://localhost:8080"),
+		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/log/futurebuild/audit.wal"),
 		Worker: WorkerConfig{
 			Concurrency: 10,
 			QueuePriorities: map[string]int{

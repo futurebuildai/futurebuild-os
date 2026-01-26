@@ -3,13 +3,12 @@
  * See PRODUCTION_PLAN.md Step 51.4
  *
  * The "Trap" - unauthenticated users are forced here by the Auth Guard.
- * Provides simulated login for development.
+ * Uses magic link authentication - user enters email, receives link via SendGrid.
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
-import { store } from '../../store/store';
-import { UserRole } from '../../types/enums';
+import { api } from '../../services/api';
 
 @customElement('fb-view-login')
 export class FBViewLogin extends FBViewElement {
@@ -95,19 +94,93 @@ export class FBViewLogin extends FBViewElement {
                 font-size: var(--fb-text-sm);
                 margin-bottom: var(--fb-spacing-md);
             }
+
+            .success-card {
+                background: var(--fb-bg-card);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-lg);
+                padding: var(--fb-spacing-2xl);
+                max-width: 400px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .success-icon {
+                font-size: 48px;
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            .success-title {
+                font-size: var(--fb-text-xl);
+                font-weight: 600;
+                color: var(--fb-text-primary);
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            .success-message {
+                color: var(--fb-text-secondary);
+                margin-bottom: var(--fb-spacing-lg);
+                line-height: 1.5;
+            }
+
+            .email-highlight {
+                color: var(--fb-primary);
+                font-weight: 500;
+            }
+
+            .btn-secondary {
+                padding: var(--fb-spacing-sm) var(--fb-spacing-md);
+                background: transparent;
+                color: var(--fb-text-secondary);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-md);
+                font-size: var(--fb-text-sm);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .btn-secondary:hover {
+                background: var(--fb-bg-tertiary);
+                color: var(--fb-text-primary);
+            }
+
+            .btn-primary:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
         `,
     ];
 
     @state() private _email = '';
     @state() private _error = '';
+    @state() private _isLoading = false;
+    @state() private _emailSent = false;
 
     override render(): TemplateResult {
+        // Show success state after email is sent
+        if (this._emailSent) {
+            return html`
+                <div class="success-card">
+                    <div class="success-icon">📧</div>
+                    <div class="success-title">Check your email</div>
+                    <p class="success-message">
+                        We've sent a magic link to<br />
+                        <span class="email-highlight">${this._email}</span><br />
+                        Click the link to sign in.
+                    </p>
+                    <button class="btn-secondary" @click=${this._resetForm.bind(this)}>
+                        Use a different email
+                    </button>
+                </div>
+            `;
+        }
+
         return html`
             <div class="login-card">
                 <div class="logo">FutureBuild</div>
                 <p class="tagline">AI-Powered Construction Management</p>
 
-                ${this._error ? html`<p class="error">${this._error}</p>` : null}
+                ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
 
                 <div class="input-group">
                     <input
@@ -115,18 +188,19 @@ export class FBViewLogin extends FBViewElement {
                         placeholder="Enter your email"
                         aria-label="Email address"
                         .value=${this._email}
+                        ?disabled=${this._isLoading}
                         @input=${this._handleEmailInput.bind(this)}
                         @keyup=${this._handleKeyUp.bind(this)}
                     />
                 </div>
 
-                <button class="btn-primary" @click=${this._handleLogin.bind(this)}>
-                    Request Magic Link
+                <button
+                    class="btn-primary"
+                    ?disabled=${this._isLoading}
+                    @click=${this._handleLogin.bind(this)}
+                >
+                    ${this._isLoading ? 'Sending...' : 'Request Magic Link'}
                 </button>
-
-                <div class="dev-note">
-                    <strong>Dev Mode:</strong> Click the button to simulate login.
-                </div>
             </div>
         `;
     }
@@ -142,35 +216,30 @@ export class FBViewLogin extends FBViewElement {
         }
     }
 
-    private _handleLogin(): void {
-        // Simulated login for development
-        // In production, this would call api.auth.requestMagicLink()
+    private async _handleLogin(): Promise<void> {
+        // Validate email
         if (!this._email || !this._email.includes('@')) {
             this._error = 'Please enter a valid email address';
             return;
         }
 
-        // Simulate successful login
-        const mockUser = {
-            id: 'user-dev-001',
-            email: this._email,
-            name: this._email.split('@')[0] ?? 'Dev User',
-            role: UserRole.Builder,
-            orgId: 'org-dev-001',
-        };
-        const mockToken = 'dev-jwt-token-' + Date.now().toString();
+        this._isLoading = true;
+        this._error = '';
 
-        store.actions.login(mockUser, mockToken);
+        try {
+            await api.auth.requestMagicLink(this._email);
+            this._emailSent = true;
+        } catch (err) {
+            this._error = err instanceof Error ? err.message : 'Failed to send magic link. Please try again.';
+        } finally {
+            this._isLoading = false;
+        }
+    }
 
-        // Setup mock data for demo
-        store.actions.setProjects([
-            { id: 'proj-1', name: 'Sunrise Villa', address: '123 Main St', status: 'active', completionPercentage: 45, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: 'proj-2', name: 'Oak Ridge Home', address: '456 Oak Ave', status: 'active', completionPercentage: 20, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        ]);
-        store.actions.setFocusTasks([
-            { id: 'ft-1', title: 'Review Framing Invoice', description: '', priority: 'high', projectId: 'proj-1', projectName: 'Sunrise Villa', actionType: 'approval', createdAt: new Date().toISOString() },
-            { id: 'ft-2', title: 'Confirm Plumber Arrival', description: '', priority: 'medium', projectId: 'proj-1', projectName: 'Sunrise Villa', actionType: 'confirmation', createdAt: new Date().toISOString() },
-        ]);
+    private _resetForm(): void {
+        this._emailSent = false;
+        this._email = '';
+        this._error = '';
     }
 }
 

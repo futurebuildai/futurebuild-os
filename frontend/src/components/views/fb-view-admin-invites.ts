@@ -1,0 +1,501 @@
+/**
+ * FBViewAdminInvites - Admin Invitation Management View
+ * See LAUNCH_PLAN.md Section: Admin Invite Management UI (P1)
+ *
+ * Allows admins to:
+ * - View pending invitations
+ * - Create new invitations
+ * - Revoke pending invitations
+ */
+import { html, css, TemplateResult, nothing } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
+import { FBViewElement } from '../base/FBViewElement';
+import { api, Invite } from '../../services/api';
+
+type ViewState = 'loading' | 'ready' | 'error';
+type ModalState = 'closed' | 'creating' | 'submitting';
+
+@customElement('fb-view-admin-invites')
+export class FBViewAdminInvites extends FBViewElement {
+    static override styles = [
+        FBViewElement.styles,
+        css`
+            :host {
+                display: flex;
+                flex-direction: column;
+                background: var(--fb-bg-primary);
+                padding: var(--fb-spacing-xl);
+            }
+
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: var(--fb-spacing-xl);
+            }
+
+            .title {
+                font-size: var(--fb-text-2xl);
+                font-weight: 600;
+                color: var(--fb-text-primary);
+            }
+
+            .subtitle {
+                font-size: var(--fb-text-sm);
+                color: var(--fb-text-secondary);
+                margin-top: var(--fb-spacing-xs);
+            }
+
+            .btn-primary {
+                padding: var(--fb-spacing-sm) var(--fb-spacing-lg);
+                background: var(--fb-primary);
+                color: white;
+                border: none;
+                border-radius: var(--fb-radius-md);
+                font-size: var(--fb-text-sm);
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+
+            .btn-primary:hover:not(:disabled) {
+                background: var(--fb-primary-hover);
+            }
+
+            .btn-primary:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            .btn-danger {
+                padding: var(--fb-spacing-xs) var(--fb-spacing-sm);
+                background: transparent;
+                color: var(--fb-error);
+                border: 1px solid var(--fb-error);
+                border-radius: var(--fb-radius-sm);
+                font-size: var(--fb-text-xs);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .btn-danger:hover {
+                background: var(--fb-error);
+                color: white;
+            }
+
+            .table-container {
+                background: var(--fb-bg-card);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-lg);
+                overflow: hidden;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                padding: var(--fb-spacing-md);
+                text-align: left;
+                border-bottom: 1px solid var(--fb-border-light);
+            }
+
+            th {
+                background: var(--fb-bg-tertiary);
+                font-size: var(--fb-text-sm);
+                font-weight: 600;
+                color: var(--fb-text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            td {
+                font-size: var(--fb-text-sm);
+                color: var(--fb-text-primary);
+            }
+
+            tr:last-child td {
+                border-bottom: none;
+            }
+
+            .role-badge {
+                display: inline-block;
+                padding: var(--fb-spacing-xs) var(--fb-spacing-sm);
+                background: var(--fb-primary);
+                color: white;
+                border-radius: var(--fb-radius-sm);
+                font-size: var(--fb-text-xs);
+                font-weight: 500;
+                text-transform: uppercase;
+            }
+
+            .empty-state {
+                text-align: center;
+                padding: var(--fb-spacing-2xl);
+                color: var(--fb-text-muted);
+            }
+
+            .empty-icon {
+                font-size: 48px;
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            .loading-state {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: var(--fb-spacing-2xl);
+            }
+
+            .spinner {
+                width: 32px;
+                height: 32px;
+                border: 3px solid var(--fb-border);
+                border-top-color: var(--fb-primary);
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
+            .error-state {
+                text-align: center;
+                padding: var(--fb-spacing-2xl);
+                color: var(--fb-error);
+            }
+
+            /* Modal styles */
+            .modal-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+            }
+
+            .modal {
+                background: var(--fb-bg-card);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-lg);
+                padding: var(--fb-spacing-xl);
+                max-width: 400px;
+                width: 90%;
+            }
+
+            .modal-title {
+                font-size: var(--fb-text-lg);
+                font-weight: 600;
+                color: var(--fb-text-primary);
+                margin-bottom: var(--fb-spacing-lg);
+            }
+
+            .form-group {
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            label {
+                display: block;
+                font-size: var(--fb-text-sm);
+                color: var(--fb-text-secondary);
+                margin-bottom: var(--fb-spacing-xs);
+            }
+
+            input, select {
+                width: 100%;
+                padding: var(--fb-spacing-md);
+                background: var(--fb-bg-tertiary);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-md);
+                color: var(--fb-text-primary);
+                font-size: var(--fb-text-base);
+                box-sizing: border-box;
+            }
+
+            input:focus, select:focus {
+                outline: none;
+                border-color: var(--fb-primary);
+            }
+
+            .modal-actions {
+                display: flex;
+                gap: var(--fb-spacing-sm);
+                justify-content: flex-end;
+                margin-top: var(--fb-spacing-lg);
+            }
+
+            .btn-secondary {
+                padding: var(--fb-spacing-sm) var(--fb-spacing-lg);
+                background: transparent;
+                color: var(--fb-text-secondary);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-md);
+                font-size: var(--fb-text-sm);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .btn-secondary:hover {
+                background: var(--fb-bg-tertiary);
+                color: var(--fb-text-primary);
+            }
+
+            .form-error {
+                color: var(--fb-error);
+                font-size: var(--fb-text-sm);
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            .date-cell {
+                color: var(--fb-text-secondary);
+                font-size: var(--fb-text-xs);
+            }
+        `,
+    ];
+
+    @state() private _viewState: ViewState = 'loading';
+    @state() private _modalState: ModalState = 'closed';
+    @state() private _invites: Invite[] = [];
+    @state() private _error = '';
+    @state() private _formEmail = '';
+    @state() private _formRole = 'Builder';
+    @state() private _formError = '';
+
+    override connectedCallback(): void {
+        super.connectedCallback();
+        void this._loadInvites();
+    }
+
+    private async _loadInvites(): Promise<void> {
+        this._viewState = 'loading';
+        this._error = '';
+
+        try {
+            this._invites = await api.invites.list();
+            this._viewState = 'ready';
+        } catch (err) {
+            this._viewState = 'error';
+            this._error = err instanceof Error ? err.message : 'Failed to load invitations';
+        }
+    }
+
+    private _openCreateModal(): void {
+        this._modalState = 'creating';
+        this._formEmail = '';
+        this._formRole = 'Builder';
+        this._formError = '';
+    }
+
+    private _closeModal(): void {
+        this._modalState = 'closed';
+    }
+
+    private async _handleCreate(): Promise<void> {
+        if (!this._formEmail || !this._formEmail.includes('@')) {
+            this._formError = 'Please enter a valid email address';
+            return;
+        }
+
+        this._modalState = 'submitting';
+        this._formError = '';
+
+        try {
+            await api.invites.create(this._formEmail, this._formRole);
+            this._modalState = 'closed';
+            void this._loadInvites();
+        } catch (err) {
+            this._modalState = 'creating';
+            this._formError = err instanceof Error ? err.message : 'Failed to create invitation';
+        }
+    }
+
+    private async _handleRevoke(id: string): Promise<void> {
+        if (!confirm('Are you sure you want to revoke this invitation?')) {
+            return;
+        }
+
+        try {
+            await api.invites.revoke(id);
+            void this._loadInvites();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Failed to revoke invitation');
+        }
+    }
+
+    private _formatDate(dateStr: string): string {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    }
+
+    override render(): TemplateResult {
+        return html`
+            <div class="header">
+                <div>
+                    <div class="title">Team Invitations</div>
+                    <div class="subtitle">Manage pending invitations to your organization</div>
+                </div>
+                <button class="btn-primary" @click=${this._openCreateModal.bind(this)}>
+                    + Invite User
+                </button>
+            </div>
+
+            ${this._renderContent()}
+            ${this._modalState !== 'closed' ? this._renderModal() : nothing}
+        `;
+    }
+
+    private _renderContent(): TemplateResult {
+        switch (this._viewState) {
+            case 'loading':
+                return html`
+                    <div class="table-container">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                `;
+
+            case 'error':
+                return html`
+                    <div class="table-container">
+                        <div class="error-state">
+                            <p>${this._error}</p>
+                            <button class="btn-secondary" @click=${this._loadInvites.bind(this)}>
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+            case 'ready':
+                if (this._invites.length === 0) {
+                    return html`
+                        <div class="table-container">
+                            <div class="empty-state">
+                                <div class="empty-icon">📧</div>
+                                <p>No pending invitations</p>
+                                <p>Click "Invite User" to add team members</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return html`
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Expires</th>
+                                    <th>Created</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${this._invites.map(
+                                    (invite) => html`
+                                        <tr>
+                                            <td>${invite.email}</td>
+                                            <td><span class="role-badge">${invite.role}</span></td>
+                                            <td class="date-cell">${this._formatDate(invite.expires_at)}</td>
+                                            <td class="date-cell">${this._formatDate(invite.created_at)}</td>
+                                            <td>
+                                                <button
+                                                    class="btn-danger"
+                                                    @click=${() => void this._handleRevoke(invite.id)}
+                                                >
+                                                    Revoke
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+        }
+    }
+
+    private _renderModal(): TemplateResult {
+        const isSubmitting = this._modalState === 'submitting';
+
+        return html`
+            <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                    <div class="modal-title">Invite Team Member</div>
+
+                    ${this._formError ? html`<p class="form-error">${this._formError}</p>` : nothing}
+
+                    <div class="form-group">
+                        <label for="invite-email">Email Address</label>
+                        <input
+                            id="invite-email"
+                            type="email"
+                            placeholder="user@example.com"
+                            .value=${this._formEmail}
+                            ?disabled=${isSubmitting}
+                            @input=${(e: Event) => {
+                                this._formEmail = (e.target as HTMLInputElement).value;
+                            }}
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="invite-role">Role</label>
+                        <select
+                            id="invite-role"
+                            .value=${this._formRole}
+                            ?disabled=${isSubmitting}
+                            @change=${(e: Event) => {
+                                this._formRole = (e.target as HTMLSelectElement).value;
+                            }}
+                        >
+                            <option value="Admin">Admin</option>
+                            <option value="Builder">Builder</option>
+                            <option value="Client">Client</option>
+                            <option value="Subcontractor">Subcontractor</option>
+                        </select>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button
+                            class="btn-secondary"
+                            ?disabled=${isSubmitting}
+                            @click=${this._closeModal.bind(this)}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="btn-primary"
+                            ?disabled=${isSubmitting}
+                            @click=${this._handleCreate.bind(this)}
+                        >
+                            ${isSubmitting ? 'Sending...' : 'Send Invitation'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+declare global {
+    interface HTMLElementTagNameMap {
+        'fb-view-admin-invites': FBViewAdminInvites;
+    }
+}

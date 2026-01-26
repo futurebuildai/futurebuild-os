@@ -38,6 +38,8 @@ type Server struct {
 	FutureShadeHandler *handlers.FutureShadeHandler // See FUTURESHADE_INIT_specs.md
 	TribunalHandler    *handlers.TribunalHandler    // See SHADOW_VIEWER_specs.md
 	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
+	InviteHandler      *handlers.InviteHandler      // See LAUNCH_STRATEGY.md Task B2
+	UserHandler        *handlers.UserHandler        // See LAUNCH_PLAN.md User Profile Endpoint
 	AuthMiddleware    *middleware.AuthMiddleware
 	AuthRateLimiter   *middleware.IPRateLimiter
 }
@@ -64,21 +66,29 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	messageStore := chat.NewPgxMessageStore(db)
 	dlq := chat.NewAsynqDLQ(cfg.RedisURL)
 
-	wal := &chat.NoOpAuditWAL{}                  // TODO: Replace with production WAL
-	circuitBreaker := &chat.NoOpCircuitBreaker{} // TODO: Replace with production circuit breaker
-
-	// PRODUCTION SAFETY CHECK (Code Review Issue 3B)
-	// NoOp implementations are placeholders that skip critical functionality.
-	// They MUST be replaced before production deployment.
-	if cfg.Environment == "production" {
-		// P0 FIX: Fail Fast in Production
-		if _, ok := interface{}(wal).(*chat.NoOpAuditWAL); ok {
-			panic("CRITICAL SECURITY ERROR: NoOpAuditWAL is not allowed in production! Configure a real WAL.")
+	// Initialize Audit WAL for durability fallback.
+	// In production/staging, use FileAuditWAL. In development, use NoOp for simplicity.
+	// See LAUNCH_PLAN.md Production Safety section.
+	var wal chat.AuditWAL
+	if cfg.Environment == "production" || cfg.Environment == "staging" {
+		fileWAL, err := chat.NewFileAuditWAL(cfg.AuditWALPath)
+		if err != nil {
+			panic(fmt.Sprintf("CRITICAL: Failed to initialize AuditWAL at %s: %v", cfg.AuditWALPath, err))
 		}
-		if _, ok := interface{}(circuitBreaker).(*chat.NoOpCircuitBreaker); ok {
-			panic("CRITICAL SECURITY ERROR: NoOpCircuitBreaker is not allowed in production! Configure a real CircuitBreaker.")
-		}
+		wal = fileWAL
+		fmt.Printf("Audit WAL: FileAuditWAL at %s\n", cfg.AuditWALPath)
+	} else {
+		wal = &chat.NoOpAuditWAL{}
+		fmt.Println("Audit WAL: NoOp (development mode)")
 	}
+
+	// Initialize Circuit Breaker for audit system availability.
+	// Uses in-memory SimpleCircuitBreaker with sensible defaults.
+	// See LAUNCH_PLAN.md Production Safety section.
+	circuitBreaker := chat.NewSimpleCircuitBreaker(chat.DefaultCircuitBreakerConfig())
+	fmt.Printf("Circuit Breaker: SimpleCircuitBreaker (threshold=%d, timeout=%s)\n",
+		chat.DefaultCircuitBreakerConfig().FailureThreshold,
+		chat.DefaultCircuitBreakerConfig().OpenTimeout)
 
 	chatOrchestrator, err := chat.NewOrchestrator(
 		messageStore, scheduleService, scheduleService, invoiceService, dlq,
@@ -90,7 +100,22 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	}
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
-	notificationService := service.NewConsoleEmailProvider()
+	// Initialize notification service based on environment.
+	// Production/Staging: Use SendGrid for real email delivery.
+	// Development: Use Console provider (logs to stdout).
+	// See LAUNCH_STRATEGY.md Task A3.
+	var notificationService types.NotificationService
+	if cfg.SendGridAPIKey != "" {
+		notificationService = service.NewSendGridProvider(
+			cfg.SendGridAPIKey,
+			cfg.EmailFromAddress,
+			cfg.EmailFromName,
+		)
+		fmt.Println("Email provider: SendGrid")
+	} else {
+		notificationService = service.NewConsoleEmailProvider()
+		fmt.Println("Email provider: Console (development mode)")
+	}
 	directoryService := service.NewDirectoryService(db)
 
 	// NOTE: Background agents (SubLiaisonAgent, DailyFocusAgent, ProcurementAgent) run in
@@ -116,7 +141,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	webhookHandler := handlers.NewWebhookHandler(inboundProcessor, cfg.WebhookSecret)
 
 	authService := service.NewAuthService(db, cfg)
-	authHandler := handlers.NewAuthHandler(authService, notificationService, "http://localhost:8080")
+	authHandler := handlers.NewAuthHandler(authService, notificationService, cfg.BaseURL)
 	authMiddleware := middleware.NewAuthMiddleware(cfg)
 
 	authRateLimiter := middleware.NewIPRateLimiter(rate.Every(12*time.Second), 2, cfg.TrustedProxies)
@@ -137,6 +162,13 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	shadowService := shadow.NewDocsService(cfg.ProjectRoot)
 	shadowHandler := handlers.NewShadowHandler(shadowService)
 
+	// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
+	inviteService := service.NewInviteService(db)
+	inviteHandler := handlers.NewInviteHandler(inviteService, notificationService, cfg.BaseURL)
+
+	// See LAUNCH_PLAN.md User Profile Endpoint (P0)
+	userHandler := handlers.NewUserHandler(db)
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -150,6 +182,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		FutureShadeHandler: futureShadeHandler, // See FUTURESHADE_INIT_specs.md
 		TribunalHandler:    tribunalHandler,    // See SHADOW_VIEWER_specs.md
 		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
+		InviteHandler:      inviteHandler,      // See LAUNCH_STRATEGY.md Task B2
+		UserHandler:        userHandler,        // See LAUNCH_PLAN.md User Profile Endpoint
 		AuthMiddleware:     authMiddleware,
 		AuthRateLimiter:    authRateLimiter,
 	}
@@ -170,6 +204,30 @@ func (s *Server) routes() {
 			r.Post("/login", s.AuthHandler.Login)
 			r.Get("/verify", s.AuthHandler.Verify)
 		})
+
+		// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
+		// Public endpoints for accepting invitations
+		r.Route("/invites", func(r chi.Router) {
+			r.Get("/info", s.InviteHandler.GetInviteInfo) // Public: get invite info by token
+			r.Post("/accept", s.InviteHandler.AcceptInvite) // Public: accept invite and create account
+		})
+
+		// Admin endpoints for managing invitations
+		r.Route("/admin/invites", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Post("/", s.InviteHandler.CreateInvite)
+			r.Get("/", s.InviteHandler.ListInvites)
+			r.Delete("/{id}", s.InviteHandler.RevokeInvite)
+		})
+
+		// See LAUNCH_PLAN.md User Profile Endpoint (P0)
+		r.Route("/users", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Get("/me", s.UserHandler.GetProfile)
+			r.Put("/me", s.UserHandler.UpdateProfile)
+		})
+
 		r.Route("/projects", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			r.Post("/", s.ProjectHandler.CreateProject)

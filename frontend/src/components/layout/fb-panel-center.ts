@@ -11,6 +11,10 @@ import type { ChatMessage, ProjectSummary, Thread } from '../../store/types';
 
 // Import view components
 import '../views/fb-view-login';
+import '../views/fb-view-verify';
+import '../views/fb-view-invite-accept';
+import '../views/fb-view-admin-invites';
+import '../views/fb-view-settings';
 
 // Import chat components (Step 52 Integration)
 import '../chat/fb-message-list';
@@ -108,7 +112,9 @@ export class FBPanelCenter extends FBElement {
                 margin-bottom: var(--fb-spacing-sm);
             }
 
-            fb-view-login {
+            fb-view-login,
+            fb-view-verify,
+            fb-view-invite-accept {
                 flex: 1;
             }
         `,
@@ -120,11 +126,19 @@ export class FBPanelCenter extends FBElement {
     @state() private _activeThread: Thread | null = null;
     @state() private _isMobile = false;
     @state() private _hasMessages = false;
+    @state() private _isVerifyRoute = false;
+    @state() private _isInviteAcceptRoute = false;
+    @state() private _isAdminInvitesRoute = false;
+    @state() private _isSettingsRoute = false;
 
     private _disposeEffects: (() => void)[] = [];
 
     override connectedCallback(): void {
         super.connectedCallback();
+
+        // Check for verify route
+        this._checkRoute();
+        window.addEventListener('popstate', this._handlePopState);
 
         this._disposeEffects.push(
             effect(() => {
@@ -143,7 +157,20 @@ export class FBPanelCenter extends FBElement {
         );
     }
 
+    private _handlePopState = (): void => {
+        this._checkRoute();
+    };
+
+    private _checkRoute(): void {
+        const path = window.location.pathname;
+        this._isVerifyRoute = path === '/auth/verify';
+        this._isInviteAcceptRoute = path === '/invite/accept';
+        this._isAdminInvitesRoute = path === '/admin/invites';
+        this._isSettingsRoute = path === '/settings';
+    }
+
     override disconnectedCallback(): void {
+        window.removeEventListener('popstate', this._handlePopState);
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
         super.disconnectedCallback();
@@ -181,9 +208,29 @@ export class FBPanelCenter extends FBElement {
     }
 
     override render(): TemplateResult {
+        // Show verify view for magic link verification
+        if (this._isVerifyRoute) {
+            return html`<fb-view-verify></fb-view-verify>`;
+        }
+
+        // Show invite acceptance view
+        if (this._isInviteAcceptRoute) {
+            return html`<fb-view-invite-accept></fb-view-invite-accept>`;
+        }
+
         // Show login if not authenticated
         if (!this.isAuthenticated) {
             return html`<fb-view-login></fb-view-login>`;
+        }
+
+        // Show admin invites view for authenticated admin users
+        if (this._isAdminInvitesRoute) {
+            return html`<fb-view-admin-invites></fb-view-admin-invites>`;
+        }
+
+        // Show settings view for authenticated users
+        if (this._isSettingsRoute) {
+            return html`<fb-view-settings></fb-view-settings>`;
         }
 
         return html`

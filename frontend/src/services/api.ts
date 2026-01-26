@@ -380,4 +380,132 @@ export const api = {
             return get<Contact>(`/contacts/${contactId}`);
         },
     },
+
+    /**
+     * User profile endpoints.
+     * See LAUNCH_PLAN.md User Profile Endpoint (P0).
+     */
+    users: {
+        /**
+         * Get the current user's profile.
+         */
+        getMe(): Promise<UserProfile> {
+            return get<UserProfile>('/users/me');
+        },
+
+        /**
+         * Update the current user's profile.
+         * @param data - Profile data to update
+         */
+        updateMe(data: UpdateProfileRequest): Promise<UserProfile> {
+            return put<UserProfile>('/users/me', data);
+        },
+    },
+
+    /**
+     * Invite endpoints.
+     * See LAUNCH_STRATEGY.md Task B2.
+     */
+    invites: {
+        /**
+         * Get invite info by token (public).
+         * @param token - Invite token from email
+         */
+        getInfo(token: string): Promise<InviteInfo> {
+            return get<InviteInfo>(`/invites/info?token=${encodeURIComponent(token)}`, { skipAuth: true });
+        },
+
+        /**
+         * Accept an invitation and create an account (public).
+         * @param token - Invite token from email
+         * @param name - User's display name
+         */
+        accept(token: string, name: string): Promise<InviteAcceptResponse> {
+            return post<InviteAcceptResponse>(
+                '/invites/accept',
+                { token, name },
+                { skipAuth: true }
+            );
+        },
+
+        /**
+         * List pending invitations for the organization (admin only).
+         */
+        list(): Promise<Invite[]> {
+            return get<Invite[]>('/admin/invites');
+        },
+
+        /**
+         * Create a new invitation (admin only).
+         * @param email - Email to invite
+         * @param role - Role to assign
+         */
+        create(email: string, role: string): Promise<Invite> {
+            return post<Invite>('/admin/invites', { email, role });
+        },
+
+        /**
+         * Revoke a pending invitation (admin only).
+         * @param id - Invite UUID
+         */
+        async revoke(id: string): Promise<void> {
+            await del<undefined>(`/admin/invites/${id}`);
+        },
+    },
 } as const;
+
+// ============================================================================
+// Invite Types
+// ============================================================================
+
+/**
+ * Invitation info returned for public endpoints.
+ */
+export interface InviteInfo {
+    email: string;
+    role: string;
+    expires_at: string;
+}
+
+/**
+ * Response when accepting an invitation.
+ */
+export interface InviteAcceptResponse {
+    message: string;
+    email: string;
+}
+
+/**
+ * Full invitation record for admin endpoints.
+ */
+export interface Invite {
+    id: string;
+    email: string;
+    role: string;
+    expires_at: string;
+    created_at: string;
+}
+
+// ============================================================================
+// User Profile Types
+// ============================================================================
+
+/**
+ * User profile response.
+ * See LAUNCH_PLAN.md User Profile Endpoint (P0).
+ */
+export interface UserProfile {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    org_id: string;
+    created_at: string;
+}
+
+/**
+ * Request body for updating user profile.
+ */
+export interface UpdateProfileRequest {
+    name: string;
+}
