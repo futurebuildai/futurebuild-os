@@ -1,0 +1,32 @@
+name: futurebuild-demo
+region: nyc3
+services:
+- name: api
+  dockerfile_path: Dockerfile
+  source_dir: .
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  envs:
+  - key: APP_ENV
+    value: demo
+    scope: RUN_TIME
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+  - key: JWT_SECRET
+    scope: RUN_TIME
+    type: SECRET
+  - key: REDIS_URL
+    scope: RUN_TIME
+    type: SECRET
+  - key: GOOGLE_APPLICATION_CREDENTIALS
+    value: /app/service-account.json
+    scope: RUN_TIME
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 10
+    period_seconds: 10
+    timeout_seconds: 5
+    failure_threshold: 3
+    success_threshold: 1

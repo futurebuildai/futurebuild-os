@@ -73,6 +73,12 @@ migrate-create:
 	@echo "--- Creating Migration: $(name) ---"
 	migrate create -ext sql -dir migrations -seq $(name)
 
+# Seed Demo Data
+# Runs the idempotent seed script for the demo environment.
+seed-demo:
+	@echo "--- Seeding Demo Environment ---"
+	go run cmd/seed-demo/main.go
+
 # --- Deployment & CI Verification ---
 # See deployment/staging/README.md (implied)
 

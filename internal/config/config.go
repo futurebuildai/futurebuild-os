@@ -57,9 +57,9 @@ type Config struct {
 	BaseURL string
 
 	// Twilio SMS configuration. See LAUNCH_PLAN.md P2 (Notifications/Toast UI).
-	TwilioAccountSID  string
-	TwilioAuthToken   string
-	TwilioFromNumber  string
+	TwilioAccountSID string
+	TwilioAuthToken  string
+	TwilioFromNumber string
 
 	// AuditWALPath is the file path for the audit Write-Ahead Log.
 	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
@@ -190,4 +190,24 @@ func getEnvBool(key string, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+// IsProduction returns true if the environment is production.
+func (c *Config) IsProduction() bool {
+	return c.Environment == "production" || c.Environment == "prod"
+}
+
+// IsStaging returns true if the environment is staging.
+func (c *Config) IsStaging() bool {
+	return c.Environment == "staging" || c.Environment == "stage"
+}
+
+// IsDemo returns true if the environment is demo.
+func (c *Config) IsDemo() bool {
+	return c.Environment == "demo"
+}
+
+// IsDevelopment returns true if the environment is development.
+func (c *Config) IsDevelopment() bool {
+	return c.Environment == "development" || c.Environment == "dev"
 }

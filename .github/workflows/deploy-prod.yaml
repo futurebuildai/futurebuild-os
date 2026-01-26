@@ -1,0 +1,28 @@
+name: Deploy to Production
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image (Verify)
+        run: docker build . --file Dockerfile
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Deploy to App Platform
+        env:
+            APP_ID: ${{ secrets.DO_APP_ID_PROD }}
+        run: |
+          doctl apps update $APP_ID --spec deployment/prod/app.yaml
