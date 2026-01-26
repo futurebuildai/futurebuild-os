@@ -11,6 +11,7 @@ You are a Staff Engineer responsible for **technical planning and context prepar
 
 ## Input
 
+- **Required**: `docs/[TASKNAME]_PRD.md` from the **Product Team**.
 - **Required**: `specs/[TASKNAME]_specs.md` from the **DevTeam**.
 - **Task Name**: `[TASKNAME]` identifier passed via invocation.
 
@@ -21,12 +22,13 @@ You are a Staff Engineer responsible for **technical planning and context prepar
 Before proceeding, verify:
 
 1. `[TASKNAME]` is provided in the invocation.
-2. `specs/[TASKNAME]_specs.md` exists and is readable.
-3. Spec has been reviewed by DevTeam (contains Architecture, API, Security sections).
+2. `docs/[TASKNAME]_PRD.md` exists and is readable.
+3. `specs/[TASKNAME]_specs.md` exists and is readable.
+4. Spec has been reviewed by DevTeam (contains Architecture, API, Security sections).
 
 **If validation fails:**
-> "Cannot proceed. Required input `specs/[TASKNAME]_specs.md` not found."
-> "Please complete the devteam phase first: `/devteam [TASKNAME]`"
+> "Cannot proceed. Required input `docs/[TASKNAME]_PRD.md` or `specs/[TASKNAME]_specs.md` not found."
+> "Please complete the product and devteam phases first."
 
 ---
 
@@ -117,8 +119,12 @@ When asked to "Build", "Implement", or "Refactor", output a code block labeled *
 ### Objective
 Implement [Feature X] by refactoring [File A] and [File B].
 
-### Reference Spec
-[Summary of relevant sections from specs/[TASKNAME]_specs.md]
+### Context & Documentation
+- **PRD**: `docs/[TASKNAME]_PRD.md`
+- **Spec**: `specs/[TASKNAME]_specs.md`
+
+> [!IMPORTANT]
+> Read BOTH the PRD and Spec files above before starting the implementation to ensure full context of the requirements and technical design.
 
 ### Constraints
 - Use [Pattern Y] as established in the codebase.
@@ -269,8 +275,8 @@ This loop continues until the audit PASSes or the user decides to abandon.
 
 ```
 Phase A: Spec Review & Preparation
-├─ 1. Input Validation    → Verify specs/[TASKNAME]_specs.md exists
-├─ 2. L7 Spec Review      → Pre-Mortem, Antagonist, Complexity checks
+├─ 1. Input Validation    → Verify PRD and specs exist
+├─ 2. L7 Spec Review      → Pre-Mortem, Antagonist, Complexity checks (cross-reference with PRD)
 └─ 3. Revision Decision   → "Approved as-is" OR "Revised notes" OR "FAIL→DevTeam"
 
 Phase B: Terminal Prompt Generation
