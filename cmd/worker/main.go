@@ -12,6 +12,9 @@ import (
 
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/config"
+	"github.com/colton/futurebuild/internal/futureshade"
+	"github.com/colton/futurebuild/internal/futureshade/gateway"
+	"github.com/colton/futurebuild/internal/futureshade/skills"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -90,9 +93,30 @@ func main() {
 	procurementCfg := config.LoadProcurementConfigFromEnv()
 	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg)
 
+	// 6.5 FutureShade Action Bridge: Initialize Skills Registry
+	// See specs/FUTURESHADE_AGENTS_SPEC.md Section 4
+	skillRegistry := skills.NewRegistry()
+	skillRegistry.Register(skills.NewProcurementSyncSkill(procurementAgent))
+	skillRegistry.Register(skills.NewDailyFocusSyncSkill(dailyFocusAgent))
+	skillRegistry.Register(skills.NewScheduleRecalcSkill(scheduleService))
+
+	// Initialize FutureShade config (defaults to disabled if not configured)
+	futureShadeConfig := futureshade.Config{
+		Enabled: os.Getenv("FUTURESHADE_ENABLED") == "true",
+	}
+	if futureShadeConfig.Enabled {
+		log.Println("INFO: FutureShade Action Bridge is ENABLED")
+	} else {
+		log.Println("INFO: FutureShade Action Bridge is DISABLED (set FUTURESHADE_ENABLED=true to enable)")
+	}
+
+	// Initialize Gateway Repository for execution logs
+	executionRepo := gateway.NewRepository(dbPool)
+
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler
-	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock)
+	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock).
+		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig)
 
 	// 8. Initialize Scheduler (The Clock)
 	// See PRODUCTION_PLAN.md Step 45 (Daily Briefing Job)
@@ -127,6 +151,8 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeHydrateProject, workerHandler.HandleHydrateProject)
 	// P1 Performance Fix: Register async notification handler (sidecar pattern)
 	srv.RegisterHandlerFunc(worker.TypeProcurementNotification, workerHandler.HandleProcurementNotification)
+	// FutureShade Action Bridge: Register skill execution handler
+	srv.RegisterHandlerFunc(worker.TypeSkillExecution, workerHandler.HandleSkillExecution)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

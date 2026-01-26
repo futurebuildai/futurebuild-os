@@ -15,6 +15,7 @@ const (
 	TypeProcurementCheck        = "task:procurement_check"
 	TypeHydrateProject          = "task:hydrate_project"
 	TypeProcurementNotification = "task:procurement_notification"
+	TypeSkillExecution          = "task:skill_execution" // FutureShade Action Bridge
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -66,4 +67,28 @@ func NewProcurementNotificationTask(itemID uuid.UUID, message string, ts time.Ti
 		return nil, err
 	}
 	return asynq.NewTask(TypeProcurementNotification, payload, asynq.Queue("default")), nil
+}
+
+// SkillExecutionPayload contains data for FutureShade skill execution tasks.
+// See specs/FUTURESHADE_AGENTS_SPEC.md Section 4 (Action Bridge)
+type SkillExecutionPayload struct {
+	DecisionID  uuid.UUID              `json:"decision_id"`
+	ExecutionID uuid.UUID              `json:"execution_id"`
+	SkillID     string                 `json:"skill_id"`
+	Params      map[string]interface{} `json:"params"`
+}
+
+// NewSkillExecutionTask creates a task for FutureShade skill execution.
+// Used by ExecutionGateway to enqueue Tribunal-triggered actions.
+func NewSkillExecutionTask(decisionID, executionID uuid.UUID, skillID string, params map[string]interface{}) (*asynq.Task, error) {
+	payload, err := json.Marshal(SkillExecutionPayload{
+		DecisionID:  decisionID,
+		ExecutionID: executionID,
+		SkillID:     skillID,
+		Params:      params,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeSkillExecution, payload, asynq.Queue("default")), nil
 }
