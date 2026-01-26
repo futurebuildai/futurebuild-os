@@ -1,0 +1,181 @@
+# FutureBuild Production Deployment Configuration
+# DigitalOcean App Platform Specification
+#
+# QUALITY GATE: L7/L8 Production Standards
+# - High availability with multiple instances
+# - Proper health checks with appropriate thresholds
+# - All secrets externalized (never hardcoded)
+# - Environment-aware configuration
+# - CORS and security headers configured
+#
+# See LAUNCH_PLAN.md Task 4.2: Production Deployment Config
+#
+# Required Secrets (configure in DO App Platform):
+#   - DATABASE_URL: PostgreSQL connection string
+#   - JWT_SECRET: 256-bit secret for JWT signing
+#   - REDIS_URL: Redis connection string
+#   - SENDGRID_API_KEY: SendGrid API key for email
+#   - WEBHOOK_SECRET: Secret for webhook signature verification
+#   - VERTEX_PROJECT_ID: Google Cloud project ID
+#   - GCP_SA_JSON: Google Cloud service account JSON (base64 encoded)
+
+name: futurebuild-production
+region: nyc3
+
+services:
+  - name: api
+    dockerfile_path: Dockerfile
+    source_dir: .
+    http_port: 8080
+
+    # Production: Multiple instances for HA
+    instance_count: 2
+    instance_size_slug: professional-xs
+
+    # Environment Variables
+    envs:
+      # Core Configuration
+      - key: APP_ENV
+        value: production
+        scope: RUN_TIME
+      - key: APP_PORT
+        value: "8080"
+        scope: RUN_TIME
+
+      # Database (Secret)
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+
+      # Authentication (Secret)
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_EXPIRY
+        value: "24h"
+        scope: RUN_TIME
+
+      # Redis (Secret)
+      - key: REDIS_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      # SendGrid Email (Secret)
+      - key: SENDGRID_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: EMAIL_FROM_ADDRESS
+        value: "noreply@futurebuild.ai"
+        scope: RUN_TIME
+      - key: EMAIL_FROM_NAME
+        value: "FutureBuild"
+        scope: RUN_TIME
+
+      # Public URL (for magic links, etc.)
+      - key: BASE_URL
+        value: "https://app.futurebuild.ai"
+        scope: RUN_TIME
+
+      # Webhook Security (Secret)
+      - key: WEBHOOK_SECRET
+        scope: RUN_TIME
+        type: SECRET
+
+      # Trusted Proxies (DO App Platform load balancer)
+      - key: TRUSTED_PROXIES
+        value: "10.0.0.0/8,172.16.0.0/12"
+        scope: RUN_TIME
+
+      # Audit WAL Path
+      - key: AUDIT_WAL_PATH
+        value: "/var/log/futurebuild/audit.wal"
+        scope: RUN_TIME
+
+      # Google Cloud / Vertex AI (Secrets)
+      - key: VERTEX_PROJECT_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: VERTEX_LOCATION
+        value: "us-central1"
+        scope: RUN_TIME
+      - key: VERTEX_MODEL_FLASH_ID
+        value: "gemini-2.5-flash"
+        scope: RUN_TIME
+      - key: VERTEX_MODEL_PRO_ID
+        value: "gemini-1.5-pro"
+        scope: RUN_TIME
+      - key: VERTEX_MODEL_EMBEDDING_ID
+        value: "text-embedding-004"
+        scope: RUN_TIME
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: "/app/service-account.json"
+        scope: RUN_TIME
+
+      # FutureShade Configuration
+      - key: FUTURESHADE_ENABLED
+        value: "true"
+        scope: RUN_TIME
+      - key: FUTURESHADE_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: FUTURESHADE_MODEL_ID
+        value: "gemini-2.5-flash"
+        scope: RUN_TIME
+
+      # Project Root (for shadow docs)
+      - key: PROJECT_ROOT
+        value: "/app"
+        scope: RUN_TIME
+
+    # Health Check Configuration
+    # L7 Best Practice: Appropriate timeouts for production
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 15
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 3
+      success_threshold: 1
+
+    # CORS Configuration
+    cors:
+      allow_origins:
+        - prefix: "https://app.futurebuild.ai"
+        - prefix: "https://futurebuild.ai"
+      allow_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allow_headers:
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+      max_age: "86400"
+
+    # Routes
+    routes:
+      - path: /
+
+# Static Assets (Frontend)
+static_sites:
+  - name: frontend
+    source_dir: frontend/dist
+    index_document: index.html
+    error_document: index.html  # SPA routing
+    routes:
+      - path: /
+    build_command: npm --prefix frontend install && npm --prefix frontend run build
+
+# Database (Managed PostgreSQL)
+databases:
+  - name: futurebuild-db
+    engine: PG
+    version: "15"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+
+# Note: Redis must be provisioned separately on DigitalOcean
+# as App Platform doesn't support managed Redis directly.
+# Use DigitalOcean Managed Redis and pass connection string as REDIS_URL secret.
