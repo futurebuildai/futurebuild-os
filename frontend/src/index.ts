@@ -39,6 +39,14 @@ import { FBFileDrop } from './components/features/fb-file-drop';
 // Base Components (Step 58.5: Fortress Hardening)
 import { FBErrorBoundary } from './components/base/fb-error-boundary';
 
+// Shadow Viewer Components (SHADOW_VIEWER_specs.md)
+import { ShadowToggle } from './components/shadow/shadow-toggle';
+import { ShadowLayout } from './components/shadow/shadow-layout';
+import { ShadowNav } from './components/shadow/shadow-nav';
+import { TribunalLogFeed } from './components/shadow/tribunal-log-feed';
+import { TribunalCaseDetail } from './components/shadow/tribunal-case-detail';
+import { ShadowDocsViewer } from './components/shadow/shadow-docs-viewer';
+
 // App shell
 import './app-root';
 
@@ -59,6 +67,13 @@ const registered = registerComponents({
     'fb-file-drop': FBFileDrop,
     'fb-typing-indicator': FBTypingIndicator,
     'fb-error-boundary': FBErrorBoundary,
+    // Shadow Viewer components (SHADOW_VIEWER_specs.md)
+    'shadow-toggle': ShadowToggle,
+    'shadow-layout': ShadowLayout,
+    'shadow-nav': ShadowNav,
+    'tribunal-log-feed': TribunalLogFeed,
+    'tribunal-case-detail': TribunalCaseDetail,
+    'shadow-docs-viewer': ShadowDocsViewer,
 });
 
 console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);

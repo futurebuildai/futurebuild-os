@@ -5,6 +5,8 @@
 // L7 Quality Gate: Vendor abstraction eliminates genai imports outside this package.
 package ai
 
+import "context"
+
 // =============================================================================
 // VENDOR-AGNOSTIC TYPES
 // =============================================================================
@@ -66,6 +68,27 @@ type GenerateResponse struct {
 	// - Returns 0.0 if logprobs not enabled or unavailable
 	// See: https://developers.googleblog.com/unlock-gemini-reasoning-with-logprobs-on-vertex-ai/
 	Confidence float32
+}
+
+// Provider specifies the AI vendor.
+type Provider string
+
+const (
+	ProviderVertex    Provider = "vertex"
+	ProviderAnthropic Provider = "anthropic"
+)
+
+// Client defines the interface for AI operations.
+// Uses vendor-agnostic types from types.go.
+type Client interface {
+	// GenerateContent generates text/multimodal content using the specified model.
+	GenerateContent(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
+
+	// GenerateEmbedding generates a vector embedding for the given text.
+	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+
+	// Close releases any resources used by the client.
+	Close() error
 }
 
 // NewTextRequest creates a simple text-only GenerateRequest.

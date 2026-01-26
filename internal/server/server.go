@@ -11,6 +11,8 @@ import (
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/futureshade"
+	"github.com/colton/futurebuild/internal/futureshade/shadow"
+	"github.com/colton/futurebuild/internal/futureshade/tribunal"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
@@ -34,6 +36,8 @@ type Server struct {
 	ChatHandler       *handlers.ChatHandler       // See PRODUCTION_PLAN.md Step 43.5
 	WebhookHandler    *handlers.WebhookHandler    // See PRODUCTION_PLAN.md Step 48
 	FutureShadeHandler *handlers.FutureShadeHandler // See FUTURESHADE_INIT_specs.md
+	TribunalHandler    *handlers.TribunalHandler    // See SHADOW_VIEWER_specs.md
+	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
 	AuthMiddleware    *middleware.AuthMiddleware
 	AuthRateLimiter   *middleware.IPRateLimiter
 }
@@ -127,6 +131,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	futureShadeService := futureshade.NewService(futureShadeConfig)
 	futureShadeHandler := handlers.NewFutureShadeHandler(futureShadeService)
 
+	// See SHADOW_VIEWER_specs.md: Tribunal and ShadowDocs handlers
+	tribunalRepo := tribunal.NewRepository(db)
+	tribunalHandler := handlers.NewTribunalHandler(tribunalRepo)
+	shadowService := shadow.NewDocsService(cfg.ProjectRoot)
+	shadowHandler := handlers.NewShadowHandler(shadowService)
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -138,6 +148,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ChatHandler:        chatHandler,        // See PRODUCTION_PLAN.md Step 43.5
 		WebhookHandler:     webhookHandler,     // See PRODUCTION_PLAN.md Step 48
 		FutureShadeHandler: futureShadeHandler, // See FUTURESHADE_INIT_specs.md
+		TribunalHandler:    tribunalHandler,    // See SHADOW_VIEWER_specs.md
+		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
 		AuthMiddleware:     authMiddleware,
 		AuthRateLimiter:    authRateLimiter,
 	}
@@ -195,6 +207,22 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
 			r.Get("/health", s.FutureShadeHandler.HandleHealth)
+		})
+
+		// See SHADOW_VIEWER_specs.md Section 3.1: Tribunal endpoints (Admin only)
+		r.Route("/tribunal", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/decisions", s.TribunalHandler.ListDecisions)
+			r.Get("/decisions/{id}", s.TribunalHandler.GetDecision)
+		})
+
+		// See SHADOW_VIEWER_specs.md Section 3.2: ShadowDocs endpoints (Admin only)
+		r.Route("/shadow", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/docs/tree", s.ShadowHandler.GetTree)
+			r.Get("/docs/content", s.ShadowHandler.GetContent)
 		})
 	})
 

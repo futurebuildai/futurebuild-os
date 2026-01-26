@@ -19,7 +19,10 @@
         "@lit-labs/preact-signals": "^1.0.0",
         "@lit-labs/virtualizer": "^2.1.1",
         "@preact/signals-core": "^1.12.1",
-        "lit": "^3.1.2"
+        "@types/dompurify": "^3.0.5",
+        "dompurify": "^3.3.1",
+        "lit": "^3.1.2",
+        "marked": "^17.0.1"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",

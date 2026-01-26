@@ -31,19 +31,24 @@ Before proceeding, verify:
 
 ---
 
-## Two-Phase Workflow
+## Core Responsibility
 
-This skill operates in **two distinct phases** with a mandatory user approval gate:
-
-| Phase | Name | Purpose | Output |
-|-------|------|---------|--------|
-| **Phase A** | Planning | Analyze PRD, generate implementation plan | Implementation Plan |
-| **STOP** | Approval Gate | User reviews/edits/approves plan | User confirmation |
-| **Phase B** | Execution | Execute approved plan | `specs/[TASKNAME]_specs.md` |
+**Architecture & Technical Design**: Convert the PRD into a comprehensive Technical Specification.
 
 ---
 
-## Phase A: Planning (Technical Analysis)
+## Two-Phase Workflow
+
+This skill follows the **Plan-First → Approval → Execute** pattern:
+
+| Phase | Steps | Output | Gate |
+|-------|-------|--------|------|
+| **Phase A: Planning** | Steps 1-3 (PRD Analysis, Architecture Planning, Implementation Plan) | Implementation Plan | **STOP: User Approval** |
+| **Phase B: Execution** | Steps 4-7 (Consult Specialists, Compile Specs, Security Review, Output) | `specs/[TASKNAME]_specs.md` | Complete |
+
+---
+
+## Phase A: Planning
 
 ### Step 1: PRD Analysis
 
@@ -53,22 +58,22 @@ This skill operates in **two distinct phases** with a mandatory user approval ga
 
 ### Step 2: Architecture Planning
 
-Review the PRD and identify which specialists are needed based on the Specialist Assignment Table:
+Identify appropriate specialists based on task complexity:
 
-| Spec Section | Primary Skill | Supporting Skills | When to Consult |
-|--------------|---------------|-------------------|-----------------|
-| System Architecture | `Architect` | `Principal Engineer` | Overall design, component interactions |
-| API Design | `Backend Developer` | `Integration Engineer` | REST/gRPC endpoints, contracts |
-| Database Schema | `Database Administrator` | `Data Engineer` | Data models, migrations, indexes |
-| Frontend Components | `Frontend Developer` | `UX Engineer` | UI components, state management |
-| Mobile Interfaces | `Mobile Developer` | `UX Engineer` | Native/cross-platform apps |
-| Security Model | `Security Engineer` | `Compliance Officer` | Auth, threat model, data protection |
-| Performance Requirements | `Performance Engineer` | `SRE` | Latency, throughput, scaling |
-| Deployment Strategy | `DevOps Engineer` | `Platform Engineer` | CI/CD, containers, infrastructure |
+| Spec Section | Primary Skill | Supporting Skills |
+|--------------|---------------|-------------------|
+| System Architecture | `Architect` | `Principal Engineer` |
+| API Design | `Backend Developer` | `Integration Engineer` |
+| Database Schema | `Database Administrator` | `Data Engineer` |
+| Frontend Components | `Frontend Developer` | `UX Engineer` |
+| Mobile Interfaces | `Mobile Developer` | `UX Engineer` |
+| Security Model | `Security Engineer` | `Compliance Officer` |
+| Performance Requirements | `Performance Engineer` | `SRE` |
+| Deployment Strategy | `DevOps Engineer` | `Platform Engineer` |
 
-### Step 3: Generate Implementation Plan
+### Step 3: Implementation Plan Generation
 
-Output a structured implementation plan for the technical specs:
+Output a structured implementation plan:
 
 ```markdown
 ## Implementation Plan for [TASKNAME] Technical Specs
@@ -77,65 +82,55 @@ Output a structured implementation plan for the technical specs:
 [1-2 sentence summary of what the PRD requires]
 
 ### Specialists Required
-
 | Spec Section | Primary Agent | Supporting Agents | Reason |
 |--------------|---------------|-------------------|--------|
-| [Section from PRD] | [Agent] | [Agent(s)] | [Why this expertise is needed] |
-| [Section from PRD] | [Agent] | [Agent(s)] | [Why this expertise is needed] |
-| ... | ... | ... | ... |
+| [Section] | [Agent] | [Agent(s)] | [Why needed] |
 
 ### Spec Sections to Generate
-1. Overview (Summary of what will be built)
-2. Architecture (System design, component interactions)
-3. API Specification (Endpoints, request/response formats)
-4. Data Model (Database schema changes)
-5. Security Considerations (Auth, validation, threat model)
-6. Testing Strategy (Unit, integration, e2e tests)
-7. Implementation Notes (Key decisions, patterns to follow)
+1. Overview
+2. Architecture
+3. API Specification
+4. Data Model
+5. Security Considerations
+6. Testing Strategy
+7. Implementation Notes
 
 ### L7 Pre-Mortem Considerations
-- [Risk 1: What if the system can't handle load?]
-- [Risk 2: What if there's a security vulnerability?]
-- [Risk 3: What if the architecture is too complex?]
+- [Risk 1: What could cause the implementation to fail under load?]
+- [Risk 2: What security vulnerabilities might be introduced?]
+- [Risk 3: What integration points could break?]
 
-### Dependencies & Constraints
+### Dependencies & Prerequisites
 - [Dependency 1]
-- [Constraint 1]
+- [Dependency 2]
 ```
 
 ---
 
-## STOP: Awaiting User Approval
+## STOP: Awaiting User Approval (End of Phase A)
 
-```
----
-## Implementation Plan Generated
+**Review the implementation plan above.** You may:
+- ✅ **Approve as-is**: Reply "Approved" to proceed to spec generation
+- ✏️ **Request modifications**: Adjust specialists or spec sections
+- ➕ **Add/remove specialists**: Change which granular agents to consult
+- 🔄 **Request clarification**: Ask questions about the technical approach
 
-Review the implementation plan above. You may:
-- **Approve as-is**: Reply "Approved" to proceed to spec generation
-- **Request modifications**: Specify changes to specialists or sections
-- **Add/remove specialists**: Request additional expertise or simplify
-
-Reply with "Approved" to proceed to Phase B (spec generation).
----
-```
-
-**IMPORTANT**: Do NOT proceed to Phase B until user explicitly approves the plan.
+⚠️ **Do not proceed to Phase B until user explicitly approves.**
 
 ---
 
-## Phase B: Execution (Spec Generation)
+## Phase B: Execution
 
 ### Step 4: Consult Specialists
 
-For each specialist identified in the approved plan:
-1. **Invoke** the specialist agent.
-2. **Provide** relevant PRD sections and constraints.
-3. **Collect** their technical recommendations.
+Execute the approved plan by consulting each specialist:
+- Each specialist reviews their assigned section
+- Cross-reference with PRD requirements
+- Document technical decisions
 
-### Step 5: Compile Specifications
+### Step 5: Compile Specs
 
-Create `specs/[TASKNAME]_specs.md` with all seven sections:
+Create `specs/[TASKNAME]_specs.md` with:
 
 1. **Overview**: Summary of what will be built
 2. **Architecture**: System design, component interactions
@@ -154,6 +149,12 @@ Validate spec with `Security Engineer`:
 - Data protection considerations
 
 ### Step 7: Output Specs
+
+Finalize and output `specs/[TASKNAME]_specs.md`
+
+---
+
+## Output
 
 - **Deliverable**: `specs/[TASKNAME]_specs.md`
 

@@ -1,5 +1,4 @@
 ---
-name: UX Engineer
 description: Design and implement high-fidelity prototypes, animations, and micro-interactions.
 ---
 

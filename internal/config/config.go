@@ -43,6 +43,10 @@ type Config struct {
 	// FutureShadeModelID is the model ID for FutureShade analysis.
 	FutureShadeModelID string
 
+	// ProjectRoot is the root directory of the project.
+	// Used by ShadowDocs to serve documentation files. See SHADOW_VIEWER_specs.md.
+	ProjectRoot string
+
 	Worker WorkerConfig
 }
 
@@ -99,6 +103,7 @@ func LoadConfig() (*Config, error) {
 		FutureShadeEnabled:         getEnvBool("FUTURESHADE_ENABLED", false),
 		FutureShadeAPIKey:          os.Getenv("FUTURESHADE_API_KEY"),
 		FutureShadeModelID:         getEnvOrDefault("FUTURESHADE_MODEL_ID", "gemini-2.5-flash"),
+		ProjectRoot:                getEnvOrDefault("PROJECT_ROOT", "."),
 		Worker: WorkerConfig{
 			Concurrency: 10,
 			QueuePriorities: map[string]int{

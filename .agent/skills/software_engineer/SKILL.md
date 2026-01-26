@@ -30,25 +30,36 @@ Before proceeding, verify:
 
 ---
 
+## Capabilities
+
+1. **Spec Analysis**: You read the linked spec for the current task.
+2. **L7 Spec Review & Revision**: MANDATORY review that may revise/improve the spec before proceeding.
+3. **Context Compilation**: You combine the Step requirements, Spec constraints, and File Paths into a single, dense prompt.
+4. **Verification Prep**: You explicitly list the test commands the executor must run.
+5. **Zero-Trust Review**: MANDATORY gate before commit/push instructions.
+6. **Post-Execution Audit**: Review Claude Code output and provide remediation if needed.
+
+---
+
 ## Three-Phase Workflow
 
-This skill operates in **three distinct phases**:
+This skill follows the **Plan-First → Approval → Execute → Audit** pattern:
 
-| Phase | Name | Purpose | Output |
-|-------|------|---------|--------|
-| **Phase A** | Spec Review & Preparation | L7 review, may revise spec | Spec approved or revision notes |
-| **Phase B** | Terminal Prompt Generation | Create execution instructions | TERMINAL PROMPT |
-| **Phase C** | Post-Execution Audit Loop | Review Claude Code output | PASS (commit) or FAIL (remediation) |
+| Phase | Description | Output | Gate |
+|-------|-------------|--------|------|
+| **Phase A: Spec Review & Preparation** | L7 review, may revise spec | Revised spec notes OR "Spec approved as-is" | Review Complete |
+| **Phase B: Terminal Prompt Generation** | Generate implementation prompt | Terminal Prompt for Claude Code | User Executes |
+| **Phase C: Post-Execution Audit Loop** | Review output, remediate if needed | PASS (commit) or FAIL (remediation prompt) | Loop until PASS |
 
 ---
 
 ## Phase A: Spec Review & Preparation
 
-### L7 Spec Review Gate (MANDATORY)
+## L7 Spec Review Gate (MANDATORY - May Revise)
 
 **Before generating ANY terminal prompt, perform this review:**
 
-#### 1. Pre-Mortem Analysis
+### 1. Pre-Mortem Analysis
 
 > "If this implementation fails catastrophically in production, what was the cause?"
 
@@ -59,9 +70,9 @@ This skill operates in **three distinct phases**:
 - [ ] Concurrent access race conditions?
 - [ ] Graceful degradation paths?
 
-**Action**: If gaps found, document them as constraints for the terminal prompt.
+**Action**: If gaps found, document them in the terminal prompt as explicit constraints.
 
-#### 2. Antagonist Analysis
+### 2. Antagonist Analysis
 
 > "How would a malicious actor exploit this implementation?"
 
@@ -74,7 +85,7 @@ This skill operates in **three distinct phases**:
 
 **Action**: If security gaps found, add explicit security verification steps.
 
-#### 3. Complexity Analysis
+### 3. Complexity Analysis
 
 > "Is this implementation over-engineered for the problem?"
 
@@ -88,31 +99,15 @@ This skill operates in **three distinct phases**:
 
 ### L7 Gate Decision
 
-- **PASS**: All checks addressed or documented as constraints. Proceed to Phase B.
-- **FAIL**: Return to DevTeam with specific gaps to address.
-- **REVISE**: Document spec improvements needed and note them in the terminal prompt.
-
-### Spec Revision Notes (if applicable)
-
-If the L7 review identified gaps, document them:
-
-```markdown
-## L7 Spec Review: Revision Notes for [TASKNAME]
-
-### Gaps Identified
-1. [Gap 1 - what's missing]
-2. [Gap 2 - what's missing]
-
-### Constraints Added to Terminal Prompt
-1. [Constraint 1 - how to address gap]
-2. [Constraint 2 - how to address gap]
-
-### Proceeding with noted constraints.
-```
+- **PASS (No Revisions)**: All checks addressed. Output: "Spec approved as-is. Proceeding to terminal prompt generation."
+- **PASS (With Revisions)**: Gaps found but can be addressed inline. Output: "Spec reviewed with the following improvements:" followed by revised spec notes that will be incorporated into the terminal prompt.
+- **FAIL**: Critical gaps that require DevTeam rework. Output: "Spec review failed. Returning to DevTeam with:" followed by specific gaps. Do NOT proceed to Phase B.
 
 ---
 
 ## Phase B: Terminal Prompt Generation
+
+## Output Format: The Context Prompt
 
 When asked to "Build", "Implement", or "Refactor", output a code block labeled **"TERMINAL PROMPT"**:
 
@@ -153,29 +148,16 @@ For EACH sub-task above, you MUST:
 - [ ] [Criterion 3 from PRD]
 ```
 
-### Inter-Thread Protocol
-
-After terminal prompt generation:
-
-```
----
-## Terminal Prompt Ready
-
-Copy the prompt above and paste it into your Claude Code terminal.
-
-When execution completes, paste the output back here for the **Audit Phase** (Phase C).
----
-```
-
 ---
 
-## Phase C: Post-Execution Audit Loop
+## Zero-Trust Antagonistic Review Gate (MANDATORY)
 
-When user pastes Claude Code output back, perform the Zero-Trust Antagonistic Review.
+**Before ANY commit/push instruction, include this gate:**
 
-### Step 1: Zero-Trust Antagonistic Review
+```text
+### Zero-Trust Antagonistic Review (Pre-Commit Gate)
 
-Analyze the implementation output for:
+STOP. Before committing, you MUST verify:
 
 #### 1. Security Checklist
 - [ ] No secrets or credentials in code or comments.
@@ -196,83 +178,90 @@ Analyze the implementation output for:
 - [ ] No breaking changes to public APIs without versioning.
 - [ ] Database migrations are reversible (if applicable).
 
-#### 4. Acceptance Criteria Verification
-- [ ] All acceptance criteria from PRD are met.
-- [ ] Edge cases are handled as specified.
-- [ ] Performance requirements are satisfied.
+#### 4. Antagonist Final Check
+Ask yourself: "If I were trying to break this system, what would I do?"
+- Document any remaining concerns.
+- If critical concerns exist, DO NOT commit. Return to implementation.
+
+Only after ALL checks pass, proceed with:
+git add [specific files] && git commit -m "[TASKNAME]: [description]"
+```
+
+---
+
+## Phase C: Post-Execution Audit Loop
+
+When user pastes Claude Code output back into Antigravity:
+
+### Step 1: Zero-Trust Antagonistic Review
+
+Analyze the implementation output for:
+
+1. **Security Gaps**
+   - Are there any hardcoded secrets or credentials?
+   - Is all user input properly validated/sanitized?
+   - Are auth/authz checks in place?
+
+2. **Acceptance Criteria Verification**
+   - Does the implementation meet ALL acceptance criteria from the spec?
+   - Are there any partially implemented features?
+
+3. **L7 Audit Compliance**
+   - Did the executor follow Pre-Mortem guidance?
+   - Did the executor address Antagonist concerns?
+   - Is the implementation appropriately simple (Complexity check)?
+
+4. **Test Results**
+   - Did all verification commands pass?
+   - Are there any test failures or warnings?
 
 ### Step 2: Audit Decision
 
-Based on the review:
+Based on the review, output ONE of:
 
-#### If PASS:
+#### PASS: Provide Commit/Push Instructions
 
-```
----
+```text
 ## Audit PASSED: [TASKNAME]
 
-All checks verified. Proceed with commit:
+All acceptance criteria met. Security review passed. Tests passing.
 
-git add [specific files] && git commit -m "[TASKNAME]: [description]"
+### Commit Instructions
+git add [specific files]
+git commit -m "[TASKNAME]: [description]"
 git push origin [branch]
 
-After push, invoke `/NEXT [TASKNAME]` to finalize and archive.
----
+### Post-Commit
+Invoke `/NEXT [TASKNAME]` to finalize and archive artifacts.
 ```
 
-#### If FAIL:
-
-Output a detailed remediation prompt:
+#### FAIL: Provide Remediation Prompt
 
 ```text
 ## Remediation Required: [TASKNAME]
 
 ### Issues Found
-1. **[Issue Type]** - [Severity: Critical/High/Medium]
-   - Location: [file:line]
-   - Description: [What's wrong]
-   - Impact: [Why it matters]
-
-2. **[Issue Type]** - [Severity: Critical/High/Medium]
-   - Location: [file:line]
-   - Description: [What's wrong]
-   - Impact: [Why it matters]
+1. [Issue 1 - severity: HIGH/MEDIUM/LOW, location: file:line, description]
+2. [Issue 2 - severity, location, description]
+3. [Issue 3 - severity, location, description]
 
 ### Required Fixes
-For Issue 1:
-- [Specific fix instruction]
-- [Code change required]
-
-For Issue 2:
-- [Specific fix instruction]
-- [Code change required]
-
-### L7 Recursive Audit for Fixes
-For each fix, you MUST:
-1. **Pre-Mortem**: "What could cause this fix to fail?"
-2. **Antagonist**: "Could this fix introduce new vulnerabilities?"
-3. **Complexity**: "Is this the simplest fix?"
+[Specific instructions for Claude Code to fix each issue]
 
 ### Re-verification Steps
-After applying fixes:
-- Run `[test command]`
-- Run `[lint command]`
-- Run `[security scan command]` (if applicable)
+[Commands to verify the fixes]
 
-Paste the output here for re-audit.
+---
+Execute this remediation prompt in Claude Code, then paste the output back here.
 ```
 
 ### Remediation Loop
 
 ```
-User executes remediation prompt in Claude Code
-    ↓
-User pastes output back
-    ↓
-Return to Step 1 (Zero-Trust Review)
-    ↓
-Repeat until PASS
+User executes remediation prompt → pastes output → return to Step 1
 ```
+
+This loop continues until the audit PASSes or the user decides to abandon.
 
 ---
 
@@ -280,22 +269,44 @@ Repeat until PASS
 
 ```
 Phase A: Spec Review & Preparation
-    ├→ L7 Spec Review Gate (Pre-Mortem, Antagonist, Complexity)
-    ├→ Document revision notes if gaps found
-    └→ Proceed to Phase B
+├─ 1. Input Validation    → Verify specs/[TASKNAME]_specs.md exists
+├─ 2. L7 Spec Review      → Pre-Mortem, Antagonist, Complexity checks
+└─ 3. Revision Decision   → "Approved as-is" OR "Revised notes" OR "FAIL→DevTeam"
 
 Phase B: Terminal Prompt Generation
-    ├→ Build context prompt with all constraints
-    ├→ Include L7 Recursive Audit instructions
-    ├→ Output TERMINAL PROMPT
-    └→ User executes in Claude Code
+├─ 4. Context Compilation → Build terminal prompt with all constraints
+├─ 5. L7 Recursive Audit  → Include audit instructions for every sub-task
+├─ 6. Zero-Trust Gate     → Pre-commit checklist before commit instruction
+└─ 7. Output Prompt       → Ready for user to paste into Claude Code
 
 Phase C: Post-Execution Audit Loop
-    ├→ User pastes Claude Code output
-    ├→ Zero-Trust Antagonistic Review
-    ├→ PASS: Provide commit/push instructions
-    └→ FAIL: Provide remediation prompt → Loop until PASS
+├─ 8. User Executes       → Pastes output back into Antigravity
+├─ 9. Antagonistic Review → Security, acceptance criteria, L7 compliance
+├─ 10. Audit Decision     → PASS (commit instructions) OR FAIL (remediation)
+└─ 11. Remediation Loop   → If FAIL, user executes fix → return to Step 9
 ```
+
+---
+
+## Inter-Thread Protocol
+
+After terminal prompt generation:
+
+---
+
+## Terminal Prompt Ready
+
+Copy the prompt above and paste it into your Claude Code terminal.
+
+**When execution completes, paste the output back here for Phase C: Post-Execution Audit.**
+
+The audit will verify:
+- All acceptance criteria are met
+- Security requirements are satisfied
+- L7 recursive audit was followed
+
+If audit passes → commit/push instructions provided.
+If audit fails → remediation prompt provided for another execution cycle.
 
 ---
 
@@ -318,7 +329,7 @@ When the user invokes `/NEXT [TASKNAME]`, execute the finalization protocol.
 
 Before finalizing, verify:
 1. `[TASKNAME]` is provided
-2. Audit phase completed successfully (Phase C PASSED)
+2. Audit phase completed successfully
 3. Code is committed and pushed to GitHub
 
 **If validation fails:**

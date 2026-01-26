@@ -14,30 +14,11 @@ const (
 	ModelTypeFlash     ModelType = "flash"
 	ModelTypePro       ModelType = "pro"
 	ModelTypeEmbedding ModelType = "embedding"
+	// New models for Tribunal
+	ModelTypeFlashPreview ModelType = "flash-preview" // gemini-3.0-flash-preview
+	ModelTypeCodeAssist   ModelType = "code-assist"   // gemini-code-assist
+	ModelTypeOpus         ModelType = "opus"          // claude-4.5-opus
 )
-
-// =============================================================================
-// VENDOR-AGNOSTIC CLIENT INTERFACE
-// =============================================================================
-// Client defines the interface for AI operations using vendor-agnostic types.
-// This abstraction allows switching between AI providers (Vertex AI, OpenAI,
-// Anthropic, local models) without modifying service layer code.
-//
-// L7 Quality Gate: No vendor-specific types (e.g., *genai.Part) in interface.
-// =============================================================================
-
-// Client defines the interface for AI operations.
-// Uses vendor-agnostic types from types.go.
-type Client interface {
-	// GenerateContent generates text/multimodal content using the specified model.
-	GenerateContent(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
-
-	// GenerateEmbedding generates a vector embedding for the given text.
-	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
-
-	// Close releases any resources used by the client.
-	Close() error
-}
 
 // =============================================================================
 // VERTEX AI IMPLEMENTATION

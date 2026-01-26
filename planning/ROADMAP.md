@@ -162,7 +162,7 @@ This plan outlines 69 sequential steps to take FutureBuild from zero to producti
 |--------|------|------|--------------|-----------|
 | [x] | 64 | **Initialize FutureShade Service**: Create `internal/futureshade` and `frontend/futureshade` | Step 63 | 2 |
 | [ ] | 65 | **Implement "The Tribunal" Interfaces**: Define Multi-Model Client and Consensus Logic | Step 64 | 3 |
-| [ ] | 66 | **Build The Shadow Viewer**: Specialized UI for ShadowDocs and Tribunal Decision Logs | Step 50, 64 | 3 |
+| [x] | 66 | **Build The Shadow Viewer**: Specialized UI for ShadowDocs and Tribunal Decision Logs | Step 50, 64 | 3 |
 | [ ] | 67 | **Integrate Antigravity Skills**: Allow FutureShade to call `internal/agents` | Step 49, 65 | 2 |
 | [ ] | 68 | **Implement Automated PR Review**: GitHub Webhook -> Tribunal -> PR Comment | Step 67 | 2 |
 | [ ] | 69 | **The "Tree Planting" Ceremony**: Final integration test where FutureShade auto-diagnoses and fixes | Step 68 | 2 |

@@ -111,6 +111,12 @@ const _activeArtifact$ = signal<ArtifactPayload | null>(null);
 const _rightPanelWidth$ = signal<number>(320);
 const _popoutArtifact$ = signal<ArtifactPayload | null>(null);
 
+// Shadow Mode state (SHADOW_VIEWER_specs.md)
+const _shadowModeEnabled$ = signal<boolean>(false);
+const _shadowActiveView$ = signal<'log' | 'docs'>('log');
+const _selectedDecisionId$ = signal<string | null>(null);
+const _selectedDocPath$ = signal<string | null>(null);
+
 // ============================================================================
 // Computed Values
 // ============================================================================
@@ -448,6 +454,46 @@ const actions: StoreActions = {
         _popoutArtifact$.value = artifact;
     },
 
+    // ---- Shadow Mode Actions (SHADOW_VIEWER_specs.md) ----
+
+    toggleShadowMode(): void {
+        _shadowModeEnabled$.value = !_shadowModeEnabled$.value;
+        // Reset shadow state when disabling
+        if (!_shadowModeEnabled$.value) {
+            _shadowActiveView$.value = 'log';
+            _selectedDecisionId$.value = null;
+            _selectedDocPath$.value = null;
+        }
+    },
+
+    setShadowModeEnabled(enabled: boolean): void {
+        _shadowModeEnabled$.value = enabled;
+        if (!enabled) {
+            _shadowActiveView$.value = 'log';
+            _selectedDecisionId$.value = null;
+            _selectedDocPath$.value = null;
+        }
+    },
+
+    setShadowActiveView(view: 'log' | 'docs'): void {
+        _shadowActiveView$.value = view;
+    },
+
+    selectDecision(id: string | null): void {
+        _selectedDecisionId$.value = id;
+    },
+
+    selectDoc(path: string | null): void {
+        _selectedDocPath$.value = path;
+    },
+
+    exitShadowMode(): void {
+        _shadowModeEnabled$.value = false;
+        _shadowActiveView$.value = 'log';
+        _selectedDecisionId$.value = null;
+        _selectedDocPath$.value = null;
+    },
+
     // ---- Session Reset (Step 58.5: State Hygiene) ----
 
     resetSession(): void {
@@ -493,6 +539,12 @@ const actions: StoreActions = {
         _leftPanelOpen$.value = false;
         _rightPanelWidth$.value = 320; // Step 59.5: Reset width
         _popoutArtifact$.value = null; // Step 59.5: Close modal
+
+        // Shadow Mode (SHADOW_VIEWER_specs.md)
+        _shadowModeEnabled$.value = false;
+        _shadowActiveView$.value = 'log';
+        _selectedDecisionId$.value = null;
+        _selectedDocPath$.value = null;
 
         // Note: localStorage cleared automatically by token effect
     },
@@ -563,6 +615,12 @@ export const store = {
     // ---- Panel Resize State (readonly, Step 59.5) ----
     rightPanelWidth$: _rightPanelWidth$ as ReadonlySignal<number>,
     popoutArtifact$: _popoutArtifact$ as ReadonlySignal<ArtifactPayload | null>,
+
+    // ---- Shadow Mode State (readonly, SHADOW_VIEWER_specs.md) ----
+    shadowModeEnabled$: _shadowModeEnabled$ as ReadonlySignal<boolean>,
+    shadowActiveView$: _shadowActiveView$ as ReadonlySignal<'log' | 'docs'>,
+    selectedDecisionId$: _selectedDecisionId$ as ReadonlySignal<string | null>,
+    selectedDocPath$: _selectedDocPath$ as ReadonlySignal<string | null>,
 
     // ---- Actions ----
     actions,

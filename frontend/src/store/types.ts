@@ -363,6 +363,14 @@ export interface StoreActions {
     setRightPanelWidth(width: number): void;
     setPopoutArtifact(artifact: ArtifactPayload | null): void;
 
+    // Shadow Mode actions (SHADOW_VIEWER_specs.md)
+    toggleShadowMode(): void;
+    setShadowModeEnabled(enabled: boolean): void;
+    setShadowActiveView(view: 'log' | 'docs'): void;
+    selectDecision(id: string | null): void;
+    selectDoc(path: string | null): void;
+    exitShadowMode(): void;
+
     // Session actions (Step 58.5: State Hygiene)
     resetSession(): void;
 }
