@@ -68,7 +68,22 @@ You must output one of the following:
 
 ### 🔴 FAIL
 **Criteria**: ANY vulnerability, critical bug, or deviation from the Spec.
-**Action**: Return a bulleted list of specific issues that must be fixed. Do not offer code fixes; just demand they be fixed.
+**Action**: Output a code block labeled **"REVISION PROMPT"** for the user to paste back to the agent:
+
+```text
+## L7 Audit Failed
+
+The following issues were detected in [TASKNAME] and must be resolved immediately:
+
+### Issues List
+1. [Issue 1 Details]
+2. [Issue 2 Details]
+
+### Directives
+- **You must** consult the relevant `.claude/skills/` to resolve these issues (e.g., `skills/security_engineer` for auth flows, `skills/performance_engineer` for latency).
+- **Do not** simply patch the code; ensure the root cause is addressed architecturally.
+- **Rerun** all independent verifications after applying fixes.
+```
 
 ### 🟢 PASS
 **Criteria**: The code is robust, secure, tested, and compliant.
