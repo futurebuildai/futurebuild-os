@@ -15,6 +15,9 @@
 #   - JWT_SECRET: 256-bit secret for JWT signing
 #   - REDIS_URL: Redis connection string
 #   - SENDGRID_API_KEY: SendGrid API key for email
+#   - TWILIO_ACCOUNT_SID: Twilio account SID for SMS
+#   - TWILIO_AUTH_TOKEN: Twilio auth token for SMS
+#   - TWILIO_FROM_NUMBER: Twilio phone number (E.164 format)
 #   - WEBHOOK_SECRET: Secret for webhook signature verification
 #   - VERTEX_PROJECT_ID: Google Cloud project ID
 #   - GCP_SA_JSON: Google Cloud service account JSON (base64 encoded)
@@ -70,6 +73,17 @@ services:
       - key: EMAIL_FROM_NAME
         value: "FutureBuild"
         scope: RUN_TIME
+
+      # Twilio SMS (Secrets) - See LAUNCH_PLAN.md P2
+      - key: TWILIO_ACCOUNT_SID
+        scope: RUN_TIME
+        type: SECRET
+      - key: TWILIO_AUTH_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: TWILIO_FROM_NUMBER
+        scope: RUN_TIME
+        type: SECRET
 
       # Public URL (for magic links, etc.)
       - key: BASE_URL

@@ -27,6 +27,9 @@ import './fb-resize-handle';
 // Import artifact modal (Step 59.5)
 import '../artifacts/fb-artifact-modal';
 
+// Import toast container (LAUNCH_PLAN.md P2)
+import '../feedback/fb-toast-container';
+
 /**
  * Application Shell - 3-Panel Layout Container
  * @element fb-app-shell
@@ -375,6 +378,8 @@ export class FBAppShell extends FBElement {
                 ` : nothing}
                 
                 ${this._hasPopoutArtifact ? html`<fb-artifact-modal></fb-artifact-modal>` : nothing}
+
+                <fb-toast-container></fb-toast-container>
             </div>
         `;
     }

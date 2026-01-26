@@ -16,6 +16,13 @@ import '../views/fb-view-invite-accept';
 import '../views/fb-view-admin-invites';
 import '../views/fb-view-settings';
 
+// Import portal view components (LAUNCH_PLAN.md P2)
+import '../views/fb-view-portal-action';
+import '../views/fb-view-portal-login';
+import '../views/fb-view-portal-signup';
+import '../views/fb-view-portal-verify';
+import '../views/fb-view-portal-dashboard';
+
 // Import chat components (Step 52 Integration)
 import '../chat/fb-message-list';
 import '../chat/fb-input-bar';
@@ -131,6 +138,14 @@ export class FBPanelCenter extends FBElement {
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
 
+    // Portal routes (LAUNCH_PLAN.md P2)
+    @state() private _isPortalActionRoute = false;
+    @state() private _portalActionToken: string | null = null;
+    @state() private _isPortalLoginRoute = false;
+    @state() private _isPortalSignupRoute = false;
+    @state() private _isPortalVerifyRoute = false;
+    @state() private _isPortalDashboardRoute = false;
+
     private _disposeEffects: (() => void)[] = [];
 
     override connectedCallback(): void {
@@ -167,6 +182,22 @@ export class FBPanelCenter extends FBElement {
         this._isInviteAcceptRoute = path === '/invite/accept';
         this._isAdminInvitesRoute = path === '/admin/invites';
         this._isSettingsRoute = path === '/settings';
+
+        // Portal routes (LAUNCH_PLAN.md P2)
+        this._isPortalLoginRoute = path === '/portal/login';
+        this._isPortalSignupRoute = path === '/portal/signup';
+        this._isPortalVerifyRoute = path === '/portal/verify';
+        this._isPortalDashboardRoute = path === '/portal/dashboard';
+
+        // Portal action route: /portal/action/:token
+        const actionMatch = path.match(/^\/portal\/action\/([a-zA-Z0-9_-]+)$/);
+        if (actionMatch && actionMatch[1]) {
+            this._isPortalActionRoute = true;
+            this._portalActionToken = actionMatch[1];
+        } else {
+            this._isPortalActionRoute = false;
+            this._portalActionToken = null;
+        }
     }
 
     override disconnectedCallback(): void {
@@ -208,6 +239,23 @@ export class FBPanelCenter extends FBElement {
     }
 
     override render(): TemplateResult {
+        // Portal routes (LAUNCH_PLAN.md P2) - These use portal-specific auth, not main app auth
+        if (this._isPortalActionRoute && this._portalActionToken) {
+            return html`<fb-view-portal-action .token=${this._portalActionToken}></fb-view-portal-action>`;
+        }
+        if (this._isPortalLoginRoute) {
+            return html`<fb-view-portal-login></fb-view-portal-login>`;
+        }
+        if (this._isPortalSignupRoute) {
+            return html`<fb-view-portal-signup></fb-view-portal-signup>`;
+        }
+        if (this._isPortalVerifyRoute) {
+            return html`<fb-view-portal-verify></fb-view-portal-verify>`;
+        }
+        if (this._isPortalDashboardRoute) {
+            return html`<fb-view-portal-dashboard></fb-view-portal-dashboard>`;
+        }
+
         // Show verify view for magic link verification
         if (this._isVerifyRoute) {
             return html`<fb-view-verify></fb-view-verify>`;

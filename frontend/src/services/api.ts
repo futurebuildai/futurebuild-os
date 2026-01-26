@@ -452,7 +452,96 @@ export const api = {
             await del<undefined>(`/admin/invites/${id}`);
         },
     },
+    /**
+     * Portal endpoints.
+     * See LAUNCH_PLAN.md P2: Field Portal (Mobile).
+     */
+    portal: {
+        /**
+         * Verify an action token and get context (public).
+         * @param token - Action token from SMS link
+         */
+        verifyActionToken(token: string): Promise<PortalActionContext> {
+            return get<PortalActionContext>(`/portal/action/${token}`, { skipAuth: true });
+        },
+
+        /**
+         * Submit an action for a token (public).
+         * @param token - Action token from SMS link
+         * @param data - Action data (status or photo_id)
+         */
+        submitAction(token: string, data: PortalSubmitRequest): Promise<PortalSubmitResponse> {
+            return post<PortalSubmitResponse>(`/portal/action/${token}`, data, { skipAuth: true });
+        },
+
+        /**
+         * Create and send an action link (admin only).
+         * @param contactId - Contact UUID
+         * @param projectId - Project UUID
+         * @param taskId - Task UUID
+         * @param actionType - Type of action (status_update, photo_upload, view)
+         */
+        createActionLink(
+            contactId: string,
+            projectId: string,
+            taskId: string,
+            actionType: 'status_update' | 'photo_upload' | 'view'
+        ): Promise<PortalLinkResponse> {
+            return post<PortalLinkResponse>('/admin/portal/link', {
+                contact_id: contactId,
+                project_id: projectId,
+                task_id: taskId,
+                action_type: actionType,
+            });
+        },
+    },
 } as const;
+
+// ============================================================================
+// Portal Types
+// ============================================================================
+
+/**
+ * Action context returned when verifying a portal token.
+ * See LAUNCH_PLAN.md P2: Field Portal (Mobile).
+ */
+export interface PortalActionContext {
+    action_type: 'status_update' | 'photo_upload' | 'view';
+    contact: { id: string; name: string };
+    project: { id: string; name: string; address: string };
+    task: {
+        id: string;
+        wbs_code: string;
+        name: string;
+        status: string;
+        start_date?: string;
+        end_date?: string;
+    };
+}
+
+/**
+ * Request body for submitting a portal action.
+ */
+export interface PortalSubmitRequest {
+    status?: string;
+    photo_id?: string;
+}
+
+/**
+ * Response after submitting a portal action.
+ */
+export interface PortalSubmitResponse {
+    success: string;
+    message: string;
+}
+
+/**
+ * Response after creating an action link.
+ */
+export interface PortalLinkResponse {
+    success: boolean;
+    message: string;
+}
 
 // ============================================================================
 // Invite Types

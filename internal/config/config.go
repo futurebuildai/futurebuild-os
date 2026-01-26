@@ -56,6 +56,11 @@ type Config struct {
 	// Used for constructing magic links and other URLs.
 	BaseURL string
 
+	// Twilio SMS configuration. See LAUNCH_PLAN.md P2 (Notifications/Toast UI).
+	TwilioAccountSID  string
+	TwilioAuthToken   string
+	TwilioFromNumber  string
+
 	// AuditWALPath is the file path for the audit Write-Ahead Log.
 	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
 	AuditWALPath string
@@ -121,6 +126,9 @@ func LoadConfig() (*Config, error) {
 		EmailFromAddress:           getEnvOrDefault("EMAIL_FROM_ADDRESS", "noreply@futurebuild.ai"),
 		EmailFromName:              getEnvOrDefault("EMAIL_FROM_NAME", "FutureBuild"),
 		BaseURL:                    getEnvOrDefault("BASE_URL", "http://localhost:8080"),
+		TwilioAccountSID:           os.Getenv("TWILIO_ACCOUNT_SID"),
+		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
+		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/log/futurebuild/audit.wal"),
 		Worker: WorkerConfig{
 			Concurrency: 10,

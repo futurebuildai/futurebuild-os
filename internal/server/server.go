@@ -40,6 +40,7 @@ type Server struct {
 	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
 	InviteHandler      *handlers.InviteHandler      // See LAUNCH_STRATEGY.md Task B2
 	UserHandler        *handlers.UserHandler        // See LAUNCH_PLAN.md User Profile Endpoint
+	PortalHandler      *handlers.PortalHandler      // See LAUNCH_PLAN.md P2: Field Portal
 	AuthMiddleware    *middleware.AuthMiddleware
 	AuthRateLimiter   *middleware.IPRateLimiter
 }
@@ -101,21 +102,17 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	// Initialize notification service based on environment.
-	// Production/Staging: Use SendGrid for real email delivery.
-	// Development: Use Console provider (logs to stdout).
-	// See LAUNCH_STRATEGY.md Task A3.
-	var notificationService types.NotificationService
-	if cfg.SendGridAPIKey != "" {
-		notificationService = service.NewSendGridProvider(
-			cfg.SendGridAPIKey,
-			cfg.EmailFromAddress,
-			cfg.EmailFromName,
-		)
-		fmt.Println("Email provider: SendGrid")
-	} else {
-		notificationService = service.NewConsoleEmailProvider()
-		fmt.Println("Email provider: Console (development mode)")
-	}
+	// Uses composite provider: SendGrid for email, Twilio for SMS.
+	// Falls back to Console provider in development mode.
+	// See LAUNCH_STRATEGY.md Task A3 and LAUNCH_PLAN.md P2.
+	notificationService := service.NewNotificationService(
+		cfg.SendGridAPIKey,
+		cfg.EmailFromAddress,
+		cfg.EmailFromName,
+		cfg.TwilioAccountSID,
+		cfg.TwilioAuthToken,
+		cfg.TwilioFromNumber,
+	)
 	directoryService := service.NewDirectoryService(db)
 
 	// NOTE: Background agents (SubLiaisonAgent, DailyFocusAgent, ProcurementAgent) run in
@@ -169,6 +166,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See LAUNCH_PLAN.md User Profile Endpoint (P0)
 	userHandler := handlers.NewUserHandler(db)
 
+	// See LAUNCH_PLAN.md P2: Field Portal (Mobile)
+	portalService := service.NewPortalService(db, notificationService, cfg.BaseURL)
+	portalHandler := handlers.NewPortalHandler(portalService)
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -184,6 +185,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
 		InviteHandler:      inviteHandler,      // See LAUNCH_STRATEGY.md Task B2
 		UserHandler:        userHandler,        // See LAUNCH_PLAN.md User Profile Endpoint
+		PortalHandler:      portalHandler,      // See LAUNCH_PLAN.md P2: Field Portal
 		AuthMiddleware:     authMiddleware,
 		AuthRateLimiter:    authRateLimiter,
 	}
@@ -219,6 +221,20 @@ func (s *Server) routes() {
 			r.Post("/", s.InviteHandler.CreateInvite)
 			r.Get("/", s.InviteHandler.ListInvites)
 			r.Delete("/{id}", s.InviteHandler.RevokeInvite)
+		})
+
+		// See LAUNCH_PLAN.md P2: Field Portal (Mobile)
+		// Public endpoints for one-time action links
+		r.Route("/portal", func(r chi.Router) {
+			r.Get("/action/{token}", s.PortalHandler.HandleVerifyActionToken)
+			r.Post("/action/{token}", s.PortalHandler.HandleSubmitAction)
+		})
+
+		// Admin endpoint for creating action links
+		r.Route("/admin/portal", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Post("/link", s.PortalHandler.HandleCreateActionLink)
 		})
 
 		// See LAUNCH_PLAN.md User Profile Endpoint (P0)
