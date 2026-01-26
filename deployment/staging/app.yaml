@@ -8,6 +8,9 @@ services:
   instance_count: 1
   instance_size_slug: basic-xxs
   envs:
+  - key: APP_ENV
+    value: staging
+    scope: RUN_TIME
   - key: DATABASE_URL
     scope: RUN_AND_BUILD_TIME
     type: SECRET
