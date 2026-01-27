@@ -24,6 +24,9 @@ services:
   - key: REDIS_URL
     scope: RUN_TIME
     type: SECRET
+  - key: GCP_SA_JSON_CONTENT
+    scope: RUN_TIME
+    type: SECRET
 
   health_check:
     http_path: /health
