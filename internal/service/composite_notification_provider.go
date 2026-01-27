@@ -50,18 +50,23 @@ func (c *CompositeNotificationProvider) SendSMS(contactID string, message string
 // This is a factory function that simplifies server.go wiring.
 //
 // Configuration logic:
-// - If SendGrid API key is set, use SendGrid for email
+// - If Resend API key is set, use Resend for email (preferred)
+// - Else if SendGrid API key is set, use SendGrid for email (fallback)
 // - If Twilio credentials are set, use Twilio for SMS
 // - Otherwise, fall back to console logging (development mode)
 func NewNotificationService(
+	resendAPIKey string,
 	sendGridAPIKey, emailFromAddress, emailFromName string,
 	twilioAccountSID, twilioAuthToken, twilioFromNumber string,
 ) types.NotificationService {
 	var emailProvider types.NotificationService
 	var smsProvider types.NotificationService
 
-	// Configure email provider
-	if sendGridAPIKey != "" {
+	// Configure email provider: Resend > SendGrid > Console
+	if resendAPIKey != "" {
+		emailProvider = NewResendProvider(resendAPIKey, emailFromAddress, emailFromName)
+		slog.Info("notification: using Resend for email")
+	} else if sendGridAPIKey != "" {
 		emailProvider = NewSendGridProvider(sendGridAPIKey, emailFromAddress, emailFromName)
 		slog.Info("notification: using SendGrid for email")
 	} else {

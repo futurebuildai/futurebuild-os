@@ -103,10 +103,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	// Initialize notification service based on environment.
-	// Uses composite provider: SendGrid for email, Twilio for SMS.
+	// Uses composite provider: Resend (preferred) or SendGrid for email, Twilio for SMS.
 	// Falls back to Console provider in development mode.
 	// See LAUNCH_STRATEGY.md Task A3 and LAUNCH_PLAN.md P2.
 	notificationService := service.NewNotificationService(
+		cfg.ResendAPIKey,
 		cfg.SendGridAPIKey,
 		cfg.EmailFromAddress,
 		cfg.EmailFromName,
