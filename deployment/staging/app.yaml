@@ -16,6 +16,7 @@ services:
     value: staging
     scope: RUN_TIME
   - key: DATABASE_URL
+    value: ${db.DATABASE_URL}
     scope: RUN_AND_BUILD_TIME
     type: SECRET
   - key: JWT_SECRET
