@@ -142,16 +142,16 @@ export class FBViewVerify extends FBViewElement {
         try {
             const response = await api.auth.verifyToken(token);
 
-            // Map snake_case API response to camelCase store format
+            // Map API response (principal/access_token) to store format
             const user = {
-                id: response.user.id,
-                email: response.user.email,
-                name: response.user.name,
-                role: response.user.role as UserRole,
-                orgId: response.user.org_id,
+                id: response.principal.id,
+                email: response.principal.email,
+                name: response.principal.name,
+                role: response.principal.role as UserRole,
+                orgId: response.principal.org_id,
             };
 
-            store.actions.login(user, response.token);
+            store.actions.login(user, response.access_token);
             this._state = 'success';
 
             // Clean up URL and redirect to dashboard
