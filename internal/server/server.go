@@ -327,8 +327,10 @@ func (s *Server) routes() {
 	}
 
 	// Serve static assets (JS, CSS, images)
+	// Vite outputs to dist/assets/, so we serve the entire dist dir and let
+	// the /assets/* route map directly to dist/assets/*
 	fileServer := http.FileServer(http.Dir(staticDir))
-	s.Router.Handle("/assets/*", http.StripPrefix("/assets/", fileServer))
+	s.Router.Handle("/assets/*", fileServer)
 
 	// SPA catch-all: serve index.html for all non-API routes
 	s.Router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
