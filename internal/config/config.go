@@ -104,6 +104,16 @@ func LoadConfig() (*Config, error) {
 		confidenceThreshold = 0.85
 	}
 
+	// Handle Service Account JSON from environment variable if provided.
+	// This allows deployment to platforms like DigitalOcean App Platform without file mounting.
+	if saContent := os.Getenv("GCP_SA_JSON_CONTENT"); saContent != "" {
+		saPath := "/tmp/service-account.json"
+		// Only write if it doesn't exist or we want to ensure fresh content
+		if err := os.WriteFile(saPath, []byte(saContent), 0600); err == nil {
+			os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saPath)
+		}
+	}
+
 	cfg := &Config{
 		DatabaseURL:                os.Getenv("DATABASE_URL"),
 		RedisURL:                   getEnvOrDefault("REDIS_URL", "localhost:6379"),

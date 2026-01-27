@@ -24,14 +24,7 @@ services:
   - key: REDIS_URL
     scope: RUN_TIME
     type: SECRET
-  - key: GOOGLE_APPLICATION_CREDENTIALS
-    value: /app/service-account.json
-    scope: RUN_TIME
-  # We will inject the service-account.json content via a build-time argument or a secret that the app platform wrapper handles, 
-  # or more commonly for App Platform, we might need a workaround for file-based auth if we can't mount secrets.
-  # L7 Best Practice for App Platform + Google Auth: pass JSON content as env var and write to file in entrypoint or use env var directly if lib supports it.
-  # The Google lib DOES support 'GOOGLE_APPLICATION_CREDENTIALS_JSON' (if not, we write it).
-  # Let's assume we pass the JSON string in a secret env var 'GCP_SA_JSON' and write it on boot.
+
   health_check:
     http_path: /health
     initial_delay_seconds: 10
