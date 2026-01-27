@@ -191,7 +191,7 @@ export const api = {
          */
         requestMagicLink(email: string): Promise<MagicLinkResponse> {
             return post<MagicLinkResponse>(
-                '/auth/magic-link',
+                '/auth/login',
                 { email } satisfies MagicLinkRequest,
                 { skipAuth: true }
             );
@@ -202,9 +202,8 @@ export const api = {
          * @param token - The magic link token from email
          */
         verifyToken(token: string): Promise<AuthResponse> {
-            return post<AuthResponse>(
-                '/auth/verify',
-                { token },
+            return get<AuthResponse>(
+                `/auth/verify?token=${encodeURIComponent(token)}`,
                 { skipAuth: true }
             );
         },
