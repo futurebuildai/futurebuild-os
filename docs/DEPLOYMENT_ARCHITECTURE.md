@@ -125,6 +125,11 @@ If the database doesn't appear after `doctl apps update`, manually add it via:
 ### 4. GCP Service Account Injection
 The Go application reads `GCP_SA_JSON_CONTENT` from the environment, writes it to `/tmp/service-account.json`, and sets `GOOGLE_APPLICATION_CREDENTIALS` automatically. See `internal/config/config.go`.
 
+### 5. GitHub Actions: Use `create-deployment`, NOT `apps update --spec`
+The GitHub Actions workflows use `doctl apps create-deployment` to trigger deployments. This preserves all environment variables configured in the Dashboard.
+
+**DO NOT** use `doctl apps update --spec` in CI/CD pipelines—it will delete any env vars not in the yaml file (like JWT_SECRET, VERTEX_PROJECT_ID, etc.).
+
 ## 🧠 Deployment Narrative
 
 When deploying, consider the context:

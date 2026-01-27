@@ -20,7 +20,11 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Deploy to App Platform
+        # IMPORTANT: Use create-deployment, NOT apps update --spec
+        # apps update --spec is DECLARATIVE and will DELETE any env vars
+        # that aren't in the yaml (like JWT_SECRET set in Dashboard).
+        # create-deployment triggers a new build/deploy using existing config.
         env:
             APP_ID: ${{ secrets.DO_APP_ID_DEMO }}
         run: |
-          doctl apps update $APP_ID --spec deployment/demo/app.yaml
+          doctl apps create-deployment $APP_ID --wait

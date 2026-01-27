@@ -21,14 +21,11 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Deploy to App Platform
-        # We assume the app is already created or we create it if missing.
-        # This command updates the app with the spec.
-        # Note: App Platform automatically builds the image from the repo if linked, 
-        # BUT since we want to control the "Deploy" event from here, we can trigger an app deployment.
-        # IF we want to use the local 'app.yaml' as the source of truth, we use `apps update`.
-        # You need the APP_ID. We can look it up by name or expect it in secrets.
-        # Let's assume APP_ID is in secrets for safety.
+        # IMPORTANT: Use create-deployment, NOT apps update --spec
+        # apps update --spec is DECLARATIVE and will DELETE any env vars
+        # that aren't in the yaml (like JWT_SECRET set in Dashboard).
+        # create-deployment triggers a new build/deploy using existing config.
         env:
             APP_ID: ${{ secrets.DO_APP_ID_STAGING }}
         run: |
-          doctl apps update $APP_ID --spec deployment/staging/app.yaml
+          doctl apps create-deployment $APP_ID --wait
