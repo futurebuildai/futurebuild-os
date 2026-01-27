@@ -30,6 +30,9 @@ import '../artifacts/fb-artifact-modal';
 // Import toast container (LAUNCH_PLAN.md P2)
 import '../feedback/fb-toast-container';
 
+// Import shadow layout (FutureShade)
+import '../shadow/shadow-layout';
+
 /**
  * Application Shell - 3-Panel Layout Container
  * @element fb-app-shell
@@ -207,6 +210,7 @@ export class FBAppShell extends FBElement {
     @state() private _isMobile = false;
     @state() private _rightPanelWidth = 320;
     @state() private _hasPopoutArtifact = false;
+    @state() private _shadowModeEnabled = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -332,6 +336,13 @@ export class FBAppShell extends FBElement {
                 this._hasPopoutArtifact = store.popoutArtifact$.value !== null;
             })
         );
+
+        // Subscribe to shadow mode (FutureShade)
+        this._disposeEffects.push(
+            effect(() => {
+                this._shadowModeEnabled = store.shadowModeEnabled$.value;
+            })
+        );
     }
 
     override disconnectedCallback(): void {
@@ -362,21 +373,31 @@ export class FBAppShell extends FBElement {
     override render(): TemplateResult {
         const resizeHandleOffset = this._rightPanelOpen && !this._isMobile ? this._rightPanelWidth : 0;
 
+        // Shadow mode replaces the standard layout with FutureShade
+        if (this._isAuthenticated && this._shadowModeEnabled) {
+            return html`
+                <div class="shell" data-theme="dark" style="position: relative;">
+                    <shadow-layout></shadow-layout>
+                    <fb-toast-container></fb-toast-container>
+                </div>
+            `;
+        }
+
         return html`
             <div class="shell" data-theme="${this._resolvedTheme}" style="position: relative;">
                 <fb-file-drop></fb-file-drop>
                 ${this._isAuthenticated ? html`<fb-panel-left></fb-panel-left>` : nothing}
                 <fb-panel-center .isAuthenticated=${this._isAuthenticated}></fb-panel-center>
                 ${this._isAuthenticated ? html`<fb-panel-right></fb-panel-right>` : nothing}
-                
+
                 ${this._isAuthenticated && this._rightPanelOpen && !this._isMobile ? html`
                     <fb-resize-handle style="--resize-handle-offset: ${resizeHandleOffset}px;"></fb-resize-handle>
                 ` : nothing}
-                
+
                 ${this._isMobile && (this._leftPanelOpen || this._rightPanelOpen) ? html`
                     <div class="backdrop" @click=${this._closePanels.bind(this)}></div>
                 ` : nothing}
-                
+
                 ${this._hasPopoutArtifact ? html`<fb-artifact-modal></fb-artifact-modal>` : nothing}
 
                 <fb-toast-container></fb-toast-container>

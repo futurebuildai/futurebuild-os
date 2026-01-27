@@ -2,13 +2,15 @@
  * FBPanelLeft - Left Panel Component (Projects, Threads, Daily Focus, Agent Activity)
  * See FRONTEND_SCOPE.md Section 3.3
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
 import type { ProjectSummary, Thread, FocusTask } from '../../store/types';
+import { UserRole } from '../../types/enums';
 import '../agent/fb-agent-activity';
+import '../shadow/shadow-toggle';
 
 @customElement('fb-panel-left')
 export class FBPanelLeft extends FBElement {
@@ -222,6 +224,7 @@ export class FBPanelLeft extends FBElement {
     @state() private _activeThreadId: string | null = null;
     @state() private _userName = '';
     @state() private _userInitials = '';
+    @state() private _userRole: UserRole | null = null;
     @state() private _theme: 'light' | 'dark' | 'system' = 'system';
 
     private _disposeEffects: (() => void)[] = [];
@@ -249,6 +252,7 @@ export class FBPanelLeft extends FBElement {
                 const user = store.user$.value;
                 this._userName = user?.name ?? '';
                 this._userInitials = this._computeInitials(user?.name);
+                this._userRole = user?.role ?? null;
             }),
             effect(() => {
                 this._theme = store.theme$.value;
@@ -369,6 +373,13 @@ export class FBPanelLeft extends FBElement {
 
             <!-- Agent Activity -->
             <fb-agent-activity></fb-agent-activity>
+
+            <!-- Shadow Mode Toggle (Admin only) -->
+            ${this._userRole === UserRole.Admin ? html`
+                <div class="section">
+                    <shadow-toggle></shadow-toggle>
+                </div>
+            ` : nothing}
 
             <!-- User -->
             <footer class="user-section">

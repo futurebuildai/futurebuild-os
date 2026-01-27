@@ -15,22 +15,8 @@
   <!-- Main Application Shell -->
   <app-root></app-root>
 
-  <!-- Demo Button for Step 51.1 Verification (DELETE AFTER TESTING) -->
-  <div id="demo-container" style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;">
-    <fb-demo-button>Click to Test</fb-demo-button>
-  </div>
-
   <!-- Main entry point loads all styles and components -->
   <script type="module" src="/src/index.ts"></script>
-
-  <!-- Event listener for verification -->
-  <script type="module">
-    document.addEventListener('fb-click', (e) => {
-      console.log('[Verification] Caught fb-click event:', e.detail);
-      console.log('  ✅ bubbles:', e.bubbles);
-      console.log('  ✅ composed:', e.composed);
-    });
-  </script>
 </body>
 
 </html>
