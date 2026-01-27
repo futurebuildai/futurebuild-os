@@ -79,14 +79,15 @@ func (s *AuthService) VerifyToken(ctx context.Context, plaintextToken string) (m
 	tokenHash := s.HashToken(plaintextToken)
 
 	// Single UNION query to search both tables in one round-trip
+	// Note: role columns cast to text for UNION compatibility (user_role_type vs contact_role_type)
 	query := `
-		SELECT 'user' as identity_type, u.id, u.org_id, u.email, u.name, u.role, u.created_at,
+		SELECT 'user' as identity_type, u.id, u.org_id, u.email, u.name, u.role::text, u.created_at,
 		       t.expires_at, t.used, 'auth_tokens' as token_table
 		FROM users u
 		JOIN auth_tokens t ON u.id = t.user_id
 		WHERE t.token_hash = $1
 		UNION ALL
-		SELECT 'contact', c.id, c.org_id, c.email, c.name, c.role, c.created_at,
+		SELECT 'contact', c.id, c.org_id, c.email, c.name, c.role::text, c.created_at,
 		       t.expires_at, t.used, 'portal_tokens'
 		FROM contacts c
 		JOIN portal_tokens t ON c.id = t.contact_id
