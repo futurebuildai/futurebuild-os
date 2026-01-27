@@ -201,8 +201,9 @@ func (s *AuthService) LookupIdentityByEmail(ctx context.Context, email string) (
 }
 
 // ConstructLink formats the magic link URL.
+// Points to frontend /verify route which calls the API and handles the auth flow.
 func (s *AuthService) ConstructLink(baseURL string, rawToken string) string {
-	return fmt.Sprintf("%s/api/v1/auth/verify?token=%s", baseURL, rawToken)
+	return fmt.Sprintf("%s/verify?token=%s", baseURL, rawToken)
 }
 
 // GenerateJWT creates a signed token response for an identity.
