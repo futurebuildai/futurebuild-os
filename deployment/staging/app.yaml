@@ -2,6 +2,10 @@ name: futurebuild-staging
 region: nyc3
 services:
 - name: api
+  github:
+    repo: futurebuildai/futurebuild-repo
+    branch: staging
+    deploy_on_push: false
   dockerfile_path: Dockerfile
   source_dir: .
   http_port: 8080
