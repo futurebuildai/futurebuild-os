@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -107,11 +108,16 @@ func LoadConfig() (*Config, error) {
 	// Handle Service Account JSON from environment variable if provided.
 	// This allows deployment to platforms like DigitalOcean App Platform without file mounting.
 	if saContent := os.Getenv("GCP_SA_JSON_CONTENT"); saContent != "" {
+		log.Printf("GCP_SA_JSON_CONTENT found (%d bytes), writing to temp file", len(saContent))
 		saPath := "/tmp/service-account.json"
-		// Only write if it doesn't exist or we want to ensure fresh content
-		if err := os.WriteFile(saPath, []byte(saContent), 0600); err == nil {
+		if err := os.WriteFile(saPath, []byte(saContent), 0600); err != nil {
+			log.Printf("ERROR: Failed to write service account JSON to %s: %v", saPath, err)
+		} else {
 			os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saPath)
+			log.Printf("GOOGLE_APPLICATION_CREDENTIALS set to %s", saPath)
 		}
+	} else {
+		log.Println("WARNING: GCP_SA_JSON_CONTENT not set - Vertex AI may fail to authenticate")
 	}
 
 	cfg := &Config{
