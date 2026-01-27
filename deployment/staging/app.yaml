@@ -1,6 +1,19 @@
 name: futurebuild-staging
 region: nyc3
 services:
+- name: db
+  type: DATABASE
+  image:
+    registry_type: DOCR
+    repository: postgres
+    tag: 15
+  instance_size_slug: db-s-dev-database
+  engine: PG
+  version: "15"
+  num_nodes: 1
+  size_slug: db-s-dev-database
+  db_name: main
+  db_user: futurebuild
 - name: api
   github:
     repo: futurebuildai/futurebuild-repo
