@@ -36,22 +36,26 @@ export interface MagicLinkResponse {
 }
 
 /**
- * Token verification response.
+ * Token verification response (matches Go types.TokenResponse).
  */
 export interface AuthResponse {
-    token: string;
-    user: AuthUser;
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    principal: AuthPrincipal;
 }
 
 /**
- * Authenticated user data.
+ * Authenticated principal data (matches Go types.Principal).
  */
-export interface AuthUser {
+export interface AuthPrincipal {
     id: string;
     email: string;
     name: string;
     role: UserRole;
     org_id: string;
+    subject_type: string;
+    created_at: string;
 }
 
 // ============================================================================
@@ -170,7 +174,7 @@ export interface TaskProgressRequest {
  * ```typescript
  * // Authentication
  * await api.auth.requestMagicLink('user@example.com');
- * const { token, user } = await api.auth.verifyToken('abc123');
+ * const { access_token, principal } = await api.auth.verifyToken('abc123');
  *
  * // Projects
  * const projects = await api.projects.list();
@@ -218,8 +222,8 @@ export const api = {
         /**
          * Get the current authenticated user.
          */
-        me(): Promise<AuthUser> {
-            return get<AuthUser>('/auth/me');
+        me(): Promise<AuthPrincipal> {
+            return get<AuthPrincipal>('/auth/me');
         },
     },
 
