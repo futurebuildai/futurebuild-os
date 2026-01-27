@@ -150,7 +150,7 @@ func LoadConfig() (*Config, error) {
 		TwilioAccountSID:           os.Getenv("TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
-		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/log/futurebuild/audit.wal"),
+		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/tmp/audit.wal"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{

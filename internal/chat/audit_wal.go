@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/colton/futurebuild/internal/models"
@@ -39,9 +40,15 @@ type FileAuditWAL struct {
 }
 
 // NewFileAuditWAL creates a new file-based WAL at the specified path.
-// Creates the file if it doesn't exist, opens in append mode if it does.
+// Creates the parent directory and file if they don't exist, opens in append mode if file exists.
 // Returns error if file cannot be created or opened.
 func NewFileAuditWAL(path string) (*FileAuditWAL, error) {
+	// Ensure parent directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create WAL directory %s: %w", dir, err)
+	}
+
 	// Open file in append-only mode with create flag
 	// O_SYNC ensures immediate write to disk (durability)
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY|os.O_SYNC, 0644)
