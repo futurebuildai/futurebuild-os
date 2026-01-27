@@ -74,6 +74,9 @@ services:
 |-----|---------------|-------|
 | `JWT_SECRET` | `my-super-secret-key-12345` | Required, Encrypted |
 | `REDIS_URL` | `redis://localhost:6379` | Optional for MVP |
+| `VERTEX_PROJECT_ID` | `futurebuild-ai` | Required for Vertex AI |
+| `VERTEX_LOCATION` | `us-central1` | Required for Vertex AI |
+| `AUDIT_WAL_PATH` | `/tmp/audit.wal` | Required for staging/production |
 
 > [!CAUTION]
 > **Critical Lesson Learned:** If you add a secret to `app.yaml` without a value (e.g., `type: SECRET` only), `doctl apps update` may interpret this as "set to empty", effectively deleting your manually configured secrets. Keep sensitive secrets in the Dashboard ONLY.
@@ -138,6 +141,10 @@ When setting up a new environment (e.g., Demo or Production):
 3. [ ] Set environment variables in Dashboard:
    - [ ] `JWT_SECRET` (Encrypted)
    - [ ] `GCP_SA_JSON_CONTENT` (Paste full JSON, Encrypted)
+   - [ ] `VERTEX_PROJECT_ID` (e.g., `futurebuild-ai`)
+   - [ ] `VERTEX_LOCATION` (e.g., `us-central1`)
+   - [ ] `AUDIT_WAL_PATH` (e.g., `/tmp/audit.wal`)
    - [ ] `REDIS_URL` (Optional)
 4. [ ] Push to the corresponding branch to trigger GitHub Action
 5. [ ] Verify `/health` endpoint returns 200
+6. [ ] Verify `/` returns index.html (frontend loads)

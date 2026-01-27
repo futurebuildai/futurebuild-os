@@ -318,6 +318,22 @@ func (s *Server) routes() {
 	s.Router.Route("/webhooks", func(r chi.Router) {
 		r.Post("/messages", s.WebhookHandler.HandleInboundMessage)
 	})
+
+	// Serve frontend static files
+	// Files are served from /app/frontend/dist in the container
+	staticDir := "/app/frontend/dist"
+	if s.Cfg.Environment == "development" || s.Cfg.Environment == "dev" {
+		staticDir = "frontend/dist"
+	}
+
+	// Serve static assets (JS, CSS, images)
+	fileServer := http.FileServer(http.Dir(staticDir))
+	s.Router.Handle("/assets/*", http.StripPrefix("/assets/", fileServer))
+
+	// SPA catch-all: serve index.html for all non-API routes
+	s.Router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, staticDir+"/index.html")
+	})
 }
 
 func (s *Server) Start() error {
