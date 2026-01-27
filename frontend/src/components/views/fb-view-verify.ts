@@ -13,7 +13,6 @@ import { customElement, state } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
 import { store } from '../../store/store';
 import { api } from '../../services/api';
-import type { UserRole } from '../../types/enums';
 
 type VerifyState = 'verifying' | 'success' | 'error' | 'no_token';
 
@@ -147,7 +146,7 @@ export class FBViewVerify extends FBViewElement {
                 id: response.principal.id,
                 email: response.principal.email,
                 name: response.principal.name,
-                role: response.principal.role as UserRole,
+                role: response.principal.role,
                 orgId: response.principal.org_id,
             };
 
@@ -159,8 +158,8 @@ export class FBViewVerify extends FBViewElement {
 
             // Short delay to show success message before redirect
             setTimeout(() => {
-                // The store login action triggers isAuthenticated change
-                // which will automatically show the dashboard in fb-panel-center
+                // Reload the page to ensure all components pick up authenticated state
+                window.location.href = '/';
             }, 1500);
         } catch (err) {
             this._state = 'error';

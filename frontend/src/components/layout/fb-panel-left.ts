@@ -214,6 +214,23 @@ export class FBPanelLeft extends FBElement {
                 fill: none;
                 stroke-width: 2;
             }
+
+            .admin-section {
+                border-top: 1px solid var(--fb-border-light);
+                margin-top: auto;
+            }
+
+            .admin-section .section-header {
+                color: var(--fb-warning, #f59e0b);
+            }
+
+            .admin-item {
+                color: var(--fb-text-secondary);
+            }
+
+            .admin-item:hover {
+                color: var(--fb-warning, #f59e0b);
+            }
         `,
     ];
 
@@ -277,6 +294,12 @@ export class FBPanelLeft extends FBElement {
         return name.substring(0, 2).toUpperCase();
     }
 
+    private _formatRole(role: UserRole | null): string {
+        if (!role) return 'User';
+        // Capitalize first letter of role
+        return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+    }
+
     private _handleProjectClick(projectId: string): void {
         store.actions.setActiveProject(projectId);
     }
@@ -296,6 +319,11 @@ export class FBPanelLeft extends FBElement {
     private _handleThemeToggle(): void {
         const next = this._theme === 'dark' ? 'light' : 'dark';
         store.actions.setTheme(next);
+    }
+
+    private _handleAdminNav(path: string): void {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
     }
 
     override render(): TemplateResult {
@@ -374,6 +402,26 @@ export class FBPanelLeft extends FBElement {
             <!-- Agent Activity -->
             <fb-agent-activity></fb-agent-activity>
 
+            <!-- Admin Navigation (Admin only) -->
+            ${this._userRole === UserRole.Admin ? html`
+                <section class="section admin-section" aria-label="Admin">
+                    <div class="section-header">Admin</div>
+                    <div class="section-content" role="list">
+                        <button
+                            class="item admin-item"
+                            role="listitem"
+                            @click=${(): void => { this._handleAdminNav('/admin/invites'); }}
+                            aria-label="Manage user invitations"
+                        >
+                            <span class="item-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+                            </span>
+                            Invitations
+                        </button>
+                    </div>
+                </section>
+            ` : nothing}
+
             <!-- Shadow Mode Toggle (Admin only) -->
             ${this._userRole === UserRole.Admin ? html`
                 <div class="section">
@@ -386,7 +434,7 @@ export class FBPanelLeft extends FBElement {
                 <div class="avatar" aria-hidden="true">${this._userInitials}</div>
                 <div class="user-info">
                     <div class="user-name">${this._userName || 'Guest'}</div>
-                    <div class="user-role">Builder</div>
+                    <div class="user-role">${this._formatRole(this._userRole)}</div>
                 </div>
                 <button 
                     class="theme-toggle" 
