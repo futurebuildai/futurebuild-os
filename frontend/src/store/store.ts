@@ -47,6 +47,7 @@ function formatDisplayTime(isoString: string): string {
 // ============================================================================
 
 const STORAGE_KEY_TOKEN = 'fb_token';
+const STORAGE_KEY_USER = 'fb_user';
 const STORAGE_KEY_THEME = 'fb_theme';
 
 // Step 56: Allowed MIME types for drag-and-drop file ingestion
@@ -172,6 +173,9 @@ const actions: StoreActions = {
         _token$.value = token;
         _authError$.value = null;
         _authLoading$.value = false;
+        // Sync persistence - ensures data survives page reload
+        localStorage.setItem(STORAGE_KEY_TOKEN, token);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
     },
 
     logout(): void {
@@ -185,6 +189,8 @@ const actions: StoreActions = {
         _focusTasks$.value = [];
         _agentActivity$.value = [];
         _authError$.value = null;
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+        localStorage.removeItem(STORAGE_KEY_USER);
     },
 
     setAuthLoading(loading: boolean): void {
@@ -653,11 +659,21 @@ export function initializeStore(): void {
         const theme = _theme$.value;
         localStorage.setItem(STORAGE_KEY_THEME, theme);
     });
-    // Restore token from localStorage
+    // Restore token and user from localStorage
     const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-    if (storedToken) {
-        _token$.value = storedToken;
-        // Note: User data should be fetched via api.auth.me() after restore
+    const storedUser = localStorage.getItem(STORAGE_KEY_USER);
+    if (storedToken && storedUser) {
+        try {
+            _token$.value = storedToken;
+            _user$.value = JSON.parse(storedUser) as User;
+        } catch {
+            // Invalid stored data, clear it
+            localStorage.removeItem(STORAGE_KEY_TOKEN);
+            localStorage.removeItem(STORAGE_KEY_USER);
+        }
+    } else if (storedToken) {
+        // Token without user - clear stale token
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
     }
 
     // Restore theme from localStorage
