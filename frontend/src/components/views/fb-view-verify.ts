@@ -151,16 +151,13 @@ export class FBViewVerify extends FBViewElement {
             };
 
             store.actions.login(user, response.access_token);
-            this._state = 'success';
 
-            // Clean up URL and redirect to dashboard
+            // Update URL without page reload
             window.history.replaceState({}, '', '/');
 
-            // Short delay to show success message before redirect
-            setTimeout(() => {
-                // Reload the page to ensure all components pick up authenticated state
-                window.location.href = '/';
-            }, 1500);
+            // Trigger route re-check in fb-panel-center
+            // popstate doesn't fire on replaceState, so dispatch manually
+            window.dispatchEvent(new PopStateEvent('popstate'));
         } catch (err) {
             this._state = 'error';
             this._errorMessage = err instanceof Error ? err.message : 'Verification failed. The link may have expired.';
