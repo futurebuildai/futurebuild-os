@@ -15,6 +15,7 @@ import '../views/fb-view-verify';
 import '../views/fb-view-invite-accept';
 import '../views/fb-view-admin-invites';
 import '../views/fb-view-settings';
+import '../views/fb-view-projects';
 
 // Import portal view components (LAUNCH_PLAN.md P2)
 import '../views/fb-view-portal-action';
@@ -137,6 +138,7 @@ export class FBPanelCenter extends FBElement {
     @state() private _isInviteAcceptRoute = false;
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
+    @state() private _isProjectsRoute = false;
 
     // Portal routes (LAUNCH_PLAN.md P2)
     @state() private _isPortalActionRoute = false;
@@ -182,6 +184,7 @@ export class FBPanelCenter extends FBElement {
         this._isInviteAcceptRoute = path === '/invite/accept';
         this._isAdminInvitesRoute = path === '/admin/invites';
         this._isSettingsRoute = path === '/settings';
+        this._isProjectsRoute = path === '/projects';
 
         // Portal routes (LAUNCH_PLAN.md P2)
         this._isPortalLoginRoute = path === '/portal/login';
@@ -279,6 +282,11 @@ export class FBPanelCenter extends FBElement {
         // Show settings view for authenticated users
         if (this._isSettingsRoute) {
             return html`<fb-view-settings></fb-view-settings>`;
+        }
+
+        // Show projects view for authenticated users
+        if (this._isProjectsRoute) {
+            return html`<fb-view-projects></fb-view-projects>`;
         }
 
         return html`

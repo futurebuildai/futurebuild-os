@@ -231,6 +231,31 @@ export class FBPanelLeft extends FBElement {
             .admin-item:hover {
                 color: var(--fb-warning, #f59e0b);
             }
+
+            .add-btn {
+                padding: 2px;
+                border: none;
+                background: transparent;
+                color: var(--fb-text-muted);
+                cursor: pointer;
+                border-radius: var(--fb-radius-sm);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .add-btn:hover {
+                background: var(--fb-bg-tertiary);
+                color: var(--fb-primary);
+            }
+
+            .add-btn svg {
+                width: 14px;
+                height: 14px;
+                stroke: currentColor;
+                fill: none;
+                stroke-width: 2;
+            }
         `,
     ];
 
@@ -365,7 +390,17 @@ export class FBPanelLeft extends FBElement {
 
             <!-- Projects -->
             <nav class="section projects-list" aria-label="Projects">
-                <div class="section-header">📁 Projects</div>
+                <div class="section-header">
+                    <span>📁 Projects</span>
+                    <button
+                        class="add-btn"
+                        @click=${(): void => { this._handleAdminNav('/projects'); }}
+                        aria-label="View all projects"
+                        title="All Projects"
+                    >
+                        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                </div>
                 <div class="section-content" role="list">
                     ${this._projects.map((project) => html`
                         <div role="listitem">
@@ -436,9 +471,20 @@ export class FBPanelLeft extends FBElement {
                     <div class="user-name">${this._userName || 'Guest'}</div>
                     <div class="user-role">${this._formatRole(this._userRole)}</div>
                 </div>
-                <button 
-                    class="theme-toggle" 
-                    @click=${this._handleThemeToggle.bind(this)} 
+                <button
+                    class="theme-toggle"
+                    @click=${(): void => { this._handleAdminNav('/settings'); }}
+                    aria-label="Open settings"
+                    title="Settings"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+                <button
+                    class="theme-toggle"
+                    @click=${this._handleThemeToggle.bind(this)}
                     aria-label="Toggle theme, current: ${this._theme}"
                 >
                     ${this._theme === 'dark' ? html`
