@@ -286,6 +286,13 @@ const actions: StoreActions = {
         );
     },
 
+    /**
+     * Remove a message by ID (for optimistic rollback).
+     */
+    removeMessage(id: string): void {
+        _messages$.value = _messages$.value.filter((m) => m.id !== id);
+    },
+
     setChatLoading(loading: boolean): void {
         _chatLoading$.value = loading;
     },
@@ -415,6 +422,16 @@ const actions: StoreActions = {
             displayTime: formatDisplayTime(createdAt),
         });
 
+        // TODO (Phase 10 Remediation): File upload currently uses WebSocket (fire-and-forget).
+        // This creates silent failure risk - if upload fails, the optimistic message persists.
+        // Required fix:
+        // 1. Add REST API endpoint: POST /api/chat/upload or POST /api/files/upload (multipart/form-data)
+        // 2. Replace WebSocket call with await api.files.upload(projectId, file)
+        // 3. Add error handling with rollback (remove optimistic message on failure)
+        // 4. Add progress tracking via _pendingFiles$ status updates
+        // 5. Add 5-second timeout to mark upload as failed if no acknowledgment
+        // See specs/phase10/STEP_73_DRAG_DROP.md Section 2.1
+        //
         // Step 57: Send file message via RealtimeService (replaces setTimeout)
         // See FRONTEND_SCOPE.md Section 8.4
         const firstUpload = newUploads[0];

@@ -328,6 +328,7 @@ export interface StoreActions {
     addMessage(message: ChatMessage): void;
     setMessages(messages: ChatMessage[]): void;
     updateMessage(id: string, updates: Partial<ChatMessage>): void;
+    removeMessage(id: string): void;
     setChatLoading(loading: boolean): void;
     setChatError(error: string | null): void;
     updateActionCard(messageId: string, status: ActionCard['status']): void;
