@@ -123,8 +123,8 @@ export class FBOnboardingDropzone extends FBElement {
 
     private _handleClick(): void {
         if (this.disabled) return;
-        const input = this.shadowRoot?.querySelector('input[type="file"]') as HTMLInputElement;
-        input?.click();
+        const input = this.shadowRoot?.querySelector<HTMLInputElement>('input[type="file"]');
+        if (input) input.click();
     }
 
     private _handleFileSelect(e: Event): void {
@@ -141,7 +141,8 @@ export class FBOnboardingDropzone extends FBElement {
             return;
         }
 
-        const file = files[0]; // Only process first file for now
+        const file = files[0];
+        if (!file) return;
 
         // Validate file type
         if (!ACCEPTED_TYPES.includes(file.type)) {

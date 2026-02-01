@@ -8,7 +8,6 @@
 
 import { signal, computed } from '@preact/signals-core';
 import type { CreateProjectRequest } from '../services/api';
-import type { ChatMessage } from './types';
 
 // ============================================================================
 // Types
@@ -90,7 +89,7 @@ export const fieldsNeedingVerification = computed(() => {
  * Update a single field value from user input.
  * Marks source as 'user' and clears AI confidence.
  */
-export function setFieldValue(field: keyof CreateProjectRequest, value: any): void {
+export function setFieldValue(field: keyof CreateProjectRequest, value: string | number): void {
     onboardingValues.value = {
         ...onboardingValues.value,
         [field]: value
@@ -100,9 +99,12 @@ export function setFieldValue(field: keyof CreateProjectRequest, value: any): vo
         [field]: 'user'
     };
     // Clear confidence when user manually edits
-    const newConf = { ...onboardingConfidence.value };
-    delete newConf[field];
-    onboardingConfidence.value = newConf;
+    const conf = { ...onboardingConfidence.value };
+    const rest: Record<string, number> = {};
+    for (const [k, v] of Object.entries(conf)) {
+        if (k !== field) rest[k] = v;
+    }
+    onboardingConfidence.value = rest;
 }
 
 /**
@@ -111,7 +113,7 @@ export function setFieldValue(field: keyof CreateProjectRequest, value: any): vo
  * User edits are never overwritten.
  */
 export function applyAIExtraction(
-    extractedValues: Record<string, any>,
+    extractedValues: Record<string, unknown>,
     confidenceScores: Record<string, number>
 ): void {
     const currentValues = { ...onboardingValues.value };
@@ -123,7 +125,7 @@ export function applyAIExtraction(
         // Only apply if field is empty OR was previously AI-populated
         const existingSource = currentSources[field];
         if (!currentValues[field as keyof CreateProjectRequest] || existingSource === 'ai' || existingSource === 'default') {
-            currentValues[field as keyof CreateProjectRequest] = value;
+            (currentValues as Record<string, unknown>)[field] = value;
             currentSources[field] = 'ai';
             currentConf[field] = confidenceScores[field] ?? 0.5;
             updatedFields.add(field);

@@ -101,6 +101,30 @@ export interface CreateProjectRequest {
     lot_size?: number;
     foundation_type?: string;
     start_date: string;
+    stories?: number;
+    topography?: string;
+}
+
+// ============================================================================
+// Onboarding Types
+// ============================================================================
+
+/**
+ * Request to the Interrogator Agent for onboarding.
+ */
+export interface OnboardProcessRequest {
+    session_id: string;
+    message: string;
+    current_state: Partial<CreateProjectRequest>;
+}
+
+/**
+ * Response from the Interrogator Agent.
+ */
+export interface OnboardProcessResponse {
+    reply: string;
+    extracted_values?: Record<string, unknown>;
+    confidence_scores?: Record<string, number>;
 }
 
 // ============================================================================
@@ -496,6 +520,20 @@ export const api = {
                 task_id: taskId,
                 action_type: actionType,
             });
+        },
+    },
+
+    /**
+     * Onboarding endpoints (Interrogator Agent).
+     * See STEP_75/STEP_76 specs.
+     */
+    onboard: {
+        /**
+         * Send a message to the Interrogator Agent for field extraction.
+         * @param data - Session ID, message, and current form state
+         */
+        process(data: OnboardProcessRequest): Promise<OnboardProcessResponse> {
+            return post<OnboardProcessResponse>('/agent/onboard', data);
         },
     },
 } as const;

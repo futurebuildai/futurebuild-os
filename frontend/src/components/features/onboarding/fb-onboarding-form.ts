@@ -1,21 +1,33 @@
 /**
  * FBOnboardingForm - Right Panel Live Form for Project Onboarding
- * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 3
+ * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 3, STEP_76_REALTIME_FORM_FILLING.md
  *
  * Live form that updates as AI extracts data from conversations and documents.
+ * Reads directly from onboarding-store signals (no prop-drilling).
  * Implements visual indicators for AI vs user-populated fields:
- * - Blue left border + ✨ badge for AI-populated fields
+ * - Blue left border + AI badge for AI-populated fields
  * - Yellow "Verify" badge for low-confidence fields (< 0.8)
+ * - Glow animation on newly AI-populated fields
  * - User edits override AI values and remove visual indicators
  */
 import { html, css, TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
+import { SignalWatcher } from '@lit-labs/preact-signals';
 import { FBElement } from '../../base/FBElement';
 import { api } from '../../../services/api';
 import type { CreateProjectRequest } from '../../../services/api';
+import {
+    onboardingValues,
+    onboardingSources,
+    onboardingConfidence,
+    recentlyUpdatedFields,
+    isReadyToCreate,
+    fieldsNeedingVerification,
+    setFieldValue,
+} from '../../../store/onboarding-store';
 
 @customElement('fb-onboarding-form')
-export class FBOnboardingForm extends FBElement {
+export class FBOnboardingForm extends SignalWatcher(FBElement) {
     static override styles = [
         FBElement.styles,
         css`
@@ -132,6 +144,36 @@ export class FBOnboardingForm extends FBElement {
                 background: linear-gradient(90deg, rgba(251, 191, 36, 0.05) 0%, var(--fb-bg-card, white) 100%);
             }
 
+            /* Glow animation for newly AI-populated fields */
+            .field.just-populated input,
+            .field.just-populated select {
+                animation: ai-glow 0.6s ease-out;
+            }
+
+            @keyframes ai-glow {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5);
+                }
+                50% {
+                    box-shadow: 0 0 8px 4px rgba(102, 126, 234, 0.3);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+                }
+            }
+
+            .verification-notice {
+                display: flex;
+                align-items: center;
+                gap: var(--fb-spacing-sm, 8px);
+                padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
+                background: rgba(251, 191, 36, 0.1);
+                border: 1px solid #fbbf24;
+                border-radius: var(--fb-radius-sm, 4px);
+                font-size: var(--fb-text-sm, 14px);
+                color: #78350f;
+            }
+
             .btn-primary {
                 display: inline-flex;
                 align-items: center;
@@ -164,12 +206,6 @@ export class FBOnboardingForm extends FBElement {
                 margin-top: var(--fb-spacing-xs, 4px);
             }
 
-            .success-message {
-                color: #16a34a;
-                font-size: var(--fb-text-sm, 14px);
-                margin-top: var(--fb-spacing-xs, 4px);
-            }
-
             @media (max-width: 767px) {
                 form {
                     gap: var(--fb-spacing-md, 16px);
@@ -178,62 +214,45 @@ export class FBOnboardingForm extends FBElement {
         `
     ];
 
-    @property({ type: Object }) values: Partial<CreateProjectRequest> = {};
-    @property({ type: Object }) sources: Record<string, 'user' | 'ai' | 'default'> = {};
-    @property({ type: Object }) confidence: Record<string, number> = {};
-
     @state() private _errorMessage = '';
     @state() private _isSubmitting = false;
 
     private _handleInput(field: keyof CreateProjectRequest, e: Event): void {
         const input = e.target as HTMLInputElement | HTMLSelectElement;
         const value = input.type === 'number' ? Number(input.value) : input.value;
-
-        // Update values
-        const updatedValues = { ...this.values, [field]: value };
-
-        // Mark as user-edited (removes AI styling)
-        const updatedSources = { ...this.sources, [field]: 'user' as const };
-
-        // Remove confidence for user-edited fields
-        const updatedConfidence = { ...this.confidence };
-        delete updatedConfidence[field];
-
-        // Emit update event
-        this.emit('form-updated', {
-            values: updatedValues,
-            sources: updatedSources,
-            confidence: updatedConfidence
-        });
+        setFieldValue(field, value);
     }
 
     private async _handleSubmit(e: Event): Promise<void> {
         e.preventDefault();
         this._errorMessage = '';
 
-        if (!this._canCreate) {
+        if (!isReadyToCreate.value) {
             this._errorMessage = 'Please fill in all required fields (Name and Address)';
             return;
         }
 
         this._isSubmitting = true;
+        const values = onboardingValues.value;
+        const name = values.name ?? '';
+        const address = values.address ?? '';
 
         try {
-            // Create the project via API
+            const startDate = values.start_date ?? new Date().toISOString().split('T')[0] ?? '';
             const projectData: CreateProjectRequest = {
-                name: this.values.name!,
-                address: this.values.address!,
-                square_footage: this.values.square_footage ?? 0,
-                bedrooms: this.values.bedrooms ?? 0,
-                bathrooms: this.values.bathrooms ?? 0,
-                lot_size: this.values.lot_size,
-                foundation_type: this.values.foundation_type,
-                start_date: this.values.start_date ?? new Date().toISOString().split('T')[0]
+                name,
+                address,
+                square_footage: values.square_footage ?? 0,
+                bedrooms: values.bedrooms ?? 0,
+                bathrooms: values.bathrooms ?? 0,
+                start_date: startDate,
             };
+            if (values.lot_size !== undefined) projectData.lot_size = values.lot_size;
+            if (values.foundation_type !== undefined) projectData.foundation_type = values.foundation_type;
+            if (values.stories !== undefined) projectData.stories = values.stories;
+            if (values.topography !== undefined) projectData.topography = values.topography;
 
             const response = await api.projects.create(projectData);
-
-            // Emit success event
             this.emit('project-created', { projectId: response.id });
         } catch (err) {
             console.error('[FBOnboardingForm] Project creation failed:', err);
@@ -243,10 +262,6 @@ export class FBOnboardingForm extends FBElement {
         }
     }
 
-    private get _canCreate(): boolean {
-        return !!(this.values.name && this.values.address);
-    }
-
     private _renderField(
         name: keyof CreateProjectRequest,
         label: string,
@@ -254,24 +269,29 @@ export class FBOnboardingForm extends FBElement {
         options?: { value: string; label: string }[],
         required = false
     ): TemplateResult {
-        const source = this.sources[name];
-        const conf = this.confidence[name];
+        const source = onboardingSources.value[name];
+        const conf = onboardingConfidence.value[name];
         const isAiPopulated = source === 'ai';
         const isLowConfidence = isAiPopulated && conf !== undefined && conf < 0.8;
+        const isJustPopulated = recentlyUpdatedFields.value.has(name);
 
-        const fieldClass = isLowConfidence ? 'low-confidence' : (isAiPopulated ? 'ai-populated' : '');
+        const classes = [
+            'field',
+            isLowConfidence ? 'low-confidence' : (isAiPopulated ? 'ai-populated' : ''),
+            isJustPopulated ? 'just-populated' : '',
+        ].filter(Boolean).join(' ');
 
         return html`
-            <div class="field ${fieldClass}">
+            <div class=${classes}>
                 <div class="field-header">
                     <label>${label}${required ? ' *' : ''}</label>
-                    ${isAiPopulated ? html`<span class="ai-badge">✨ AI</span>` : ''}
-                    ${isLowConfidence ? html`<span class="verify-badge">⚠️ Verify</span>` : ''}
+                    ${isAiPopulated ? html`<span class="ai-badge">AI</span>` : ''}
+                    ${isLowConfidence ? html`<span class="verify-badge">Verify</span>` : ''}
                 </div>
                 ${type === 'select' && options ? html`
                     <select
-                        .value=${String(this.values[name] ?? '')}
-                        @input=${(e: Event) => this._handleInput(name, e)}
+                        .value=${String(onboardingValues.value[name] ?? '')}
+                        @input=${(e: Event): void => { this._handleInput(name, e); }}
                     >
                         <option value="">-- Select --</option>
                         ${options.map(opt => html`
@@ -281,8 +301,8 @@ export class FBOnboardingForm extends FBElement {
                 ` : html`
                     <input
                         type=${type}
-                        .value=${String(this.values[name] ?? '')}
-                        @input=${(e: Event) => this._handleInput(name, e)}
+                        .value=${String(onboardingValues.value[name] ?? '')}
+                        @input=${(e: Event): void => { this._handleInput(name, e); }}
                         ?required=${required}
                     />
                 `}
@@ -291,8 +311,16 @@ export class FBOnboardingForm extends FBElement {
     }
 
     override render(): TemplateResult {
+        const needsVerification = fieldsNeedingVerification.value;
+
         return html`
-            <form @submit=${this._handleSubmit}>
+            ${needsVerification.length > 0 ? html`
+                <div class="verification-notice">
+                    Some fields have low AI confidence and may need your review.
+                </div>
+            ` : ''}
+
+            <form @submit=${(e: Event): void => { void this._handleSubmit(e); }}>
                 <section class="required-fields">
                     <h3>Project Details</h3>
                     ${this._renderField('name', 'Project Name', 'text', undefined, true)}
@@ -306,11 +334,17 @@ export class FBOnboardingForm extends FBElement {
                     ${this._renderField('square_footage', 'Square Feet', 'number')}
                     ${this._renderField('bedrooms', 'Bedrooms', 'number')}
                     ${this._renderField('bathrooms', 'Bathrooms', 'number')}
+                    ${this._renderField('stories', 'Stories', 'number')}
                     ${this._renderField('lot_size', 'Lot Size (sq ft)', 'number')}
                     ${this._renderField('foundation_type', 'Foundation Type', 'select', [
                         { value: 'slab', label: 'Slab' },
                         { value: 'crawlspace', label: 'Crawlspace' },
                         { value: 'basement', label: 'Basement' }
+                    ])}
+                    ${this._renderField('topography', 'Topography', 'select', [
+                        { value: 'flat', label: 'Flat' },
+                        { value: 'sloped', label: 'Sloped' },
+                        { value: 'hillside', label: 'Hillside' }
                     ])}
                 </section>
 
@@ -321,7 +355,7 @@ export class FBOnboardingForm extends FBElement {
                 <button
                     type="submit"
                     class="btn-primary"
-                    ?disabled=${!this._canCreate || this._isSubmitting}
+                    ?disabled=${!isReadyToCreate.value || this._isSubmitting}
                 >
                     ${this._isSubmitting ? 'Creating...' : 'Create Project'}
                 </button>

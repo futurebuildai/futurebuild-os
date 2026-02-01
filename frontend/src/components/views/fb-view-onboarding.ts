@@ -1,16 +1,16 @@
 /**
  * FBViewOnboarding - Split-Screen Wizard for AI-Driven Project Creation
- * See STEP_74_SPLIT_SCREEN_WIZARD.md
+ * See STEP_74_SPLIT_SCREEN_WIZARD.md, STEP_76_REALTIME_FORM_FILLING.md
  *
- * Implements a conversational onboarding flow with:
+ * Pure layout component. State lives in onboarding-store; children read from it directly.
  * - Left Panel: Chat interface with "The Interrogator" agent
  * - Right Panel: Live form that auto-populates as AI extracts data
  * - Responsive: Side-by-side on desktop, stacked on tablet, tabs on mobile
  */
 import { html, css, TemplateResult } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
-import type { CreateProjectRequest } from '../../services/api';
+import { resetOnboarding } from '../../store/onboarding-store';
 
 import '../features/onboarding/fb-onboarding-chat';
 import '../features/onboarding/fb-onboarding-form';
@@ -113,41 +113,17 @@ export class FBViewOnboarding extends FBViewElement {
         `
     ];
 
-    @state() private _formValues: Partial<CreateProjectRequest> = {};
-    @state() private _fieldSources: Record<string, 'user' | 'ai' | 'default'> = {};
-    @state() private _fieldConfidence: Record<string, number> = {};
-
-    override connectedCallback(): void {
-        super.connectedCallback();
-        // Initialize with default values
-        this._formValues = {
-            start_date: new Date().toISOString().split('T')[0]
-        };
+    override disconnectedCallback(): void {
+        super.disconnectedCallback();
+        resetOnboarding();
     }
 
     private _handleClose(): void {
-        // Navigate back to projects view
         this.emit('navigate', { path: '/projects' });
     }
 
-    private _handleFormUpdate(e: CustomEvent<{
-        values: Partial<CreateProjectRequest>;
-        sources: Record<string, 'user' | 'ai' | 'default'>;
-        confidence: Record<string, number>;
-    }>): void {
-        this._formValues = e.detail.values;
-        this._fieldSources = e.detail.sources;
-        this._fieldConfidence = e.detail.confidence;
-
-        // Emit for potential parent listeners
-        this.emit('form-updated', this._formValues);
-    }
-
     private _handleProjectCreated(e: CustomEvent<{ projectId: string }>): void {
-        // Forward event to parent
         this.emit('project-created', e.detail);
-
-        // Navigate to the new project
         this.emit('navigate', { path: `/projects/${e.detail.projectId}` });
     }
 
@@ -157,7 +133,7 @@ export class FBViewOnboarding extends FBViewElement {
                 <span class="wizard-title">New Project</span>
                 <button
                     class="close-btn"
-                    @click=${this._handleClose}
+                    @click=${(): void => { this._handleClose(); }}
                     aria-label="Close wizard"
                     title="Close"
                 >
@@ -168,17 +144,11 @@ export class FBViewOnboarding extends FBViewElement {
             </div>
             <div class="wizard-body">
                 <div class="panel-chat">
-                    <fb-onboarding-chat
-                        @ai-extracted=${this._handleFormUpdate}
-                    ></fb-onboarding-chat>
+                    <fb-onboarding-chat></fb-onboarding-chat>
                 </div>
                 <div class="panel-form">
                     <fb-onboarding-form
-                        .values=${this._formValues}
-                        .sources=${this._fieldSources}
-                        .confidence=${this._fieldConfidence}
-                        @form-updated=${this._handleFormUpdate}
-                        @project-created=${this._handleProjectCreated}
+                        @project-created=${(e: CustomEvent<{ projectId: string }>): void => { this._handleProjectCreated(e); }}
                     ></fb-onboarding-form>
                 </div>
             </div>

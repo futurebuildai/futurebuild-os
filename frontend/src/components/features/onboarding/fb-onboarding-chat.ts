@@ -1,20 +1,18 @@
 /**
  * FBOnboardingChat - Left Panel Chat Interface for Project Onboarding
- * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2
+ * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2, STEP_76_REALTIME_FORM_FILLING.md
  *
  * Conversational interface that:
  * - Displays initial greeting from "The Interrogator" agent
- * - Reuses existing fb-message-list and fb-input-bar components
+ * - Renders messages inline (separate from global chat store)
  * - Includes drag-and-drop zone for blueprints/documents
- * - Emits extracted data events for real-time form population
+ * - Calls Interrogator Agent API for field extraction
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { FBElement } from '../../base/FBElement';
 import { api } from '../../../services/api';
-import type { ChatMessage } from '../../../store/types';
-import type { CreateProjectRequest } from '../../../services/api';
 import {
     onboardingMessages,
     onboardingValues,
@@ -24,20 +22,8 @@ import {
     type OnboardingMessage
 } from '../../../store/onboarding-store';
 
-import '../../chat/fb-message-list';
 import '../../chat/fb-input-bar';
 import './fb-onboarding-dropzone';
-
-/**
- * Formats an ISO timestamp to a display time string.
- */
-function formatDisplayTime(isoString: string): string {
-    try {
-        return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-        return '';
-    }
-}
 
 @customElement('fb-onboarding-chat')
 export class FBOnboardingChat extends SignalWatcher(FBElement) {
@@ -58,30 +44,78 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 min-height: 0;
             }
 
-            fb-message-list {
+            .message-list {
                 flex: 1;
-                min-height: 0;
+                overflow-y: auto;
+                padding: var(--fb-spacing-md, 16px);
+                display: flex;
+                flex-direction: column;
+                gap: var(--fb-spacing-sm, 8px);
+            }
+
+            .message {
+                max-width: 85%;
+                padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
+                border-radius: var(--fb-radius-md, 8px);
+                font-size: var(--fb-text-sm, 14px);
+                line-height: 1.5;
+                word-wrap: break-word;
+            }
+
+            .message.user {
+                align-self: flex-end;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border-bottom-right-radius: 2px;
+            }
+
+            .message.assistant {
+                align-self: flex-start;
+                background: var(--fb-bg-tertiary, #f5f5f5);
+                color: var(--fb-text-primary, #1a1a1a);
+                border-bottom-left-radius: 2px;
+            }
+
+            .message.system {
+                align-self: center;
+                background: rgba(102, 126, 234, 0.08);
+                color: var(--fb-text-muted, #666);
+                font-size: var(--fb-text-xs, 12px);
+                text-align: center;
+                max-width: 90%;
+            }
+
+            .processing-indicator {
+                align-self: flex-start;
+                padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
+                color: var(--fb-text-muted, #666);
+                font-size: var(--fb-text-sm, 14px);
+                font-style: italic;
             }
 
             .dropzone-wrapper {
                 flex-shrink: 0;
-                padding: var(--fb-spacing-md);
-                border-top: 1px solid var(--fb-border-light);
+                padding: var(--fb-spacing-md, 16px);
+                border-top: 1px solid var(--fb-border-light, #eee);
             }
 
             .greeting {
-                padding: var(--fb-spacing-lg);
-                background: var(--fb-bg-tertiary);
-                border-radius: var(--fb-radius-lg);
-                margin: var(--fb-spacing-lg);
-                color: var(--fb-text-primary);
-                font-size: var(--fb-text-sm);
+                padding: var(--fb-spacing-lg, 24px);
+                background: var(--fb-bg-tertiary, #f5f5f5);
+                border-radius: var(--fb-radius-lg, 12px);
+                margin: var(--fb-spacing-lg, 24px);
+                color: var(--fb-text-primary, #1a1a1a);
+                font-size: var(--fb-text-sm, 14px);
                 line-height: 1.6;
             }
 
             .greeting-icon {
                 font-size: 24px;
-                margin-bottom: var(--fb-spacing-sm);
+                margin-bottom: var(--fb-spacing-sm, 8px);
+            }
+
+            fb-input-bar {
+                flex-shrink: 0;
             }
         `
     ];
@@ -91,7 +125,6 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
 
     override connectedCallback(): void {
         super.connectedCallback();
-        // Add initial greeting to store
         if (onboardingMessages.value.length === 0) {
             addMessage({
                 id: `sys-${String(Date.now())}`,
@@ -118,7 +151,6 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         this._showGreeting = false;
         isProcessing.value = true;
 
-        // Add user message to store
         addMessage({
             id: `msg-${String(Date.now())}-user`,
             role: 'user',
@@ -127,22 +159,19 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         });
 
         try {
-            // Call Interrogator Agent API (Step 75)
             const response = await api.onboard.process({
                 session_id: this._sessionId,
                 message: content,
                 current_state: onboardingValues.value
             });
 
-            // Apply AI extractions to store (triggers form update)
             if (response.extracted_values) {
                 applyAIExtraction(
                     response.extracted_values,
-                    response.confidence_scores || {}
+                    response.confidence_scores ?? {}
                 );
             }
 
-            // Add assistant message
             addMessage({
                 id: `msg-${String(Date.now())}-assistant`,
                 role: 'assistant',
@@ -169,14 +198,12 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
 
         try {
             // TODO Step 77: Implement magic upload trigger with real API
-            // For now, simulate extraction
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             this._addSystemMessage(
                 `I found a ${fileName}. Let me extract the project details for you.`
             );
 
-            // Simulate extraction (Step 77 will connect to real backend)
             applyAIExtraction(
                 {
                     name: 'Extracted Project Name',
@@ -188,7 +215,7 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                     name: 0.85,
                     square_footage: 0.92,
                     bedrooms: 0.88,
-                    bathrooms: 0.75, // Low confidence - will show yellow border
+                    bathrooms: 0.75,
                 }
             );
         } catch (err) {
@@ -199,31 +226,43 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         }
     }
 
+    private _renderMessage(msg: OnboardingMessage): TemplateResult {
+        return html`<div class="message ${msg.role}">${msg.content}</div>`;
+    }
+
+    private _renderMessages(): TemplateResult {
+        const messages = onboardingMessages.value;
+        return html`
+            <div class="message-list">
+                ${messages.map(msg => this._renderMessage(msg))}
+                ${isProcessing.value ? html`
+                    <div class="processing-indicator">Thinking...</div>
+                ` : nothing}
+            </div>
+        `;
+    }
+
     override render(): TemplateResult {
         return html`
             <div class="chat-container">
                 ${this._showGreeting ? html`
                     <div class="greeting">
-                        <div class="greeting-icon">👋</div>
-                        <strong>Welcome to FutureBuild!</strong>
-                        <p>I'm The Interrogator, your AI project assistant. I'll help you set up your construction project by asking a few questions or analyzing your documents.</p>
+                        <div class="greeting-icon">Welcome to FutureBuild</div>
+                        <strong>I'm The Interrogator, your AI project assistant.</strong>
+                        <p>I'll help you set up your construction project by asking a few questions or analyzing your documents.</p>
                     </div>
-                ` : html`
-                    <fb-message-list .messages=${this._messages}></fb-message-list>
-                `}
+                ` : this._renderMessages()}
 
                 <div class="dropzone-wrapper">
                     <fb-onboarding-dropzone
-                        @file-dropped=${this._handleFileDrop}
-                        ?disabled=${this._isProcessing}
+                        @file-dropped=${(e: CustomEvent<{ files: File[] }>): void => { void this._handleFileDrop(e); }}
+                        ?disabled=${isProcessing.value}
                     ></fb-onboarding-dropzone>
                 </div>
             </div>
 
             <fb-input-bar
-                placeholder="Describe your project..."
-                .disabled=${this._isProcessing}
-                @send=${this._handleSend}
+                @send=${(e: CustomEvent<{ content: string }>): void => { void this._handleSend(e); }}
             ></fb-input-bar>
         `;
     }
