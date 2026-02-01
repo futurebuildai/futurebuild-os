@@ -42,6 +42,7 @@ type Server struct {
 	UserHandler          *handlers.UserHandler          // See LAUNCH_PLAN.md User Profile Endpoint
 	PortalHandler        *handlers.PortalHandler        // See LAUNCH_PLAN.md P2: Field Portal
 	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
+	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	AuthMiddleware       *middleware.AuthMiddleware
 	AuthRateLimiter      *middleware.IPRateLimiter
 }
@@ -179,6 +180,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		githubWebhookHandler = handlers.NewGitHubWebhookHandler(cfg.GitHubWebhookSecret, cfg.RedisURL)
 	}
 
+	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
+	interrogatorService := service.NewInterrogatorService(aiClient)
+	onboardingHandler := handlers.NewOnboardingHandler(interrogatorService)
+
 	s := &Server{
 		Router:          chi.NewRouter(),
 		DB:              db,
@@ -196,6 +201,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		UserHandler:          userHandler,          // See LAUNCH_PLAN.md User Profile Endpoint
 		PortalHandler:        portalHandler,        // See LAUNCH_PLAN.md P2: Field Portal
 		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
+		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
 		AuthMiddleware:       authMiddleware,
 		AuthRateLimiter:      authRateLimiter,
 	}
@@ -278,6 +284,15 @@ func (s *Server) routes() {
 		r.Route("/chat", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.Post("/", s.ChatHandler.HandleChat)
+		})
+
+		// See PHASE_11_PRD.md Step 75: Interrogator Agent
+		// L7: Auth required, rate-limited to prevent AI API abuse
+		r.Route("/agent", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			// FUTURE: Add rate limiter when agent abuse detected
+			// r.Use(middleware.RateLimit(s.AgentRateLimiter))
+			r.Post("/onboard", s.OnboardingHandler.HandleOnboard)
 		})
 
 		// See PRODUCTION_PLAN.md Step 48: Inbound Webhook Endpoints
