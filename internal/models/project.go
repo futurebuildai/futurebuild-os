@@ -25,8 +25,15 @@ type Project struct {
 	Address          string        `json:"address" db:"address"`
 	PermitIssuedDate *time.Time    `json:"permit_issued_date,omitempty" db:"permit_issued_date"`
 	TargetEndDate    *time.Time    `json:"target_end_date,omitempty" db:"target_end_date"`
-	GSF              float64       `json:"gsf" db:"gsf"`
+	GSF              float64       `json:"square_footage" db:"gsf"`
 	Status           ProjectStatus `json:"status" db:"status"`
+	Bedrooms         int           `json:"bedrooms" db:"bedrooms"`
+	Bathrooms        int           `json:"bathrooms" db:"bathrooms"`
+	Stories          int           `json:"stories" db:"stories"`
+	LotSize          float64       `json:"lot_size" db:"lot_size"`
+	FoundationType   string        `json:"foundation_type" db:"foundation_type"`
+	Topography       string        `json:"topography" db:"topography"`
+	SoilConditions   string        `json:"soil_conditions" db:"soil_conditions"`
 }
 
 

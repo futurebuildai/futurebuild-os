@@ -22,6 +22,7 @@ import {
     onboardingConfidence,
     recentlyUpdatedFields,
     isReadyToCreate,
+    isProcessing,
     fieldsNeedingVerification,
     setFieldValue,
 } from '../../../store/onboarding-store';
@@ -227,6 +228,9 @@ export class FBOnboardingForm extends SignalWatcher(FBElement) {
         e.preventDefault();
         this._errorMessage = '';
 
+        // Fix 8: Guard against submit while AI is processing or already submitting
+        if (isProcessing.value || this._isSubmitting) return;
+
         if (!isReadyToCreate.value) {
             this._errorMessage = 'Please fill in all required fields (Name and Address)';
             return;
@@ -362,7 +366,7 @@ export class FBOnboardingForm extends SignalWatcher(FBElement) {
                 <button
                     type="submit"
                     class="btn-primary"
-                    ?disabled=${!isReadyToCreate.value || this._isSubmitting}
+                    ?disabled=${!isReadyToCreate.value || this._isSubmitting || isProcessing.value}
                 >
                     ${this._isSubmitting ? 'Creating...' : 'Create Project'}
                 </button>

@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 )
@@ -24,17 +27,32 @@ func NewOnboardingHandler(svc *service.InterrogatorService) *OnboardingHandler {
 }
 
 // HandleOnboard processes the /api/v1/agent/onboard endpoint.
+// Accepts both JSON and multipart/form-data (Step 77: Magic Upload Trigger).
 // L7: Input validation, structured errors, observability.
 // @route POST /api/v1/agent/onboard
 func (h *OnboardingHandler) HandleOnboard(w http.ResponseWriter, r *http.Request) {
-	// L7: Limit request body size (prevent DoS)
-	r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024) // 1MB max
-
 	var req models.OnboardRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// L7: User-friendly error, no stack traces
-		http.Error(w, "Invalid request format", http.StatusBadRequest)
-		return
+	var err error
+
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		// Step 77: Multipart file upload path
+		// L7: 50MB limit for blueprint uploads
+		r.Body = http.MaxBytesReader(w, r.Body, 50*1024*1024)
+		req, err = parseMultipartOnboard(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		// Existing JSON path
+		// L7: 1MB limit for text-only requests
+		r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// L7: Input validation
@@ -43,18 +61,14 @@ func (h *OnboardingHandler) HandleOnboard(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get user context from JWT (middleware should have set this)
-	userID, ok := r.Context().Value("user_id").(string)
-	if !ok {
-		http.Error(w, "Missing user_id in context", http.StatusUnauthorized)
+	// C1 Fix: Use typed context key via middleware.GetClaims (matches all other handlers)
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	tenantID, ok := r.Context().Value("tenant_id").(string)
-	if !ok {
-		http.Error(w, "Missing tenant_id in context", http.StatusUnauthorized)
-		return
-	}
+	userID := claims.UserID
+	tenantID := claims.OrgID
 
 	// L7: Set timeout for AI operations (Gemini can be slow)
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
@@ -81,6 +95,77 @@ func (h *OnboardingHandler) HandleOnboard(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// parseMultipartOnboard extracts OnboardRequest fields from multipart form data.
+// Step 77: Reads the uploaded file and form fields into the request model.
+func parseMultipartOnboard(r *http.Request) (models.OnboardRequest, error) {
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		return models.OnboardRequest{}, fmt.Errorf("failed to parse form: invalid or too large")
+	}
+	// C4 Fix: Clean up multipart temp files when done
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return models.OnboardRequest{}, fmt.Errorf("file field is required for multipart uploads")
+	}
+	defer file.Close()
+
+	// Validate MIME type
+	mimeType := header.Header.Get("Content-Type")
+	if !isValidBlueprintMIME(mimeType) {
+		return models.OnboardRequest{}, fmt.Errorf("invalid file type: %s (PDF, PNG, JPG only)", mimeType)
+	}
+
+	// Read file data
+	fileData, err := io.ReadAll(file)
+	if err != nil {
+		return models.OnboardRequest{}, fmt.Errorf("failed to read uploaded file")
+	}
+
+	req := models.OnboardRequest{
+		SessionID:           r.FormValue("session_id"),
+		Message:             r.FormValue("message"),
+		CurrentState:        parseCurrentState(r.FormValue("current_state")),
+		DocumentData:        fileData,
+		DocumentContentType: mimeType,
+		DocumentFileName:    header.Filename,
+	}
+
+	return req, nil
+}
+
+// parseCurrentState parses a JSON string into a map, returning empty map on failure.
+func parseCurrentState(jsonStr string) map[string]interface{} {
+	if jsonStr == "" {
+		return make(map[string]interface{})
+	}
+	var state map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &state); err != nil {
+		return make(map[string]interface{})
+	}
+	return state
+}
+
+// isValidBlueprintMIME validates file MIME types for blueprint uploads.
+// C6 Fix: Uses exact match after stripping parameters to prevent bypass
+// (e.g., "image/jpeg; evil=true" was previously accepted via HasPrefix).
+func isValidBlueprintMIME(mimeType string) bool {
+	// Strip parameters: "image/jpeg; charset=utf-8" → "image/jpeg"
+	normalized := strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])
+	allowed := map[string]bool{
+		"image/jpeg":      true,
+		"image/jpg":       true,
+		"image/png":       true,
+		"image/webp":      true,
+		"application/pdf": true,
+	}
+	return allowed[normalized]
+}
+
 // validateOnboardRequest validates input fields.
 // L7: Prevents abuse and ensures data integrity.
 func validateOnboardRequest(req *models.OnboardRequest) error {
@@ -99,14 +184,38 @@ func validateOnboardRequest(req *models.OnboardRequest) error {
 		return fmt.Errorf("message too long (max 10,000 characters)")
 	}
 
+	// Mutual exclusion: document_url and inline file data
+	if req.DocumentURL != "" && len(req.DocumentData) > 0 {
+		return fmt.Errorf("provide either document_url or file upload, not both")
+	}
+
 	// Document URL validation (if provided)
+	// C7 Fix: Strict validation - require http/https scheme and valid host.
+	// url.Parse accepts javascript:, data:, and empty-scheme URIs which are unsafe.
 	if req.DocumentURL != "" {
 		if len(req.DocumentURL) > 2000 {
 			return fmt.Errorf("document_url too long")
 		}
-		// Basic URL format check
-		if _, err := url.Parse(req.DocumentURL); err != nil {
+		parsedURL, err := url.Parse(req.DocumentURL)
+		if err != nil {
 			return fmt.Errorf("invalid document_url format")
+		}
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return fmt.Errorf("document_url must use http or https scheme")
+		}
+		if parsedURL.Host == "" {
+			return fmt.Errorf("document_url must include a host")
+		}
+	}
+
+	// Inline file validation (if provided)
+	if len(req.DocumentData) > 0 {
+		const maxFileSize = 50 * 1024 * 1024 // 50MB
+		if len(req.DocumentData) > maxFileSize {
+			return fmt.Errorf("file too large (max 50MB)")
+		}
+		if req.DocumentContentType == "" {
+			return fmt.Errorf("file content type is required")
 		}
 	}
 

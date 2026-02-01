@@ -66,12 +66,14 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 	}
 
 	query := `
-		INSERT INTO projects (id, org_id, name, address, permit_issued_date, target_end_date, gsf, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO projects (id, org_id, name, address, permit_issued_date, target_end_date, gsf, status,
+			bedrooms, bathrooms, stories, lot_size, foundation_type, topography, soil_conditions)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 
 	_, err := s.db.Exec(ctx, query,
-		p.ID, p.OrgID, p.Name, p.Address, p.PermitIssuedDate, p.TargetEndDate, p.GSF, p.Status)
+		p.ID, p.OrgID, p.Name, p.Address, p.PermitIssuedDate, p.TargetEndDate, p.GSF, p.Status,
+		p.Bedrooms, p.Bathrooms, p.Stories, p.LotSize, p.FoundationType, p.Topography, p.SoilConditions)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -99,13 +101,15 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 // See DATA_SPINE_SPEC.md Section 3.1
 func (s *ProjectService) GetProject(ctx context.Context, id uuid.UUID, orgID uuid.UUID) (*models.Project, error) {
 	query := `
-		SELECT id, org_id, name, address, permit_issued_date, target_end_date, gsf, status
+		SELECT id, org_id, name, address, permit_issued_date, target_end_date, gsf, status,
+			bedrooms, bathrooms, stories, lot_size, foundation_type, topography, soil_conditions
 		FROM projects
 		WHERE id = $1 AND org_id = $2
 	`
 	var p models.Project
 	err := s.db.QueryRow(ctx, query, id, orgID).Scan(
-		&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.GSF, &p.Status)
+		&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.GSF, &p.Status,
+		&p.Bedrooms, &p.Bathrooms, &p.Stories, &p.LotSize, &p.FoundationType, &p.Topography, &p.SoilConditions)
 	if err != nil {
 		// L7 Fix: Return typed sentinel
 		if errors.Is(err, pgx.ErrNoRows) {

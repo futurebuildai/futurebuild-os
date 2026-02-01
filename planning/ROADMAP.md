@@ -21,10 +21,10 @@
 
 | Status | Step | Task | Gap Addressed | Est. Days |
 |--------|------|------|---------------|-----------|
-| [ ] | 74 | **Split-Screen Wizard**: Create `fb-view-onboarding` with Chat (Left) and Live Form (Right). | Gap 1 (Creation Workflow) | 1 |
-| [ ] | 75 | **"The Interrogator" Agent**: Implement backend logic for Agent 2 to ask clarifying questions (e.g., "I see 3 baths, is one a master en-suite?"). | User Request (Interactive) | 2 |
-| [ ] | 76 | **Real-Time Form Filling**: Wire the chat stream to auto-update the `ProjectDetail` form state as the AI extracts data. | User Request (Structured Data) | 1 |
-| [ ] | 77 | **Magic Upload Trigger**: Ensure dragging a Blueprint PDF triggers the analysis workflow immediately. | Gap 1 (Creation Workflow) | 0.5 |
+| [x] | 74 | **Split-Screen Wizard**: Create `fb-view-onboarding` with Chat (Left) and Live Form (Right). | Gap 1 (Creation Workflow) | 1 |
+| [x] | 75 | **"The Interrogator" Agent**: Implement backend logic for Agent 2 to ask clarifying questions (e.g., "I see 3 baths, is one a master en-suite?"). | User Request (Interactive) | 2 |
+| [x] | 76 | **Real-Time Form Filling**: Wire the chat stream to auto-update the `ProjectDetail` form state as the AI extracts data. | User Request (Structured Data) | 1 |
+| [x] | 77 | **Magic Upload Trigger**: Ensure dragging a Blueprint PDF triggers the analysis workflow immediately. | Gap 1 (Creation Workflow) | 0.5 |
 
 ## 🆔 Phase 12: Identity & Sovereignty (Auth Refactor)
 **Goal:** Replace fragile magic links with a robust Auth Provider (Clerk/Auth0) and implement deep Tenant/Org management.

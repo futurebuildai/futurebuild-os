@@ -5,11 +5,18 @@ import (
 )
 
 // OnboardRequest is the incoming payload from the frontend wizard.
+// Supports both JSON (text/document_url) and multipart/form-data (inline file upload).
 type OnboardRequest struct {
 	SessionID    string                 `json:"session_id"`
 	Message      string                 `json:"message,omitempty"`
 	DocumentURL  string                 `json:"document_url,omitempty"`
 	CurrentState map[string]interface{} `json:"current_state"`
+
+	// Inline file data (populated by multipart handler, not JSON).
+	// Step 77: Magic Upload Trigger - direct file upload path.
+	DocumentData        []byte `json:"-"`
+	DocumentContentType string `json:"-"`
+	DocumentFileName    string `json:"-"`
 }
 
 // OnboardResponse is returned to the frontend with extracted values.
@@ -55,11 +62,11 @@ func GetPriorityFields() []PhysicsFieldPriority {
 	return []PhysicsFieldPriority{
 		{"name", 0, "What would you like to call this project?"},
 		{"address", 0, "Where is the project located?"},
-		{"gsf", 0, "What's the approximate square footage?"},
+		{"square_footage", 0, "What's the approximate square footage?"},
 		{"foundation_type", 0, "What type of foundation? Slab, crawlspace, or basement?"},
 		{"stories", 1, "Is this a single-story or multi-story home?"},
-		{"topography", 1, "Is the lot flat, moderately sloped, or steeply sloped?"},
-		{"soil_conditions", 1, "Any special soil conditions like rock or clay?"},
+		{"topography", 1, "Is the lot flat, sloped, or hillside?"},
+		{"soil_conditions", 1, "Any special soil conditions? Normal, rocky, clay, or sandy?"},
 		{"bedrooms", 2, "How many bedrooms?"},
 		{"bathrooms", 2, "How many bathrooms?"},
 		{"supply_chain_volatility", 2, "Any supply chain concerns for this project?"},

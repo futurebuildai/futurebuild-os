@@ -181,8 +181,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	}
 
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
-	interrogatorService := service.NewInterrogatorService(aiClient)
-	onboardingHandler := handlers.NewOnboardingHandler(interrogatorService)
+	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
+	var onboardingHandler *handlers.OnboardingHandler
+	if aiClient != nil {
+		interrogatorService := service.NewInterrogatorService(aiClient)
+		onboardingHandler = handlers.NewOnboardingHandler(interrogatorService)
+	}
 
 	s := &Server{
 		Router:          chi.NewRouter(),
@@ -288,11 +292,14 @@ func (s *Server) routes() {
 
 		// See PHASE_11_PRD.md Step 75: Interrogator Agent
 		// L7: Auth required, rate-limited to prevent AI API abuse
+		// C5 Fix: Only register route if AI client is configured
 		r.Route("/agent", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			// FUTURE: Add rate limiter when agent abuse detected
 			// r.Use(middleware.RateLimit(s.AgentRateLimiter))
-			r.Post("/onboard", s.OnboardingHandler.HandleOnboard)
+			if s.OnboardingHandler != nil {
+				r.Post("/onboard", s.OnboardingHandler.HandleOnboard)
+			}
 		})
 
 		// See PRODUCTION_PLAN.md Step 48: Inbound Webhook Endpoints

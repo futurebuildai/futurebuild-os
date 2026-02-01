@@ -112,20 +112,27 @@ export interface CreateProjectRequest {
 
 /**
  * Request to the Interrogator Agent for onboarding.
+ * For file uploads, use FormData with multipart/form-data instead of this interface.
  */
 export interface OnboardProcessRequest {
     session_id: string;
     message: string;
+    document_url?: string;
     current_state: Partial<CreateProjectRequest>;
 }
 
 /**
  * Response from the Interrogator Agent.
+ * Must match Go models.OnboardResponse exactly (Rosetta Stone).
  */
 export interface OnboardProcessResponse {
+    session_id: string;
     reply: string;
     extracted_values?: Record<string, unknown>;
     confidence_scores?: Record<string, number>;
+    clarifying_question?: string;
+    ready_to_create: boolean;
+    next_priority_field?: string;
 }
 
 // ============================================================================

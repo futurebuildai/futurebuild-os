@@ -1,18 +1,20 @@
 /**
  * FBOnboardingChat - Left Panel Chat Interface for Project Onboarding
- * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2, STEP_76_REALTIME_FORM_FILLING.md
+ * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2, STEP_76_REALTIME_FORM_FILLING.md,
+ * STEP_77_MAGIC_UPLOAD_TRIGGER.md
  *
  * Conversational interface that:
  * - Displays initial greeting from "The Interrogator" agent
  * - Renders messages inline (separate from global chat store)
  * - Includes drag-and-drop zone for blueprints/documents
  * - Calls Interrogator Agent API for field extraction
+ * - Step 77: Uploads files via multipart to /agent/onboard
  */
 import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { FBElement } from '../../base/FBElement';
-import { api } from '../../../services/api';
+import { api, type OnboardProcessResponse } from '../../../services/api';
 import {
     onboardingMessages,
     onboardingValues,
@@ -21,9 +23,12 @@ import {
     applyAIExtraction,
     type OnboardingMessage
 } from '../../../store/onboarding-store';
+import type { FBOnboardingDropzone } from './fb-onboarding-dropzone';
 
 import '../../chat/fb-input-bar';
 import './fb-onboarding-dropzone';
+
+const STORAGE_KEY_TOKEN = 'fb_token';
 
 @customElement('fb-onboarding-chat')
 export class FBOnboardingChat extends SignalWatcher(FBElement) {
@@ -135,6 +140,10 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         }
     }
 
+    private _getDropzone(): FBOnboardingDropzone | null {
+        return this.shadowRoot?.querySelector<FBOnboardingDropzone>('fb-onboarding-dropzone') ?? null;
+    }
+
     private _addSystemMessage(content: string): void {
         addMessage({
             id: `sys-${String(Date.now())}`,
@@ -144,9 +153,18 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         });
     }
 
+    // Fix 3: Auto-scroll message list when new messages arrive
+    override updated(): void {
+        const list = this.shadowRoot?.querySelector('.message-list');
+        if (list) {
+            list.scrollTop = list.scrollHeight;
+        }
+    }
+
     private async _handleSend(e: CustomEvent<{ content: string }>): Promise<void> {
         const content = e.detail.content.trim();
-        if (!content) return;
+        // Fix 4: Guard against rapid sends while processing
+        if (!content || isProcessing.value) return;
 
         this._showGreeting = false;
         isProcessing.value = true;
@@ -187,39 +205,85 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         }
     }
 
+    // Step 77: Magic Upload Trigger - real multipart upload to /agent/onboard
     private async _handleFileDrop(e: CustomEvent<{ files: File[] }>): Promise<void> {
+        const file = e.detail.files[0];
+        // Fix 4: Guard against uploads while already processing
+        if (!file || isProcessing.value) return;
+
         this._showGreeting = false;
         isProcessing.value = true;
 
-        const files = e.detail.files;
-        const fileName = files[0]?.name ?? 'file';
+        const dropzone = this._getDropzone();
+        dropzone?.setUploading(file.name);
 
-        this._addSystemMessage(`Analyzing ${fileName}...`);
+        this._addSystemMessage(`Analyzing ${file.name}...`);
 
         try {
-            // TODO Step 77: Implement magic upload trigger with real API
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Build multipart form data
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('session_id', this._sessionId);
+            formData.append('message', '');
+            formData.append('current_state', JSON.stringify(onboardingValues.value));
 
-            this._addSystemMessage(
-                `I found a ${fileName}. Let me extract the project details for you.`
-            );
+            // Progress: uploading phase
+            dropzone?.setProgress(30);
 
-            applyAIExtraction(
-                {
-                    name: 'Extracted Project Name',
-                    square_footage: 2500,
-                    bedrooms: 4,
-                    bathrooms: 3,
-                },
-                {
-                    name: 0.85,
-                    square_footage: 0.92,
-                    bedrooms: 0.88,
-                    bathrooms: 0.75,
-                }
-            );
+            // POST multipart to /agent/onboard
+            const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+            const headers: Record<string, string> = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const rawResponse = await fetch('/api/v1/agent/onboard', {
+                method: 'POST',
+                headers,
+                body: formData
+            });
+
+            // Progress: analyzing phase
+            dropzone?.setProgress(70);
+
+            // Fix 6: Handle 401 explicitly (raw fetch bypasses centralized http.ts 401 handler)
+            if (rawResponse.status === 401) {
+                window.dispatchEvent(new CustomEvent('fb-unauthorized'));
+                throw new Error('Session expired. Please log in again.');
+            }
+
+            if (!rawResponse.ok) {
+                const errorText = await rawResponse.text();
+                throw new Error(errorText || `Upload failed (${String(rawResponse.status)})`);
+            }
+
+            const response = await rawResponse.json() as OnboardProcessResponse;
+
+            // Progress: done
+            dropzone?.setProgress(100);
+
+            // Apply extractions to form
+            if (response.extracted_values) {
+                applyAIExtraction(
+                    response.extracted_values,
+                    response.confidence_scores ?? {}
+                );
+            }
+
+            // Add assistant response
+            addMessage({
+                id: `msg-${String(Date.now())}-assistant`,
+                role: 'assistant',
+                content: response.reply,
+                timestamp: new Date()
+            });
+
+            dropzone?.setComplete();
+
         } catch (err) {
-            console.error('[FBOnboardingChat] File drop failed:', err);
+            console.error('[FBOnboardingChat] File upload failed:', err);
+            const message = err instanceof Error ? err.message : 'Upload failed';
+            dropzone?.setError(message);
             this._addSystemMessage('Sorry, I had trouble reading that file. Please try again.');
         } finally {
             isProcessing.value = false;
@@ -263,6 +327,7 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
 
             <fb-input-bar
                 @send=${(e: CustomEvent<{ content: string }>): void => { void this._handleSend(e); }}
+                ?disabled=${isProcessing.value}
             ></fb-input-bar>
         `;
     }

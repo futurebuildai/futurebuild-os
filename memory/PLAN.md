@@ -18,7 +18,7 @@
   - Spec: [STEP_76_REALTIME_FORM_FILLING.md](../specs/committed/STEP_76_REALTIME_FORM_FILLING.md)
   - Core Requirement: Blue left border + ✨ for AI fields, yellow for low confidence.
 
-- [ ] Step 77: Magic Upload Trigger @Frontend
+- [x] Step 77: Magic Upload Trigger @Frontend
   - Task: Implement drag-and-drop zone that auto-triggers analysis on file drop.
   - Spec: [STEP_77_MAGIC_UPLOAD_TRIGGER.md](../specs/committed/STEP_77_MAGIC_UPLOAD_TRIGGER.md)
   - Core Requirement: Progress states (Uploading -> Analyzing), 50MB max.

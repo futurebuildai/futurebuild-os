@@ -1,14 +1,18 @@
 /**
  * FBOnboardingDropzone - Drag-and-Drop Zone for Blueprint/Document Upload
- * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2
+ * See STEP_77_MAGIC_UPLOAD_TRIGGER.md
  *
  * Compact drag-and-drop zone for the onboarding chat panel.
- * - Accepts PDF, PNG, JPG files
+ * - Accepts PDF, PNG, JPG files (50MB max)
  * - Visual feedback on drag over
+ * - Progress bar with uploading/analyzing states
+ * - Keyboard accessible (Enter/Space to browse)
  * - Emits file-dropped event for parent to handle
- * - 50MB max file size (Step 77 requirement)
+ *
+ * @fires file-dropped - When a valid file is selected with { files: [file] }
+ * @fires upload-error - When validation fails with { error: string }
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../../base/FBElement';
 
@@ -38,6 +42,12 @@ export class FBOnboardingDropzone extends FBElement {
                 cursor: pointer;
                 transition: all 0.2s;
                 min-height: 80px;
+                outline: none;
+            }
+
+            .dropzone:focus-visible {
+                outline: 2px solid #667eea;
+                outline-offset: 2px;
             }
 
             .dropzone:hover:not(.disabled) {
@@ -49,6 +59,12 @@ export class FBOnboardingDropzone extends FBElement {
                 border-color: #667eea;
                 background: rgba(102, 126, 234, 0.08);
                 border-style: solid;
+            }
+
+            .dropzone.uploading {
+                border-color: #667eea;
+                border-style: solid;
+                cursor: default;
             }
 
             .dropzone.disabled {
@@ -80,6 +96,22 @@ export class FBOnboardingDropzone extends FBElement {
                 margin-top: var(--fb-spacing-xs, 4px);
             }
 
+            .progress-container {
+                width: 100%;
+                max-width: 200px;
+                height: 4px;
+                background: var(--fb-border, #e5e5e5);
+                border-radius: 2px;
+                margin-top: var(--fb-spacing-sm, 8px);
+                overflow: hidden;
+            }
+
+            .progress-bar {
+                height: 100%;
+                background: #667eea;
+                transition: width 0.3s ease;
+            }
+
             input[type="file"] {
                 display: none;
             }
@@ -89,29 +121,67 @@ export class FBOnboardingDropzone extends FBElement {
     @property({ type: Boolean }) disabled = false;
     @state() private _isDragOver = false;
     @state() private _errorMessage = '';
+    @state() private _isUploading = false;
+    @state() private _uploadProgress = 0;
+    @state() private _uploadFileName = '';
+
+    /** Called by parent to indicate upload has started. */
+    public setUploading(fileName: string): void {
+        this._isUploading = true;
+        this._uploadProgress = 0;
+        this._uploadFileName = fileName;
+        this._errorMessage = '';
+    }
+
+    /** Called by parent to update upload progress (0-100). */
+    public setProgress(pct: number): void {
+        this._uploadProgress = Math.min(100, Math.max(0, pct));
+    }
+
+    /** Called by parent when upload/analysis is done. */
+    public setComplete(): void {
+        this._uploadProgress = 100;
+        setTimeout(() => {
+            this._isUploading = false;
+            this._uploadProgress = 0;
+            this._uploadFileName = '';
+        }, 500);
+    }
+
+    /** Called by parent to reset on error. */
+    public setError(message: string): void {
+        this._isUploading = false;
+        this._uploadProgress = 0;
+        this._uploadFileName = '';
+        this._errorMessage = message;
+    }
+
+    private get _isDisabled(): boolean {
+        return this.disabled || this._isUploading;
+    }
 
     private _handleDragEnter(e: DragEvent): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         e.preventDefault();
         e.stopPropagation();
         this._isDragOver = true;
     }
 
     private _handleDragLeave(e: DragEvent): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         e.preventDefault();
         e.stopPropagation();
         this._isDragOver = false;
     }
 
     private _handleDragOver(e: DragEvent): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         e.preventDefault();
         e.stopPropagation();
     }
 
     private _handleDrop(e: DragEvent): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         e.preventDefault();
         e.stopPropagation();
         this._isDragOver = false;
@@ -122,13 +192,21 @@ export class FBOnboardingDropzone extends FBElement {
     }
 
     private _handleClick(): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         const input = this.shadowRoot?.querySelector<HTMLInputElement>('input[type="file"]');
         if (input) input.click();
     }
 
+    private _handleKeyDown(e: KeyboardEvent): void {
+        if (this._isDisabled) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this._handleClick();
+        }
+    }
+
     private _handleFileSelect(e: Event): void {
-        if (this.disabled) return;
+        if (this._isDisabled) return;
         const input = e.target as HTMLInputElement;
         const files = Array.from(input.files ?? []);
         this._processFiles(files);
@@ -138,6 +216,12 @@ export class FBOnboardingDropzone extends FBElement {
 
     private _processFiles(files: File[]): void {
         if (files.length === 0) {
+            return;
+        }
+
+        // Fix 9: Warn user about multiple files instead of silently discarding
+        if (files.length > 1) {
+            this._errorMessage = 'Please upload one file at a time';
             return;
         }
 
@@ -152,36 +236,72 @@ export class FBOnboardingDropzone extends FBElement {
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            this._errorMessage = 'File size must be less than 50MB';
+            this._errorMessage = 'File too large. Maximum size is 50MB.';
             return;
         }
+
+        this._errorMessage = '';
 
         // Emit file-dropped event
         this.emit('file-dropped', { files: [file] });
     }
 
+    private _renderIdle(): TemplateResult {
+        return html`
+            <div class="dropzone-icon">📄</div>
+            <div class="dropzone-text">
+                ${this._isDragOver ? 'Drop file here' : 'Drag blueprint or document here'}
+            </div>
+            <div class="dropzone-hint">
+                or click to browse (PDF, PNG, JPG • Max 50MB)
+            </div>
+        `;
+    }
+
+    private _renderUploading(): TemplateResult {
+        return html`
+            <div class="dropzone-icon">⏳</div>
+            <div class="dropzone-text">
+                ${this._uploadProgress < 100
+                    ? `Uploading ${this._uploadFileName}...`
+                    : 'Analyzing blueprint...'}
+            </div>
+            <div class="progress-container">
+                <div
+                    class="progress-bar"
+                    style="width: ${String(this._uploadProgress)}%"
+                ></div>
+            </div>
+        `;
+    }
+
     override render(): TemplateResult {
+        const dzClass = [
+            'dropzone',
+            this._isDragOver ? 'drag-over' : '',
+            this._isDisabled ? 'disabled' : '',
+            this._isUploading ? 'uploading' : '',
+        ].filter(Boolean).join(' ');
+
         return html`
             <div
-                class="dropzone ${this._isDragOver ? 'drag-over' : ''} ${this.disabled ? 'disabled' : ''}"
+                class=${dzClass}
+                tabindex="0"
+                role="button"
+                aria-label="Upload blueprint file. Drag and drop or press Enter to browse."
                 @dragenter=${this._handleDragEnter}
                 @dragleave=${this._handleDragLeave}
                 @dragover=${this._handleDragOver}
                 @drop=${this._handleDrop}
                 @click=${this._handleClick}
+                @keydown=${this._handleKeyDown}
             >
-                <div class="dropzone-icon">📄</div>
-                <div class="dropzone-text">
-                    ${this._isDragOver ? 'Drop file here' : 'Drag blueprint or document here'}
-                </div>
-                <div class="dropzone-hint">
-                    or click to browse (PDF, PNG, JPG • Max 50MB)
-                </div>
+                ${this._isUploading ? this._renderUploading() : this._renderIdle()}
             </div>
 
             ${this._errorMessage ? html`
                 <div class="error-message">${this._errorMessage}</div>
-            ` : ''}
+            ` : nothing}
 
             <input
                 type="file"

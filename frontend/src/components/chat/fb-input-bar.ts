@@ -1,5 +1,5 @@
 import { html, css, TemplateResult } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
 
@@ -17,6 +17,9 @@ import { store } from '../../store/store';
 export class FBInputBar extends FBElement {
     /** Maximum height for auto-resizing textarea in pixels */
     private static readonly MAX_TEXTAREA_HEIGHT = 120;
+
+    /** When true, disables input and send button (e.g., during AI processing). */
+    @property({ type: Boolean }) disabled = false;
 
     static override styles = [
         FBElement.styles,
@@ -153,7 +156,7 @@ export class FBInputBar extends FBElement {
     }
 
     private _send(): void {
-        if (!this._value.trim()) return;
+        if (!this._value.trim() || this.disabled) return;
 
         this.emit('send', { content: this._value });
         this._value = '';
@@ -209,6 +212,7 @@ export class FBInputBar extends FBElement {
                         aria-label="Message input"
                         aria-describedby="input-hint"
                         .value=${this._value}
+                        ?disabled=${this.disabled}
                         @input=${this._handleInput.bind(this)}
                         @keydown=${this._handleKeyDown.bind(this)}
                         rows="1"
@@ -229,7 +233,7 @@ export class FBInputBar extends FBElement {
 
                 <button 
                     class="icon-btn send-btn" 
-                    ?disabled=${!this._value.trim()}
+                    ?disabled=${!this._value.trim() || this.disabled}
                     @click=${this._send.bind(this)}
                     title="Send Message"
                     aria-label="Send message"

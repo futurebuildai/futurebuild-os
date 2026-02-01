@@ -112,6 +112,11 @@ export function setFieldValue(field: keyof CreateProjectRequest, value: string |
  * Only updates empty fields or fields previously populated by AI.
  * User edits are never overwritten.
  */
+// Fix 7: Numeric fields that need type coercion (AI may return strings)
+const NUMERIC_FIELDS = new Set<string>([
+    'square_footage', 'bedrooms', 'bathrooms', 'stories', 'lot_size'
+]);
+
 export function applyAIExtraction(
     extractedValues: Record<string, unknown>,
     confidenceScores: Record<string, number>
@@ -121,7 +126,14 @@ export function applyAIExtraction(
     const currentConf = { ...onboardingConfidence.value };
     const updatedFields = new Set<string>();
 
-    for (const [field, value] of Object.entries(extractedValues)) {
+    for (const [field, rawValue] of Object.entries(extractedValues)) {
+        // Fix 7: Coerce string values to numbers for numeric fields
+        let value: unknown = rawValue;
+        if (NUMERIC_FIELDS.has(field) && typeof rawValue === 'string') {
+            const num = Number(rawValue);
+            if (!isNaN(num)) value = num;
+        }
+
         // Only apply if field is empty OR was previously AI-populated
         const existingSource = currentSources[field];
         if (!currentValues[field as keyof CreateProjectRequest] || existingSource === 'ai' || existingSource === 'default') {

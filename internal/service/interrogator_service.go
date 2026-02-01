@@ -43,6 +43,7 @@ func (s *InterrogatorService) ProcessMessage(
 		"session_id", req.SessionID,
 		"has_message", req.Message != "",
 		"has_document", req.DocumentURL != "",
+		"has_file_data", len(req.DocumentData) > 0,
 		"current_fields", len(req.CurrentState),
 	)
 
@@ -54,8 +55,19 @@ func (s *InterrogatorService) ProcessMessage(
 	}
 
 	// BRANCH 1: Document uploaded → Extract via Vision API
-	if req.DocumentURL != "" {
-		extraction, err := s.extractFromDocument(ctx, req.DocumentURL)
+	// Step 77: Support both URL-based and inline file data paths.
+	if req.DocumentURL != "" || len(req.DocumentData) > 0 {
+		var extraction *models.ExtractionResult
+		var err error
+
+		if len(req.DocumentData) > 0 {
+			// Step 77: Inline file data (multipart upload)
+			extraction, err = s.extractFromBytes(ctx, req.DocumentData, req.DocumentContentType, req.DocumentFileName)
+		} else {
+			// Existing URL-based path
+			extraction, err = s.extractFromDocument(ctx, req.DocumentURL)
+		}
+
 		if err != nil {
 			resp.Reply = "I couldn't read that file. Could you try a clearer scan or describe the project?"
 			return resp, nil
@@ -149,10 +161,11 @@ func (s *InterrogatorService) extractFromDocument(
 	}
 
 	// Parse JSON response from Gemini
+	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
 	var extraction struct {
 		Name           string             `json:"name"`
 		Address        string             `json:"address"`
-		GSF            float64            `json:"gsf"`
+		SquareFootage  float64            `json:"square_footage"`
 		FoundationType string             `json:"foundation_type"`
 		Stories        int                `json:"stories"`
 		Bedrooms       int                `json:"bedrooms"`
@@ -171,8 +184,8 @@ func (s *InterrogatorService) extractFromDocument(
 	if extraction.Address != "" {
 		values["address"] = extraction.Address
 	}
-	if extraction.GSF > 0 {
-		values["gsf"] = extraction.GSF
+	if extraction.SquareFootage > 0 {
+		values["square_footage"] = extraction.SquareFootage
 	}
 	if extraction.FoundationType != "" {
 		values["foundation_type"] = extraction.FoundationType
@@ -190,6 +203,83 @@ func (s *InterrogatorService) extractFromDocument(
 	return &models.ExtractionResult{
 		DocumentURL: documentURL,
 		ExtractedAt: time.Now(), // L7: Add timestamp
+		Values:      values,
+		Confidence:  extraction.Confidence,
+	}, nil
+}
+
+// extractFromBytes uses Vision API to extract data from inline file bytes.
+// Step 77: Direct file upload path that skips URL download.
+func (s *InterrogatorService) extractFromBytes(
+	ctx context.Context,
+	fileData []byte,
+	mimeType string,
+	fileName string,
+) (*models.ExtractionResult, error) {
+	prompt := prompts.BlueprintExtractionPrompt()
+
+	slog.Info("blueprint_extraction_from_bytes",
+		"file_name", fileName,
+		"mime_type", mimeType,
+		"file_size", len(fileData),
+	)
+
+	// Create multimodal request with inline image
+	req := ai.NewMultimodalRequest(ai.ModelTypeFlash, prompt, fileData, mimeType)
+	req.ReturnLogprobs = true
+
+	result, err := s.aiClient.GenerateContent(ctx, req)
+	if err != nil {
+		slog.Error("ai_extraction_failed_bytes",
+			"error", err.Error(),
+			"file_name", fileName,
+		)
+		return nil, fmt.Errorf("AI extraction failed: %w", err)
+	}
+
+	// Parse JSON response from Gemini (same structure as extractFromDocument)
+	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
+	var extraction struct {
+		Name           string             `json:"name"`
+		Address        string             `json:"address"`
+		SquareFootage  float64            `json:"square_footage"`
+		FoundationType string             `json:"foundation_type"`
+		Stories        int                `json:"stories"`
+		Bedrooms       int                `json:"bedrooms"`
+		Bathrooms      int                `json:"bathrooms"`
+		Confidence     map[string]float64 `json:"confidence"`
+	}
+
+	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
+		return nil, fmt.Errorf("failed to parse extraction result: %w", err)
+	}
+
+	values := make(map[string]any)
+	if extraction.Name != "" {
+		values["name"] = extraction.Name
+	}
+	if extraction.Address != "" {
+		values["address"] = extraction.Address
+	}
+	if extraction.SquareFootage > 0 {
+		values["square_footage"] = extraction.SquareFootage
+	}
+	if extraction.FoundationType != "" {
+		values["foundation_type"] = extraction.FoundationType
+	}
+	if extraction.Stories > 0 {
+		values["stories"] = extraction.Stories
+	}
+	if extraction.Bedrooms > 0 {
+		values["bedrooms"] = extraction.Bedrooms
+	}
+	if extraction.Bathrooms > 0 {
+		values["bathrooms"] = extraction.Bathrooms
+	}
+
+	return &models.ExtractionResult{
+		DocumentURL: fmt.Sprintf("inline:%s", fileName),
+		ExtractedAt: time.Now(),
 		Values:      values,
 		Confidence:  extraction.Confidence,
 	}, nil
@@ -354,20 +444,18 @@ func isPrivateIP(host string) bool {
 }
 
 // isValidImageMIME validates MIME type for blueprint uploads.
+// C6 Fix: Uses exact match after stripping parameters to prevent bypass.
 func isValidImageMIME(mimeType string) bool {
-	allowed := []string{
-		"image/jpeg",
-		"image/jpg",
-		"image/png",
-		"image/webp",
-		"application/pdf",
+	// Strip parameters: "image/jpeg; charset=utf-8" → "image/jpeg"
+	normalized := strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])
+	allowed := map[string]bool{
+		"image/jpeg":      true,
+		"image/jpg":       true,
+		"image/png":       true,
+		"image/webp":      true,
+		"application/pdf": true,
 	}
-	for _, allowedType := range allowed {
-		if strings.HasPrefix(mimeType, allowedType) {
-			return true
-		}
-	}
-	return false
+	return allowed[normalized]
 }
 
 // calculateAvgConfidence computes the average confidence score.
