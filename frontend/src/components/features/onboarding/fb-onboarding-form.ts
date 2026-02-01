@@ -251,6 +251,7 @@ export class FBOnboardingForm extends SignalWatcher(FBElement) {
             if (values.foundation_type !== undefined) projectData.foundation_type = values.foundation_type;
             if (values.stories !== undefined) projectData.stories = values.stories;
             if (values.topography !== undefined) projectData.topography = values.topography;
+            if (values.soil_conditions !== undefined) projectData.soil_conditions = values.soil_conditions;
 
             const response = await api.projects.create(projectData);
             this.emit('project-created', { projectId: response.id });
@@ -345,6 +346,12 @@ export class FBOnboardingForm extends SignalWatcher(FBElement) {
                         { value: 'flat', label: 'Flat' },
                         { value: 'sloped', label: 'Sloped' },
                         { value: 'hillside', label: 'Hillside' }
+                    ])}
+                    ${this._renderField('soil_conditions', 'Soil Conditions', 'select', [
+                        { value: 'normal', label: 'Normal' },
+                        { value: 'rocky', label: 'Rocky' },
+                        { value: 'clay', label: 'Clay' },
+                        { value: 'sandy', label: 'Sandy' }
                     ])}
                 </section>
 

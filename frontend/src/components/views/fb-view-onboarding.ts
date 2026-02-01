@@ -8,9 +8,14 @@
  * - Responsive: Side-by-side on desktop, stacked on tablet, tabs on mobile
  */
 import { html, css, TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
+import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
-import { resetOnboarding } from '../../store/onboarding-store';
+import type { CreateProjectRequest } from '../../services/api';
+import {
+    onboardingValues,
+    resetOnboarding,
+} from '../../store/onboarding-store';
 
 import '../features/onboarding/fb-onboarding-chat';
 import '../features/onboarding/fb-onboarding-form';
@@ -113,18 +118,50 @@ export class FBViewOnboarding extends FBViewElement {
         `
     ];
 
+    /**
+     * Optional pre-filled values for the form (e.g., from "duplicate project").
+     * Applied to the store on first connect.
+     */
+    @property({ type: Object, attribute: 'initial-values' }) initialValues: Partial<CreateProjectRequest> = {};
+
+    private _disposeEffect: (() => void) | null = null;
+
+    override connectedCallback(): void {
+        super.connectedCallback();
+
+        // Seed store with initial values if provided
+        if (Object.keys(this.initialValues).length > 0) {
+            onboardingValues.value = { ...this.initialValues };
+        }
+
+        // Emit form-updated whenever store values change (for parent sync)
+        this._disposeEffect = effect(() => {
+            const values = onboardingValues.value;
+            this.emit('form-updated', values);
+        });
+    }
+
     override disconnectedCallback(): void {
-        super.disconnectedCallback();
+        if (this._disposeEffect) {
+            this._disposeEffect();
+            this._disposeEffect = null;
+        }
         resetOnboarding();
+        super.disconnectedCallback();
+    }
+
+    private _navigateTo(path: string): void {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
     }
 
     private _handleClose(): void {
-        this.emit('navigate', { path: '/projects' });
+        this._navigateTo('/projects');
     }
 
     private _handleProjectCreated(e: CustomEvent<{ projectId: string }>): void {
         this.emit('project-created', e.detail);
-        this.emit('navigate', { path: `/projects/${e.detail.projectId}` });
+        this._navigateTo(`/projects/${e.detail.projectId}`);
     }
 
     override render(): TemplateResult {

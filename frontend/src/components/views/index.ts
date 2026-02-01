@@ -19,6 +19,7 @@ import './fb-view-projects';
 import './fb-view-chat';
 import './fb-view-schedule';
 import './fb-view-directory';
+import './fb-view-onboarding';
 
 // Re-export for convenience
 export { FBViewLogin } from './fb-view-login';
@@ -27,6 +28,7 @@ export { FBViewProjects } from './fb-view-projects';
 export { FBViewChat } from './fb-view-chat';
 export { FBViewSchedule } from './fb-view-schedule';
 export { FBViewDirectory } from './fb-view-directory';
+export { FBViewOnboarding } from './fb-view-onboarding';
 
 // ============================================================================
 // View Registry (Future: Async Loaders)
@@ -52,4 +54,5 @@ export const VIEW_REGISTRY = {
     schedule: () => import('./fb-view-schedule').then((m) => m.FBViewSchedule),
     directory: () => import('./fb-view-directory').then((m) => m.FBViewDirectory),
     login: () => import('./fb-view-login').then((m) => m.FBViewLogin),
+    onboarding: () => import('./fb-view-onboarding').then((m) => m.FBViewOnboarding),
 } as const;

@@ -103,6 +103,7 @@ export interface CreateProjectRequest {
     start_date: string;
     stories?: number;
     topography?: string;
+    soil_conditions?: string;
 }
 
 // ============================================================================

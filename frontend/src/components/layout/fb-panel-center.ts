@@ -27,6 +27,9 @@ import '../views/fb-view-portal-dashboard';
 // Import chat view (Step 72 Integration)
 import '../views/fb-view-chat';
 
+// Import onboarding view (Step 74 Split-Screen Wizard)
+import '../views/fb-view-onboarding';
+
 @customElement('fb-panel-center')
 export class FBPanelCenter extends FBElement {
     static override styles = [
@@ -122,7 +125,8 @@ export class FBPanelCenter extends FBElement {
             fb-view-login,
             fb-view-verify,
             fb-view-invite-accept,
-            fb-view-chat {
+            fb-view-chat,
+            fb-view-onboarding {
                 flex: 1;
             }
         `,
@@ -138,6 +142,7 @@ export class FBPanelCenter extends FBElement {
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
     @state() private _isProjectsRoute = false;
+    @state() private _isOnboardingRoute = false;
 
     // Portal routes (LAUNCH_PLAN.md P2)
     @state() private _isPortalActionRoute = false;
@@ -180,6 +185,7 @@ export class FBPanelCenter extends FBElement {
         this._isAdminInvitesRoute = path === '/admin/invites';
         this._isSettingsRoute = path === '/settings';
         this._isProjectsRoute = path === '/projects';
+        this._isOnboardingRoute = path === '/projects/new';
 
         // Portal routes (LAUNCH_PLAN.md P2)
         this._isPortalLoginRoute = path === '/portal/login';
@@ -254,6 +260,11 @@ export class FBPanelCenter extends FBElement {
         // Show settings view for authenticated users
         if (this._isSettingsRoute) {
             return html`<fb-view-settings></fb-view-settings>`;
+        }
+
+        // Show onboarding wizard (Step 74)
+        if (this._isOnboardingRoute) {
+            return html`<fb-view-onboarding></fb-view-onboarding>`;
         }
 
         // Show projects view for authenticated users
