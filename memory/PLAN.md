@@ -3,17 +3,17 @@
 ## Phase 11: The Conversational Hook (Smart Onboarding)
 **PRD Reference:** [PHASE_11_PRD.md](../planning/PHASE_11_PRD.md)
 
-- [ ] Step 74: Split-Screen Wizard @Frontend
+- [x] Step 74: Split-Screen Wizard @Frontend
   - Task: Create `<fb-view-onboarding>` with chat/form split layout.
   - Spec: [STEP_74_SPLIT_SCREEN_WIZARD.md](../specs/committed/STEP_74_SPLIT_SCREEN_WIZARD.md)
   - Core Requirement: Responsive 50/50 desktop layout, stacked mobile.
 
-- [ ] Step 75: The Interrogator Agent @Backend
+- [x] Step 75: The Interrogator Agent @Backend
   - Task: Implement `interrogator_service.go` for document extraction & clarifying questions.
   - Spec: [STEP_75_INTERROGATOR_AGENT.md](../specs/committed/STEP_75_INTERROGATOR_AGENT.md)
   - Core Requirement: Layer 4 only (no physics calculations), P0-P2 priority matrix.
 
-- [ ] Step 76: Real-Time Form Filling @Frontend
+- [x] Step 76: Real-Time Form Filling @Frontend
   - Task: Implement bidirectional state sync with Signals and visual "AI-populated" indicators.
   - Spec: [STEP_76_REALTIME_FORM_FILLING.md](../specs/committed/STEP_76_REALTIME_FORM_FILLING.md)
   - Core Requirement: Blue left border + ✨ for AI fields, yellow for low confidence.

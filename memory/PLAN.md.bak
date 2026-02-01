@@ -1,0 +1,23 @@
+# Project Overlord: Master State Machine
+- Status: PHASE_7_ACTIVE
+- Phase: Phase 7: Sovereign Manifestation & The Market
+- Factory Node: ThinkStation-P3-Tiny (128GB)
+
+## Phase 6: Swarm Intelligence (COMPLETE)
+- [x] H.1 - H.5: Swarm Core & Project Forge @Architect
+
+## Phase 7: Sovereign Manifestation (ACTIVE)
+- [x] I.1: Manifest "Satellite Alpha" (Real-time Crypto Tracker) @Architect
+- [x] I.2: Remote Node Deployment (F.1 Orchestration) @SRE
+- [x] I.3: Sovereign Credit System (Internal Resource Billing) @Gopher
+    - Task: Create usage_metrics table and API for remote nodes to report resource stats.
+    - Logic: Implement credit-decrementing logic based on CPU/MEM runtime.
+- [x] I.4: Multi-Tenant Dashboard View @Frontliner
+- [x] I.5: Global Ingress Orchestrator (Cloudflare/Nginx) @SRE
+        -Task: Automated Domain mapping, SSL termination, and DDoS protection.
+        -Integration: Allow 1-click "Publish to Web" for any satellite.
+
+---
+## 🧠 Memory Logs
+- **Milestone:** Satellite Alpha is LIVE on remote node. F.1 tunnel verified.
+- **Gopher:** Starting I.3. Building the accounting layer for fleet resources.

@@ -7,7 +7,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
-import type { ChatMessage, ProjectSummary, Thread } from '../../store/types';
+import type { ProjectSummary, Thread } from '../../store/types';
 
 // Import view components
 import '../views/fb-view-login';
@@ -24,9 +24,8 @@ import '../views/fb-view-portal-signup';
 import '../views/fb-view-portal-verify';
 import '../views/fb-view-portal-dashboard';
 
-// Import chat components (Step 52 Integration)
-import '../chat/fb-message-list';
-import '../chat/fb-input-bar';
+// Import chat view (Step 72 Integration)
+import '../views/fb-view-chat';
 
 @customElement('fb-panel-center')
 export class FBPanelCenter extends FBElement {
@@ -122,7 +121,8 @@ export class FBPanelCenter extends FBElement {
 
             fb-view-login,
             fb-view-verify,
-            fb-view-invite-accept {
+            fb-view-invite-accept,
+            fb-view-chat {
                 flex: 1;
             }
         `,
@@ -133,7 +133,6 @@ export class FBPanelCenter extends FBElement {
     @state() private _activeProject: ProjectSummary | null = null;
     @state() private _activeThread: Thread | null = null;
     @state() private _isMobile = false;
-    @state() private _hasMessages = false;
     @state() private _isVerifyRoute = false;
     @state() private _isInviteAcceptRoute = false;
     @state() private _isAdminInvitesRoute = false;
@@ -166,10 +165,6 @@ export class FBPanelCenter extends FBElement {
             }),
             effect(() => {
                 this._isMobile = store.isMobile$.value;
-            }),
-            // Step 56: Track messages for file drop display
-            effect(() => {
-                this._hasMessages = store.messages$.value.length > 0;
             })
         );
     }
@@ -208,29 +203,6 @@ export class FBPanelCenter extends FBElement {
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
         super.disconnectedCallback();
-    }
-
-    private _handleSend(e: CustomEvent<{ content: string }>): void {
-        const content = e.detail.content;
-
-        const message: ChatMessage = {
-            id: `msg-${String(Date.now())}`,
-            role: 'user',
-            content: content,
-            createdAt: new Date().toISOString(),
-        };
-
-        store.actions.addMessage(message);
-
-        // Step 57: Send chat message via RealtimeService
-        // Response is handled by store's realtime event listener
-        // See FRONTEND_SCOPE.md Section 8.4
-        void import('../../services/realtime').then(({ realtimeService }) => {
-            realtimeService.send({
-                type: 'chat',
-                payload: { content },
-            });
-        });
     }
 
     private _toggleLeftPanel(): void {
@@ -324,20 +296,8 @@ export class FBPanelCenter extends FBElement {
                 </button>
             </nav>
 
-            <!-- Conversation / Empty State -->
-            ${this._activeThread || this._hasMessages ? html`
-                <fb-message-list></fb-message-list>
-                <fb-input-bar @send=${this._handleSend.bind(this)}></fb-input-bar>
-            ` : html`
-                <div class="empty-state" role="status">
-                    <div class="empty-icon" aria-hidden="true">💬</div>
-                    <div class="empty-title">No conversation selected</div>
-                    <div>Select a project and thread from the left panel to start chatting.</div>
-                    <div style="margin-top: var(--fb-spacing-md); font-size: var(--fb-text-sm);">
-                        Or drag and drop a file anywhere to upload.
-                    </div>
-                </div>
-            `}
+            <!-- Step 72: Conversation via fb-view-chat -->
+            <fb-view-chat></fb-view-chat>
         `;
     }
 }

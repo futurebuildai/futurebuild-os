@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --prefix frontend run build)",
+      "Bash(npm --prefix frontend run lint)",
+      "Bash(npm --prefix frontend run lint -- src/components/views/fb-view-chat.ts src/store/store.ts src/store/types.ts)",
+      "Bash(npm --prefix frontend run lint -- src/components/views/fb-view-chat.ts)",
+      "Bash(npx eslint:*)",
+      "Bash(git add:*)",
+      "Bash(find:*)",
+      "Bash(go test:*)",
+      "Bash(make audit:*)",
+      "Bash(go vet:*)",
+      "Bash(echo:*)",
+      "Bash(go clean:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(phase11\\): implement L7 production-ready Interrogator Agent \\(Step 75\\)\n\nImplements comprehensive production readiness for the Smart Onboarding wizard\nwith SSRF protection, security hardening, and full test coverage.\n\nCRITICAL FIXES \\(P0\\):\n- Fix nil pointer for OnboardingHandler in server initialization\n- Register /api/v1/agent/onboard route with auth middleware\n- Implement SSRF-safe image download with comprehensive security controls\n  * URL scheme validation \\(blocks file://, ftp://\\)\n  * Private IP blocking \\(10.x, 192.168.x, 172.x, 127.x, AWS metadata\\)\n  * 50MB size limit, 30s timeout, redirect blocking\n  * MIME type validation \\(images/PDFs only\\)\n- Add request validation \\(body size, session ID, message length, URL format\\)\n- Fix multimodal AI requests for blueprint vision analysis\n\nSECURITY HARDENING:\n- SSRF protection against OWASP A10 vulnerabilities\n- Input validation with clear error messages\n- DoS prevention \\(size limits, timeouts, field limits\\)\n- User-friendly error messages \\(no internal error disclosure\\)\n\nTEST COVERAGE:\n- 45 unit tests covering SSRF, business logic, error handling\n- 18 integration tests for API contract and end-to-end flow\n- Security tests for file schemes, private IPs, redirects\n- All tests passing \\(go vet clean\\)\n\nOBSERVABILITY:\n- Structured logging with log/slog\n  * onboarding_message_received/completed\n  * blueprint_download_failed\n  * ai_extraction_failed\n- Metrics-ready \\(confidence scoring, extraction tracking\\)\n\nDOCUMENTATION:\n- Complete API documentation \\(docs/API_ONBOARDING.md\\)\n- Deployment checklist with pre-deploy, rollback, monitoring plans\n- Request/response schemas with security notes\n\nFILES ADDED:\n- internal/service/interrogator_service.go \\(384 lines\\)\n- internal/service/interrogator_service_test.go \\(382 lines\\)\n- internal/api/handlers/onboarding_handler.go \\(124 lines\\)\n- test/integration/onboarding_test.go \\(570 lines\\)\n- docs/API_ONBOARDING.md \\(378 lines\\)\n- deployment/STEP_75_CHECKLIST.md \\(424 lines\\)\n\nFILES MODIFIED:\n- internal/server/server.go \\(+15 lines\\)\n  * Added OnboardingHandler initialization\n  * Registered /agent/onboard route with auth\n\nSee PHASE_11_PRD.md Step 75 and specs/committed/STEP_75_INTERROGATOR_AGENT.md\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

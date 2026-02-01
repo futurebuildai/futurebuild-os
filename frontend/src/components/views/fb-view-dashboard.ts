@@ -1,15 +1,36 @@
 /**
  * FBViewDashboard - Default Landing View
- * See PRODUCTION_PLAN.md Step 51.4
+ * See PRODUCTION_PLAN.md Step 51.4, STEP_70_DASHBOARD_WIRING.md
  *
  * The home base for authenticated users.
- * Displays project overview, metrics, and quick actions.
+ * Displays project overview, metrics derived from store signals,
+ * and daily focus tasks driven by the agentic backend.
  */
 import { html, css, TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
 import { store } from '../../store/store';
+import { api, type Project as APIProject } from '../../services/api';
+import type { FocusTask, ProjectSummary } from '../../store/types';
+import type { StatusCardType } from '../widgets/fb-status-card';
+import '../widgets/fb-status-card';
+
+/**
+ * Convert API Project to store ProjectSummary format.
+ * Duplicated from fb-view-projects.ts to avoid cross-view imports.
+ */
+function mapAPIProjectToSummary(project: APIProject): ProjectSummary {
+    return {
+        id: project.id,
+        name: project.name,
+        address: project.address,
+        status: project.status,
+        completionPercentage: project.completion_percentage,
+        createdAt: project.created_at,
+        updatedAt: project.updated_at,
+    };
+}
 
 @customElement('fb-view-dashboard')
 export class FBViewDashboard extends FBViewElement {
@@ -90,10 +111,19 @@ export class FBViewDashboard extends FBViewElement {
                 text-align: center;
                 color: var(--fb-text-muted);
             }
+
+            .task-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--fb-spacing-sm);
+            }
+
         `,
     ];
 
     @state() private _userName = '';
+    @state() private _focusTasks: FocusTask[] = [];
+    @state() private _projects: ProjectSummary[] = [];
 
     private _disposeEffect: (() => void) | null = null;
 
@@ -101,6 +131,8 @@ export class FBViewDashboard extends FBViewElement {
         super.connectedCallback();
         this._disposeEffect = effect(() => {
             this._userName = store.user$.value?.name ?? 'Builder';
+            this._focusTasks = store.focusTasks$.value;
+            this._projects = store.projects$.value;
         });
     }
 
@@ -111,8 +143,76 @@ export class FBViewDashboard extends FBViewElement {
     }
 
     override onViewActive(): void {
-        // Future: Fetch dashboard metrics from API
-        console.log('[FBViewDashboard] View activated - would fetch metrics');
+        // Fetch projects to populate metrics if store is empty
+        if (store.projects$.value.length === 0) {
+            void this._fetchProjects();
+        }
+    }
+
+    private async _fetchProjects(): Promise<void> {
+        try {
+            const apiProjects = await api.projects.list();
+            store.actions.setProjects(apiProjects.map(mapAPIProjectToSummary));
+        } catch (err) {
+            console.error('[FBViewDashboard] Failed to fetch projects:', err);
+        }
+    }
+
+    private get _activeProjectCount(): number {
+        return this._projects.length;
+    }
+
+    private get _criticalTaskCount(): number {
+        return this._focusTasks.filter(
+            (t) => t.priority === 'high' || t.actionType === 'urgent'
+        ).length;
+    }
+
+    private get _avgCompletion(): string {
+        if (this._projects.length === 0) return '\u2014';
+        const avg =
+            this._projects.reduce((sum, p) => sum + p.completionPercentage, 0) /
+            this._projects.length;
+        return `${Math.round(avg)}%`;
+    }
+
+    private _mapPriorityToType(task: FocusTask): StatusCardType {
+        if (task.actionType === 'urgent' || task.priority === 'high')
+            return 'critical';
+        if (task.priority === 'medium') return 'warning';
+        return 'info';
+    }
+
+    private _mapPriorityToIcon(task: FocusTask): string {
+        if (task.actionType === 'urgent') return 'priority_high';
+        if (task.actionType === 'approval') return 'approval';
+        if (task.actionType === 'review') return 'rate_review';
+        return 'task_alt';
+    }
+
+    private _renderFocusTasks(): TemplateResult {
+        if (this._focusTasks.length === 0) {
+            return html`
+                <div class="placeholder-content">
+                    No focus tasks right now. The AI agent will surface priorities here.
+                </div>
+            `;
+        }
+
+        return html`
+            <div class="task-list">
+                ${this._focusTasks.map(
+                    (task) => html`
+                        <fb-status-card
+                            type=${this._mapPriorityToType(task)}
+                            title=${task.title}
+                            subtitle="${task.description} — ${task.projectName}"
+                            icon=${this._mapPriorityToIcon(task)}
+                        ></fb-status-card>
+                    `
+                )}
+            </div>
+        `;
     }
 
     override render(): TemplateResult {
@@ -125,30 +225,24 @@ export class FBViewDashboard extends FBViewElement {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">Active Projects</div>
-                    <div class="metric-value">3</div>
-                    <div class="metric-trend trend-up">↑ 1 new this month</div>
+                    <div class="metric-value">${this._activeProjectCount}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Tasks Due This Week</div>
-                    <div class="metric-value">12</div>
-                    <div class="metric-trend">5 completed</div>
+                    <div class="metric-label">Critical Tasks</div>
+                    <div class="metric-value">${this._criticalTaskCount}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Pending Invoices</div>
-                    <div class="metric-value">$24,500</div>
-                    <div class="metric-trend trend-down">3 overdue</div>
+                    <div class="metric-label">Focus Items</div>
+                    <div class="metric-value">${this._focusTasks.length}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Avg. Completion</div>
-                    <div class="metric-value">67%</div>
-                    <div class="metric-trend trend-up">↑ 5% this week</div>
+                    <div class="metric-value">${this._avgCompletion}</div>
                 </div>
             </div>
 
-            <h2 class="section-title">Recent Activity</h2>
-            <div class="placeholder-content">
-                Activity feed coming soon. Will show task updates, chat messages, and alerts.
-            </div>
+            <h2 class="section-title">Daily Focus</h2>
+            ${this._renderFocusTasks()}
         `;
     }
 }

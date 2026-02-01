@@ -1,0 +1,34 @@
+{
+  "prime_node": "ThinkStation-P3-Tiny",
+  "protocol": "Prism",
+  "version": "4.0",
+  "satellites": {
+    "alpha": {
+      "status": "DEPLOYED",
+      "manifest_type": "recursive_fabrication",
+      "node_target": "railway_cloud",
+      "github_repo": "https://github.com/futurebuildai/alpha",
+      "railway_project": "08c81077-69d7-439b-bc96-4f009e0234bf",
+      "services": {
+        "backend": {
+          "url": "https://backend-production-22a82.up.railway.app",
+          "health": "/health",
+          "port": 8081,
+          "verified": true,
+          "verified_status": 200,
+          "verified_body": {"service":"Satellite Alpha","status":"healthy"}
+        },
+        "frontend": {
+          "url": "https://frontend-production-74d4.up.railway.app",
+          "port": 3000,
+          "verified": true,
+          "verified_status": 200,
+          "verified_title": "Satellite Alpha — Real-time Crypto Tracker"
+        }
+      },
+      "verified_at": "2026-01-30",
+      "verification_agent": "Inspector",
+      "dna_inheritance": "hardened_go_nextjs_v15"
+    }
+  }
+}

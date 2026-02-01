@@ -1,18 +1,15 @@
 import { html, css, TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { store } from '../../store/store';
 
 /**
  * FBInputBar - User input component for chat messages.
  * Features auto-resizing textarea, keyboard shortcuts, and accessibility.
- * 
- * NOTE: The file upload button is currently inert (placeholder for Step 56).
- * 
- * **Step 56 Implementation Guidance:**
- * When implementing drag-and-drop file ingestion, attach drag event listeners
- * to the ENTIRE chat window (fb-panel-center), not just this input bar.
- * Users expect to drop files anywhere on the chat interface.
- * 
+ *
+ * Step 73: Upload button wired to native file picker → store.handleFileDrop().
+ * Drag-and-drop listeners live on fb-app-shell (global), not here.
+ *
  * @element fb-input-bar
  * @fires send - When user submits a message
  */
@@ -166,13 +163,37 @@ export class FBInputBar extends FBElement {
         if (textarea) textarea.style.height = 'auto';
     }
 
+    /** Step 73: Open native file picker, feed selection into store.handleFileDrop */
+    private _openFilePicker(): void {
+        const input = this.shadowRoot?.querySelector<HTMLInputElement>('#file-input');
+        input?.click();
+    }
+
+    private _handleFileSelect(e: Event): void {
+        const input = e.target as HTMLInputElement;
+        if (input.files && input.files.length > 0) {
+            store.actions.handleFileDrop(input.files);
+        }
+        // Reset so the same file can be re-selected
+        input.value = '';
+    }
+
     override render(): TemplateResult {
         return html`
+            <input
+                id="file-input"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                multiple
+                hidden
+                @change=${this._handleFileSelect.bind(this)}
+            />
             <div class="container">
-                <button 
-                    class="icon-btn" 
+                <button
+                    class="icon-btn"
                     title="Upload File"
                     aria-label="Upload file attachment"
+                    @click=${this._openFilePicker.bind(this)}
                 >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>

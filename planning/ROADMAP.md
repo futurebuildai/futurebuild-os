@@ -1,187 +1,75 @@
-# FutureBuild: Zero to Production - 69 Step Plan
+# FutureBuild: Beta Launch Roadmap (Steps 70-95)
 
-**Version:** 1.2.0
-**Date:** 2026-01-05
-**Focus:** Lit/TypeScript Architecture, Rosetta Stone Type System, and Robust Multi-Layer Validation
-
----
-
-## Overview
-
-This plan outlines 69 sequential steps to take FutureBuild from zero to production. The strategy emphasizes type safety through a shared "Rosetta Stone," a modern reactive frontend using Lit and TypeScript, and automated validation checkpoints at every layer.
+**Version:** 2.1.0 (Beta Remediation + Identity Overhaul)
+**Previous Status:** Completed Phase 9 (FutureShade / Step 69)
+**Current Focus:** Bridging the gap between "Static UI" and "AI-Driven Action" for Public Beta.
 
 ---
 
-## Phase 0: Foundation & CI/CD (Steps 1-8)
+## 🚦 Phase 10: The Brain Connection (Dashboard & Chat)
+**Goal:** Connect the "Daily Focus" and "Chat" views to the live Data Spine so users feel the AI's presence immediately.
 
-| Status | Step | Task | Why Upfront | Est. Days |
-|--------|------|------|-------------|-----------|
-| [x] | 1 | Set up Git branching strategy (main, develop, feature/*) | Everything depends on version control | 0.5 |
-| [x] | 2 | Configure GitHub Actions pipeline (linting/tests) | Catch errors early, enforce consistency | 1 |
-| [x] | 3 | Set up automated testing pipeline (go test) | Tests run on every PR from day 1 | 1 |
-| [x] | 4 | Configure pre-commit hooks (gofmt, go vet, staticcheck) | Code quality before it hits repo | 0.5 |
-| [x] | 5 | Set up staging environment on Digital Ocean | Test deployments safely | 1 |
-| [x] | 6 | Configure environment variable management (dev/staging/prod) | Secrets flow correctly from start | 0.5 |
-| [x] | 7 | Set up database migrations framework (golang-migrate) | Schema changes tracked from beginning | 1 |
-| [x] | 8 | Create Docker Compose for local dev parity | Consistent dev environments | 1 |
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [x] | 70 | **Dashboard Data Wiring**: Refactor `fb-view-dashboard.ts` to subscribe to `store.focusTasks$` instead of hardcoded strings. | Gap 2 (Dashboard Brain) | 1 |
+| [x] | 71 | **Focus Card Component**: Create `<fb-status-card>` to render specific Agent 1 outputs (Critical Path, Weather). | Gap 2 (Dashboard Brain) | 1 |
+| [x] | 72 | **Chat View Implementation**: Build the actual `<fb-message-list>` and `<fb-input-bar>` inside `fb-view-chat.ts`. | Gap 7 (Chat Interface) | 1 |
+| [x] | 73 | **Drag-to-Chat Wiring**: Connect the global `fb-file-drop` event to trigger `api.chat.send` with attachments. | Gap 7 (Chat Interface) | 1 |
 
----
+## 🏗️ Phase 11: The Conversational Hook (Smart Onboarding)
+**Goal:** Replace the manual form with a "Chat + Upload" wizard where Agent 2 interviews the user to build the project spec.
 
-## Phase 1: Database & Core Models (Steps 9-16)
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [ ] | 74 | **Split-Screen Wizard**: Create `fb-view-onboarding` with Chat (Left) and Live Form (Right). | Gap 1 (Creation Workflow) | 1 |
+| [ ] | 75 | **"The Interrogator" Agent**: Implement backend logic for Agent 2 to ask clarifying questions (e.g., "I see 3 baths, is one a master en-suite?"). | User Request (Interactive) | 2 |
+| [ ] | 76 | **Real-Time Form Filling**: Wire the chat stream to auto-update the `ProjectDetail` form state as the AI extracts data. | User Request (Structured Data) | 1 |
+| [ ] | 77 | **Magic Upload Trigger**: Ensure dragging a Blueprint PDF triggers the analysis workflow immediately. | Gap 1 (Creation Workflow) | 0.5 |
 
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 9 | Provision PostgreSQL 15 with pgvector extension | Step 5 | 0.5 |
-| [x] | 10 | Create Identity & Access models (Org, User, Project) | Step 7 | 2 |
-| [x] | 11 | Implement WBS_TEMPLATE and WBS_TASK models | Step 10 | 1 |
-| [x] | 12 | **Create Domain 3 Financial tables** (PROJECT_BUDGETS, INVOICES) | Step 11 | 1.5 |
-| [x] | 13 | **Create Domain 4 Communication tables** (CONTACTS, ASSIGNMENTS, LOGS) | Step 11 | 1.5 |
-| [x] | 14 | Create PROJECT_TASK model with dependency fields | Step 11 | 1 |
-| [x] | 15 | **Seed data for WBS_TASKS including "Ghost Predecessors" (WBS 6.x)** | Step 11 | 1 |
-| [x] | 16.1 | Implement DB indexing and health check endpoint | Step 9 | 0.5 |
-| [x] | 16.2 | **Implement Project CRUD APIs** (POST/GET) with Multi-Tenancy gates | Step 16.1 | 0.5 |
+## 🆔 Phase 12: Identity & Sovereignty (Auth Refactor)
+**Goal:** Replace fragile magic links with a robust Auth Provider (Clerk/Auth0) and implement deep Tenant/Org management.
 
----
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [ ] | 78 | **Auth Provider Integration**: Replace `fb-view-login` and backend handlers with Clerk/Auth0 SDKs. | User Request (Auth) | 1 |
+| [ ] | 79 | **Middleware Swap**: Update Go middleware to validate 3rd-party JWTs instead of internal tokens. | User Request (Auth) | 1 |
+| [ ] | 80 | **Organization Manager**: Build a "Team Settings" view to invite/remove members via the Provider API. | Gap (Org Mgmt) | 2 |
+| [ ] | 81 | **Role Mapping**: Map Provider roles (Admin/Member) to FutureBuild's `PermissionMatrix`. | Gap (Org Mgmt) | 0.5 |
 
-## Phase 2: The Rosetta Stone - Type System (Steps 17-20)
+## 🔄 Phase 13: The Action Loop (Invoice & Field)
+**Goal:** Make Artifacts interactive so users can validate and approve AI decisions.
 
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 17 | **Create `pkg/types` in Go**: Define Enums and Structs from API_AND_TYPES_SPEC.md | Step 11 | 1 |
-| [x] | 18 | **Create `frontend/src/types`**: Define matching TypeScript Interfaces and Enums | Step 17 | 1 |
-| [x] | 19 | **Define Go Service Interfaces**: Weather, Vision, Notification, Directory | Step 17 | 1 |
-| [x] | 20 | **Contract Validation Test**: Write a test suite that marshals all Go structs to JSON and validates them against the TypeScript definitions | Step 18 | 1 |
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [ ] | 82 | **Interactive Invoice**: Rewrite `fb-artifact-invoice.ts` to use `<input>` fields for values (Edit Mode). | Gap 3 (Invoice Loop) | 2 |
+| [ ] | 83 | **Approval Actions**: Add "Approve" & "Reject" buttons to artifacts that call `api.finance.approve`. | Gap 3 (Invoice Loop) | 1 |
+| [ ] | 84 | **Field Feedback Loop**: Update `fb-photo-upload.ts` to poll `api.vision.status` after upload. | Gap 6 (Field Portal) | 1 |
+| [ ] | 85 | **Vision Badges**: Implement "Verifying..." vs "Verified ✅" UI states in the portal. | Gap 6 (Field Portal) | 0.5 |
 
----
+## ⚙️ Phase 14: Physics Calibration (Settings & Gantt)
+**Goal:** Allow users to tune the engine and see the results visually.
 
-## Phase 3: Authentication & Authorization (Steps 21-25)
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [ ] | 86 | **Builder Profile UI**: Add "Speed" (Slider) and "Work Days" (Checkbox) to `fb-view-settings.ts`. | Gap 4 (Physics Tuning) | 1 |
+| [ ] | 87 | **Config Persistence**: Wire settings to update `business_config` table in the backend. | Gap 4 (Physics Tuning) | 1 |
+| [ ] | 88 | **Critical Path Visuals**: Add `.critical-path` CSS styling to `fb-artifact-gantt` tasks where `is_critical === true`. | Gap 5 (Gantt) | 1 |
+| [ ] | 89 | **Dependency Arrows**: Render SVG connectors between dependent tasks in the Gantt view. | Gap 5 (Gantt) | 2 |
 
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 21 | Implement magic link email authentication | Step 10, 17 | 2 |
-| [x] | 22 | Create JWT token generation and validation logic | Step 21 | 1 |
-| [x] | 23 | Build role-based permission middleware (Admin, Builder, Client, Sub) | Step 22 | 1.5 |
-| [x] | 24 | Create portal access tokens for external users | Step 23 | 1 |
-| [x] | 25 | Add rate limiting for auth endpoints | Step 21 | 0.5 |
+## 💅 Phase 15: Polish & Launch
+**Goal:** Final UX implementations to ensure a professional feel.
 
----
-
-## Phase 4: Physics Engine - Core Scheduling (Steps 26-34)
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 26 | Implement DHSM calculator with multiplier logic | Step 14, 17 | 2 |
-| [x] | 27 | Build dependency graph using gonum/graph | Step 14 | 2 |
-| [x] | 28 | Implement CPM forward pass (ES, EF) | Step 27 | 1 |
-| [x] | 29 | Implement CPM backward pass (LS, LF, float, critical path) | Step 28 | 1 |
-| [x] | 30 | Implement "Event Duration Locking" (fixed durations for Inspections) | Step 26 | 0.5 |
-| [x] | 31 | Add SWIM weather overlay for pre-dry-in tasks | Step 26 | 2 |
-| [x] | 32 | Build schedule recalculation trigger system | Step 29 | 1 |
-| [x] | 33 | **Golden Master Physics Test**: Create a test suite that runs the DHSM and CPM calculators against a dataset of 50 pre-calculated scenarios | Step 32 | 1 |
-| [x] | 34 | **Cycle Detection Test**: Verify the CPM solver correctly handles and rejects circular dependencies | Step 27 | 0.5 |
+| Status | Step | Task | Gap Addressed | Est. Days |
+|--------|------|------|---------------|-----------|
+| [ ] | 90 | **Mobile Navigation**: Implement the bottom tab bar `<fb-mobile-nav>` for screens < 768px. | Gap 8 (Navigation) | 1 |
+| [ ] | 91 | **Notification UI**: Build the Notification Bell/Stream in the App Shell. | Gap 10 (Notifications) | 1 |
+| [ ] | 92 | **Risk Indicators**: Add the "Red Dot" logic to `<fb-project-card>` based on blocking issues. | Gap 9 (Command Center) | 0.5 |
+| [ ] | 93 | **Beta Release Tag**: Final regression test and deployment to Production. | Release | 1 |
 
 ---
 
-## Phase 5: Context Engine - AI Integration (Steps 35-42)
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 35 | Set up Vertex AI client and PDF upload pipeline (S3) | Step 6, 9 | 2 |
-| [x] | 36 | Implement RAG pipeline with pgvector embeddings | Step 35 | 3 |
-| [x] | 37 | **Implement Invoice Processor logic**: PDF -> `InvoiceExtraction` JSON | Step 17, 36 | 3 |
-| [x] | 38 | **Implement DirectoryService lookup logic** (Project Phase -> Contact) | Step 13, 19 | 1.5 |
-| [x] | 39 | Add confidence scoring and human review flags | Step 37 | 1 |
-| [x] | 40 | Build site photo verification flow | Step 35 | 2 |
-| [x] | 40b | **Upgrade Vertex AI SDK**: Refactor `pkg/ai` to support Gemini 2.5 Flash image payloads | Step 40 | 1 |
-| [x] | 41 | Create document re-processing and audit trail system | Step 36 | 1 |
-| [x] | 42 | **Mock Ingestion Pipeline**: Create a test fixture that injects "perfect" JSON to verify DB logic | Step 37, 12 | 1 |
-
----
-
-## Phase 6: Action Engine - Chat & Agents (Steps 43-49)
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 43.1 | **Domain Modeling (Types)**: Define strict data contracts for Chat domain | Step 36, 37 | 1 |
-| [x] | 43.2 | **Intent Classification (Router)**: Implement KeywordClassifier (V1 MVP) | Step 43.1 | 1 |
-| [x] | 43.3 | **Orchestration Service (Executor)**: Build traffic controller and logic flow | Step 43.2 | 1 |
-| [x] | 43.4 | **API Handler (Interface)**: Expose orchestrator via HTTP with strict security | Step 43.3 | 1 |
-| [x] | 43.5 | **Wiring & Assembly**: Register components and apply AuthMiddleware | Step 43.4 | 0.5 |
-| [x] | 43.6 | **Verification**: Verify endpoint with mock Auth Token and DB check | Step 43.5 | 0.5 |
-| [x] | 44 | Implement internal artifact mapping (Tool Output -> ArtifactType) | Step 43 | 1 |
-| [x] | 45 | Create prioritized daily briefing job (Asynq) | Step 29, 43 | 2 |
-| [x] | 46 | **Update Procurement Agent**: Lead-times + Weather/Buffer calculations | Step 26, 31, 43 | 2 |
-| [x] | 47 | **Update Sub Liaison Agent**: Use DirectoryService for contact resolving | Step 19, 38 | 1.5 |
-| [x] | 48 | Implement inbound message processing and state-machine updates | Step 43, 47 | 2 |
-| [x] | 49 | **Time-Travel Agent Simulation**: Create an integration test with mocked Clock interface | Step 48 | 2 |
-
----
-
-## Phase 7: Frontend - Lit + TypeScript (Steps 50-59)
-
-> [!IMPORTANT]
-> **UI Architecture Pivot (v1.3.0)**: 3-panel "Agent Command Center" layout replaces SaaS dashboard.
-> See FRONTEND_SCOPE.md Section 3.3 for details.
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 50 | **Initialize Vite project with Lit + TS**; Configure `@types` aliases | Step 18 | 1 |
-| [x] | 51.1 | **Base Architecture**: `FBElement`, global styles, and registry | Step 50 | 1 |
-| [x] | 51.2 | **Reactive State Engine**: Signals Store (`store.ts`) & Service Layer | Step 51.1 | 1 |
-| [x] | 51.3 | **3-Panel Shell**: Left (Projects/Threads), Center (Chat), Right (Artifacts) | Step 51.2 | 2 |
-| [x] | 52 | **Conversation UI Components**: Message List, Action Cards, Input Bar | Step 51.3 | 2 |
-| [x] | 53 | **Agent Activity Log**: Real-time status w/ expanding details | Step 52 | 1 |
-| [x] | 54 | **Mobile Responsive Behavior**: Panel overlays & collapse logic | Step 53 | 2 |
-| [x] | 55 | **Artifact Panel Renderers**: Gantt, Budget, Invoice components | Step 54 | 3 |
-| [x] | 56 | **Drag-and-Drop Ingestion**: Invoice upload zone in specialized input | Step 55 | 1.5 |
-| [x] | 57 | **Real-time Messaging**: WebSocket/SSE wiring | Step 56 | 2 |
-| [x] | 58 | **Artifact Fixture Testing**: Wire components to Store data & Fixtures | Step 55 | 1 |
-| [x] | 59 | **E2E Demo Readiness**: Full flow verification, accessibility, polish | Step 58 | 2 |
-
----
-
-## Phase 8: Production Readiness (Steps 60-63)
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 60.1 | **Strict Mode & Type Hygiene**: Enforce `no-explicit-any` | Step 59 | 1 |
-| [x] | 60.2.1 | **Virtualization Infrastructure**: Implement `@lit-labs/virtualizer` in `fb-message-list` | Step 60.1 | 1 |
-| [x] | 60.2.2 | **Load Test Harness**: Create `LoadTestService` to pump 1,000+ messages | Step 60.2.1 | 0.5 |
-| [x] | 60.2.3 | **Performance Tuning**: Profile and tune `overscan` buffers for 60fps scrolling | Step 60.2.2 | 0.5 |
-| [x] | 61.1 | **Security Audit & Hardening**: Run static analysis, audit SQL queries, verify RBAC | All previous | 1.5 |
-| [x] | 61.2 | **Go Service Mocking**: Implement "Spy" and "Stub" mocks for Weather, Vision, Directory | 61.1 | 1.5 |
-| [x] | 62.1 | **Integration Test Infrastructure**: Set up `TestMain` with `testcontainers-go` | Step 61.2 | 1 |
-| [x] | 62.2 | **Core API Integration Suite**: Write `handler_test.go` suites for Projects and Tasks | Step 62.1 | 1 |
-| [x] | 62.3 | **Agent Loop Verification**: Integration tests for Asynq workers | Step 62.2 | 1.5 |
-| [x] | 62.4 | **The "Golden Thread" E2E**: A single "Life of a Project" end-to-end test | Step 62.3 | 1.5 |
-| [x] | 63 | **Implement Shadow Site & Protocol**: Deploy internal documentation portal | All previous | 3 |
-
-## Phase 9: FutureShade - The Intelligence Layer (Steps 64-69)
-
-| Status | Step | Task | Dependencies | Est. Days |
-|--------|------|------|--------------|-----------|
-| [x] | 64 | **Initialize FutureShade Service**: Create `internal/futureshade` and `frontend/futureshade` | Step 63 | 2 |
-| [x] | 65 | **Implement "The Tribunal" Interfaces**: Define Multi-Model Client and Consensus Logic | Step 64 | 3 |
-| [x] | 66 | **Build The Shadow Viewer**: Specialized UI for ShadowDocs and Tribunal Decision Logs | Step 50, 64 | 3 |
-| [x] | 67 | **Integrate Antigravity Skills**: Allow FutureShade to call `internal/agents` | Step 49, 65 | 2 |
-| [x] | 68 | **Implement Automated PR Review**: GitHub Webhook -> Tribunal -> PR Comment | Step 67 | 2 |
-| [x] | 69 | **The "Tree Planting" Ceremony**: Final integration test where FutureShade auto-diagnoses and fixes | Step 68 | 2 |
-> Completed: 2026-01-26
-
----
-
-## Definition of Done
-
-1. Code passes all Go linting (golangci-lint).
-2. **TypeScript compiles with no 'any' types (Strict Mode).**
-3. Unit tests written and passing (>80% coverage).
-4. **Go Service Interfaces (Weather, Vision, etc.) mocked and tested.**
-5. Database migrations tested (forward and rollback).
-6. Deployed to staging and manually verified.
-7. Documentation updated (API and README).
-8. **All Phase Checkpoints (Contract, Physics, Time-Travel) must pass.**
-9. **No logic committed without a corresponding Replay Test.**
-
----
-
-*Document Version: 1.2.0*
+## Definition of Done (Beta)
+1. **No "Lorem Ipsum"**: All dashboards display real database values.
+2. **Conversation First**: Project creation is a chat, not a form.
+3. **Secure**: Auth is handled by a dedicated provider (Clerk/Auth0).
+4. **Loop Closure**: Users receive feedback (Success/Fail) after every action.
