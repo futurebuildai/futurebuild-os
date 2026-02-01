@@ -1,30 +1,40 @@
-- Phase: Phase 11: The Conversational Hook (Smart Onboarding)
+- Phase: Phase 12: Identity & Sovereignty (Auth Refactor)
 
-## Phase 11: The Conversational Hook (Smart Onboarding)
-**PRD Reference:** [PHASE_11_PRD.md](../planning/PHASE_11_PRD.md)
+## Phase 12: Identity & Sovereignty (Auth Refactor)
+**PRD Reference:** [PHASE_12_PRD.md](../planning/PHASE_12_PRD.md)
 
-- [x] Step 74: Split-Screen Wizard @Frontend
-  - Task: Create `<fb-view-onboarding>` with chat/form split layout.
-  - Spec: [STEP_74_SPLIT_SCREEN_WIZARD.md](../specs/committed/STEP_74_SPLIT_SCREEN_WIZARD.md)
-  - Core Requirement: Responsive 50/50 desktop layout, stacked mobile.
+### 🛡️ Guardrails & Alignment
+Before executing any step, the Engineer MUST verify alignment with:
+1.  **Product Vision:** Does this change maintain the "Construction Professional" aesthetic and high-trust environment?
+2.  **Master PRD:** Does this adhere to the Multi-Tenant Schema (Section 4.1) and Role Definitions?
+3.  **L7 Spec:** Does the implementation match the granular requirement in the linked spec file?
 
-- [x] Step 75: The Interrogator Agent @Backend
-  - Task: Implement `interrogator_service.go` for document extraction & clarifying questions.
-  - Spec: [STEP_75_INTERROGATOR_AGENT.md](../specs/committed/STEP_75_INTERROGATOR_AGENT.md)
-  - Core Requirement: Layer 4 only (no physics calculations), P0-P2 priority matrix.
+**CRITICAL:** Perform an **L7 Self-Reflective Test** before marking any step as complete. Ask: "If I were an antagonistic auditor, would I find a security hole or UX regression here?"
 
-- [x] Step 76: Real-Time Form Filling @Frontend
-  - Task: Implement bidirectional state sync with Signals and visual "AI-populated" indicators.
-  - Spec: [STEP_76_REALTIME_FORM_FILLING.md](../specs/committed/STEP_76_REALTIME_FORM_FILLING.md)
-  - Core Requirement: Blue left border + ✨ for AI fields, yellow for low confidence.
+---
 
-- [x] Step 77: Magic Upload Trigger @Frontend
-  - Task: Implement drag-and-drop zone that auto-triggers analysis on file drop.
-  - Spec: [STEP_77_MAGIC_UPLOAD_TRIGGER.md](../specs/committed/STEP_77_MAGIC_UPLOAD_TRIGGER.md)
-  - Core Requirement: Progress states (Uploading -> Analyzing), 50MB max.
+- [ ] Step 78: Auth Provider Integration @Frontend
+  - **Task:** Integrate Clerk/Auth0 to replace magic link system.
+  - **Spec:** [STEP_78_AUTH_PROVIDER.md](../specs/phase12/STEP_78_AUTH_PROVIDER.md)
+  - **Core Requirement:** Zero custom auth code in frontend; use Provider SDK. Validate strictly against the "Construction Professional" dark mode aesthetic.
+
+- [ ] Step 79: Middleware Swap @Backend
+  - **Task:** Update Go middleware to validate JWKS from Provider instead of DB tokens.
+  - **Spec:** [STEP_79_MIDDLEWARE_SWAP.md](../specs/phase12/STEP_79_MIDDLEWARE_SWAP.md)
+  - **Core Requirement:** Stateless verification. Hard cutover (legacy tokens invalid). Security Audit: Ensure no algorithmic confusion attacks possible on JWT.
+
+- [ ] Step 80: Organization Manager @Frontend
+  - **Task:** Implement "Team Settings" to invite/manage members.
+  - **Spec:** [STEP_80_ORG_MANAGER.md](../specs/phase12/STEP_80_ORG_MANAGER.md)
+  - **Core Requirement:** Org-switching in UI must trigger immediate data store reset to prevent data leaks between tenants.
+
+- [ ] Step 81: Role Mapping @Backend
+  - **Task:** Map Provider roles (Admin/Member) to internal `PermissionMatrix`.
+  - **Spec:** [STEP_81_ROLE_MAPPING.md](../specs/phase12/STEP_81_ROLE_MAPPING.md)
+  - **Core Requirement:** Strict enforcement of "Viewer" vs "Builder" roles at the API level (RBAC).
 
 ---
 ## 🧠 Memory Logs
-- **Product Orchestrator:** Phase 11 Onboarding plan initialized.
-- **L7 Gatekeeper:** Phase 10 Audit Passed. Specs 74-77 committed with strict architectural guardrails.
-- **Reference:** PRD available at [PHASE_11_PRD.md](../planning/PHASE_11_PRD.md).
+- **Product Orchestrator:** Phase 12 Identity plan initialized.
+- **L7 Gatekeeper:** Phase 11 Audit Passed. Phase 12 Specs generated with strict security focus.
+- **Reference:** PRD available at [PHASE_12_PRD.md](../planning/PHASE_12_PRD.md).
