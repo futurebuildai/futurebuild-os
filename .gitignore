@@ -1,4 +1,5 @@
 # Go binaries
+api
 bin/
 *.exe
 *.exe~
