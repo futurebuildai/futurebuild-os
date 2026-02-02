@@ -43,6 +43,7 @@ type Server struct {
 	PortalHandler        *handlers.PortalHandler        // See LAUNCH_PLAN.md P2: Field Portal
 	PortalAuthHandler    *handlers.PortalAuthHandler    // Phase 12: Portal magic-link auth (separate from Clerk)
 	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
+	ClerkWebhookHandler  *handlers.ClerkWebhookHandler  // See PHASE_12_PRD.md Step 80
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
@@ -185,6 +186,13 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		githubWebhookHandler = handlers.NewGitHubWebhookHandler(cfg.GitHubWebhookSecret, cfg.RedisURL)
 	}
 
+	// See PHASE_12_PRD.md Step 80: Clerk Webhook Handler for org/user sync
+	// Only initialize if webhook secret is configured (fail-closed handled in handler)
+	var clerkWebhookHandler *handlers.ClerkWebhookHandler
+	if cfg.ClerkWebhookSecret != "" {
+		clerkWebhookHandler = handlers.NewClerkWebhookHandler(db, cfg.ClerkWebhookSecret)
+	}
+
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
 	var onboardingHandler *handlers.OnboardingHandler
@@ -211,6 +219,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		PortalHandler:        portalHandler,        // See LAUNCH_PLAN.md P2: Field Portal
 		PortalAuthHandler:    portalAuthHandler,    // Phase 12: Portal magic-link auth
 		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
+		ClerkWebhookHandler:  clerkWebhookHandler,  // See PHASE_12_PRD.md Step 80
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
@@ -324,6 +333,10 @@ func (s *Server) routes() {
 			// See docs/AUTOMATED_PR_REVIEW_PRD.md: GitHub PR Review Webhook
 			if s.GitHubWebhookHandler != nil {
 				r.Post("/github", s.GitHubWebhookHandler.HandleGitHubWebhook)
+			}
+			// See PHASE_12_PRD.md Step 80: Clerk org/user sync webhook
+			if s.ClerkWebhookHandler != nil {
+				r.Post("/clerk", s.ClerkWebhookHandler.HandleClerkWebhook)
 			}
 		})
 

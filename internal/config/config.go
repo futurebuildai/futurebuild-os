@@ -75,6 +75,10 @@ type Config struct {
 	// Optional: only enforced when non-empty. Configure in Clerk Dashboard JWT template.
 	// See STEP_79_MIDDLEWARE_SWAP.md Section 1.2.
 	ClerkAudience string
+	// ClerkWebhookSecret is the Svix signing secret for Clerk webhook verification.
+	// Optional: webhook handler is fail-closed when empty (rejects all requests).
+	// See PHASE_12_PRD.md Step 80: Organization Manager.
+	ClerkWebhookSecret string
 
 	// GitHub configuration for Automated PR Review.
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -164,6 +168,7 @@ func LoadConfig() (*Config, error) {
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/tmp/audit.wal"),
 		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
 		ClerkAudience:              os.Getenv("CLERK_AUDIENCE"),
+		ClerkWebhookSecret:         os.Getenv("CLERK_WEBHOOK_SECRET"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{

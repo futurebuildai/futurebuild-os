@@ -248,6 +248,46 @@ export const clerkService = {
     },
 
     /**
+     * Mount the Clerk Organization Profile component.
+     * @param element - Target HTMLDivElement
+     */
+    mountOrganizationProfile(element: HTMLDivElement): void {
+        if (!clerk) return;
+        clerk.mountOrganizationProfile(element, {
+            appearance: CLERK_APPEARANCE,
+        });
+    },
+
+    /**
+     * Unmount the Clerk Organization Profile component.
+     * @param element - Target HTMLDivElement
+     */
+    unmountOrganizationProfile(element: HTMLDivElement): void {
+        if (!clerk) return;
+        clerk.unmountOrganizationProfile(element);
+    },
+
+    /**
+     * Mount the Clerk Organization Switcher component.
+     * @param element - Target HTMLDivElement
+     */
+    mountOrganizationSwitcher(element: HTMLDivElement): void {
+        if (!clerk) return;
+        clerk.mountOrganizationSwitcher(element, {
+            appearance: CLERK_APPEARANCE,
+        });
+    },
+
+    /**
+     * Unmount the Clerk Organization Switcher component.
+     * @param element - Target HTMLDivElement
+     */
+    unmountOrganizationSwitcher(element: HTMLDivElement): void {
+        if (!clerk) return;
+        clerk.unmountOrganizationSwitcher(element);
+    },
+
+    /**
      * Sign out the current user.
      */
     async signOut(): Promise<void> {

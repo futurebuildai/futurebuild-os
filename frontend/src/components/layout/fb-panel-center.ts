@@ -16,6 +16,7 @@ import '../views/fb-view-invite-accept';
 import '../views/fb-view-admin-invites';
 import '../views/fb-view-settings';
 import '../views/fb-view-projects';
+import '../views/fb-view-team';
 
 // Import portal view components (LAUNCH_PLAN.md P2)
 import '../views/fb-view-portal-action';
@@ -125,7 +126,8 @@ export class FBPanelCenter extends FBElement {
             fb-view-login,
             fb-view-invite-accept,
             fb-view-chat,
-            fb-view-onboarding {
+            fb-view-onboarding,
+            fb-view-team {
                 flex: 1;
             }
         `,
@@ -141,6 +143,7 @@ export class FBPanelCenter extends FBElement {
     @state() private _isSettingsRoute = false;
     @state() private _isProjectsRoute = false;
     @state() private _isOnboardingRoute = false;
+    @state() private _isTeamRoute = false;
 
     // Portal routes (LAUNCH_PLAN.md P2)
     @state() private _isPortalActionRoute = false;
@@ -183,6 +186,7 @@ export class FBPanelCenter extends FBElement {
         this._isSettingsRoute = path === '/settings';
         this._isProjectsRoute = path === '/projects';
         this._isOnboardingRoute = path === '/projects/new';
+        this._isTeamRoute = path === '/settings/team';
 
         // Portal routes (LAUNCH_PLAN.md P2)
         this._isPortalLoginRoute = path === '/portal/login';
@@ -252,6 +256,11 @@ export class FBPanelCenter extends FBElement {
         // Show settings view for authenticated users
         if (this._isSettingsRoute) {
             return html`<fb-view-settings></fb-view-settings>`;
+        }
+
+        // Show team management view for authenticated users (Step 80)
+        if (this._isTeamRoute) {
+            return html`<fb-view-team></fb-view-team>`;
         }
 
         // Show onboarding wizard (Step 74)

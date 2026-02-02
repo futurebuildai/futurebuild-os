@@ -3,12 +3,13 @@
  * See FRONTEND_SCOPE.md Section 3.3
  */
 import { html, css, TemplateResult, nothing } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, query } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
 import type { ProjectSummary, Thread, FocusTask } from '../../store/types';
 import { UserRole } from '../../types/enums';
+import { clerkService } from '../../services/clerk';
 import '../agent/fb-agent-activity';
 import '../shadow/shadow-toggle';
 
@@ -256,8 +257,15 @@ export class FBPanelLeft extends FBElement {
                 fill: none;
                 stroke-width: 2;
             }
+
+            .org-switcher {
+                padding: var(--fb-spacing-sm) var(--fb-spacing-md);
+                border-bottom: 1px solid var(--fb-border-light);
+            }
         `,
     ];
+
+    @query('#org-switcher-container') private _orgSwitcherContainer: HTMLDivElement | undefined;
 
     @state() private _projects: ProjectSummary[] = [];
     @state() private _threads: Thread[] = [];
@@ -302,7 +310,16 @@ export class FBPanelLeft extends FBElement {
         );
     }
 
+    protected override firstUpdated(): void {
+        if (this._orgSwitcherContainer) {
+            clerkService.mountOrganizationSwitcher(this._orgSwitcherContainer);
+        }
+    }
+
     override disconnectedCallback(): void {
+        if (this._orgSwitcherContainer) {
+            clerkService.unmountOrganizationSwitcher(this._orgSwitcherContainer);
+        }
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
         super.disconnectedCallback();
@@ -362,6 +379,11 @@ export class FBPanelLeft extends FBElement {
                 </svg>
                 <div class="brand">FUTURE<span>BUILD</span></div>
             </header>
+
+            <!-- Organization Switcher (Step 80) -->
+            <div class="org-switcher">
+                <div id="org-switcher-container"></div>
+            </div>
 
             <!-- Daily Focus -->
             ${this._focusTasks.length > 0 ? html`
@@ -452,6 +474,17 @@ export class FBPanelLeft extends FBElement {
                                 <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
                             </span>
                             Invitations
+                        </button>
+                        <button
+                            class="item admin-item"
+                            role="listitem"
+                            @click=${(): void => { this._handleAdminNav('/settings/team'); }}
+                            aria-label="Manage team members"
+                        >
+                            <span class="item-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </span>
+                            Team
                         </button>
                     </div>
                 </section>

@@ -711,8 +711,14 @@ export function initializeStore(): void {
     // Wire Clerk auth state changes into the store
     // On sign-in: Clerk fires callback with user info and cached token
     // On sign-out: Clerk fires callback with (null, null)
+    // Step 80: Detect org switch (same user, different org) and clear project data
     clerkService.onAuthChange((clerkUser, token) => {
         if (clerkUser && token) {
+            const currentUser = _user$.value;
+            const isOrgSwitch = currentUser !== null
+                && currentUser.id === clerkUser.id
+                && currentUser.orgId !== clerkUser.orgId;
+
             const user: User = {
                 id: clerkUser.id,
                 email: clerkUser.email,
@@ -721,6 +727,20 @@ export function initializeStore(): void {
                 orgId: clerkUser.orgId,
             };
             actions.login(user, token);
+
+            // On org switch: clear project/thread/chat data but keep auth and UI state
+            if (isOrgSwitch) {
+                _projects$.value = [];
+                _currentProjectId$.value = null;
+                _currentProjectDetail$.value = null;
+                _activeProjectId$.value = null;
+                _threads$.value = [];
+                _activeThreadId$.value = null;
+                _messages$.value = [];
+                _focusTasks$.value = [];
+                _agentActivity$.value = [];
+                _activeArtifact$.value = null;
+            }
         } else {
             actions.logout();
         }

@@ -83,12 +83,13 @@ type AuthResponse struct {
 // User represents an internal user.
 // See DATA_SPINE_SPEC.md Section 2.2
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	OrgID     uuid.UUID `json:"org_id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Role      UserRole  `json:"role"`
-	CreatedAt string    `json:"created_at"`
+	ID         uuid.UUID `json:"id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	Email      string    `json:"email"`
+	Name       string    `json:"name"`
+	Role       UserRole  `json:"role"`
+	ExternalID string    `json:"external_id,omitempty"` // Clerk user ID (Step 80)
+	CreatedAt  string    `json:"created_at"`
 }
 
 // ToolCall represents a single tool invocation from the AI model.
