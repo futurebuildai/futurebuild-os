@@ -139,8 +139,8 @@ func TestAllScopes_ReturnsCorrectScopes(t *testing.T) {
 	}
 
 	builderScopes := AllScopes(types.UserRoleBuilder)
-	if len(builderScopes) != 9 {
-		t.Errorf("Builder should have 9 scopes, got %d", len(builderScopes))
+	if len(builderScopes) != 10 {
+		t.Errorf("Builder should have 10 scopes, got %d", len(builderScopes))
 	}
 
 	viewerScopes := AllScopes(types.UserRoleViewer)

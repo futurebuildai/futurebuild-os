@@ -15,6 +15,7 @@
 
 import { get, post, put, del } from './http';
 import type { GanttData, Contact, InvoiceExtraction } from '../types/models';
+import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
 
 // ============================================================================
@@ -492,6 +493,74 @@ export const api = {
             return post<OnboardProcessResponse>('/agent/onboard', data);
         },
     },
+
+    /**
+     * Vision analysis endpoints.
+     * See STEP_84_FIELD_FEEDBACK.md Section 2
+     */
+    vision: {
+        /**
+         * Get the analysis status of a project asset.
+         * @param assetId - Project asset UUID
+         */
+        status(assetId: string): Promise<VisionStatusResponse> {
+            return get<VisionStatusResponse>(`/vision/status/${assetId}`);
+        },
+    },
+
+    /**
+     * Project asset endpoints.
+     * See STEP_85_VISION_BADGES.md Section 2
+     */
+    assets: {
+        /**
+         * List all assets for a project with analysis status.
+         * @param projectId - Project UUID
+         */
+        list(projectId: string): Promise<ProjectAssetResponse[]> {
+            return get<ProjectAssetResponse[]>(`/projects/${projectId}/assets`);
+        },
+    },
+
+    /**
+     * Invoice endpoints.
+     * See PHASE_13_PRD.md Step 82: Interactive Invoice
+     */
+    invoices: {
+        /**
+         * Get a single invoice by ID.
+         * @param id - Invoice UUID
+         */
+        get(id: string): Promise<InvoiceResponse> {
+            return get<InvoiceResponse>(`/invoices/${id}`);
+        },
+
+        /**
+         * Update invoice line items (Draft invoices only).
+         * @param id - Invoice UUID
+         * @param data - Updated line items
+         */
+        update(id: string, data: UpdateInvoiceRequest): Promise<InvoiceResponse> {
+            return put<InvoiceResponse>(`/invoices/${id}`, data);
+        },
+
+        /**
+         * Approve a Draft invoice. Irreversible.
+         * @param id - Invoice UUID
+         */
+        approve(id: string): Promise<InvoiceResponse> {
+            return post<InvoiceResponse>(`/invoices/${id}/approve`);
+        },
+
+        /**
+         * Reject a Draft invoice with an optional reason.
+         * @param id - Invoice UUID
+         * @param reason - Rejection reason
+         */
+        reject(id: string, reason?: string): Promise<InvoiceResponse> {
+            return post<InvoiceResponse>(`/invoices/${id}/reject`, { reason: reason ?? '' });
+        },
+    },
 } as const;
 
 // ============================================================================
@@ -594,4 +663,93 @@ export interface UserProfile {
  */
 export interface UpdateProfileRequest {
     name: string;
+}
+
+// ============================================================================
+// Invoice Types (Step 82)
+// ============================================================================
+
+/**
+ * Line item in an invoice update request.
+ */
+export interface UpdateInvoiceLineItem {
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+}
+
+/**
+ * Request body for updating invoice line items.
+ * See STEP_82_INTERACTIVE_INVOICE.md Section 2.1
+ */
+export interface UpdateInvoiceRequest {
+    items: UpdateInvoiceLineItem[];
+}
+
+/**
+ * Full invoice response from backend.
+ * Mirrors Go models.Invoice.
+ */
+export interface InvoiceResponse {
+    id: string;
+    project_id: string;
+    vendor_name: string;
+    amount_cents: number;
+    line_items: InvoiceLineItemResponse[];
+    detected_wbs_code: string;
+    status: InvoiceStatus;
+    invoice_date: string | null;
+    invoice_number: string | null;
+    confidence: number;
+    is_human_review_required: boolean;
+    source_document_id: string | null;
+    // Step 83: Approval metadata (Rosetta Stone parity with Go models.Invoice)
+    approved_by_id: string | null;
+    approved_at: string | null;
+    rejected_by_id: string | null;
+    rejected_at: string | null;
+    rejection_reason: string | null;
+}
+
+/**
+ * Line item in an invoice response.
+ */
+export interface InvoiceLineItemResponse {
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+    total_cents: number;
+}
+
+// ============================================================================
+// Vision Status Types (Step 84)
+// ============================================================================
+
+/**
+ * Vision analysis status for a project asset.
+ * See STEP_84_FIELD_FEEDBACK.md Section 2.2
+ */
+export type AnalysisStatus = 'processing' | 'completed' | 'failed';
+
+/**
+ * Response from GET /api/v1/vision/status/:id.
+ * See STEP_84_FIELD_FEEDBACK.md Section 2.2
+ */
+export interface VisionStatusResponse {
+    id: string;
+    status: AnalysisStatus;
+    analysis: Record<string, unknown> | null;
+}
+
+/**
+ * Project asset with analysis status for gallery display.
+ * See STEP_85_VISION_BADGES.md Section 2.1
+ */
+export interface ProjectAssetResponse {
+    id: string;
+    file_name: string;
+    file_url: string;
+    analysis_status: AnalysisStatus;
+    analysis: Record<string, unknown> | null;
+    created_at: string;
 }

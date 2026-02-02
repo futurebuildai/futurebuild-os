@@ -188,12 +188,28 @@ type MockInvoiceService struct {
 	AnalyzeErr      error
 	SaveRespUUID    uuid.UUID
 	SaveErr         error
+	GetResp         *models.Invoice
+	GetErr          error
+	UpdateResp      *models.Invoice
+	UpdateErr       error
+	ApproveResp     *models.Invoice
+	ApproveErr      error
+	RejectResp      *models.Invoice
+	RejectErr       error
 
 	AnalyzeCalls []struct{ OrgID, DocID uuid.UUID }
 	SaveCalls    []struct {
 		ProjectID   uuid.UUID
 		SourceDocID *uuid.UUID
 	}
+	GetCalls    []struct{ InvoiceID, OrgID uuid.UUID }
+	UpdateCalls []struct {
+		InvoiceID uuid.UUID
+		OrgID     uuid.UUID
+		Items     []models.LineItem
+	}
+	ApproveCalls []struct{ InvoiceID, OrgID uuid.UUID; ApproverID string }
+	RejectCalls  []struct{ InvoiceID, OrgID uuid.UUID; RejectorID, Reason string }
 }
 
 func (m *MockInvoiceService) AnalyzeInvoice(ctx context.Context, orgID, docID uuid.UUID) (uuid.UUID, *types.InvoiceExtraction, error) {
@@ -211,6 +227,38 @@ func (m *MockInvoiceService) SaveExtraction(ctx context.Context, projectID uuid.
 		SourceDocID *uuid.UUID
 	}{projectID, sourceDocID})
 	return m.SaveRespUUID, m.SaveErr
+}
+
+func (m *MockInvoiceService) GetInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID) (*models.Invoice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetCalls = append(m.GetCalls, struct{ InvoiceID, OrgID uuid.UUID }{invoiceID, orgID})
+	return m.GetResp, m.GetErr
+}
+
+func (m *MockInvoiceService) UpdateInvoiceItems(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, items []models.LineItem) (*models.Invoice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.UpdateCalls = append(m.UpdateCalls, struct {
+		InvoiceID uuid.UUID
+		OrgID     uuid.UUID
+		Items     []models.LineItem
+	}{invoiceID, orgID, items})
+	return m.UpdateResp, m.UpdateErr
+}
+
+func (m *MockInvoiceService) ApproveInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, approverID string) (*models.Invoice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ApproveCalls = append(m.ApproveCalls, struct{ InvoiceID, OrgID uuid.UUID; ApproverID string }{invoiceID, orgID, approverID})
+	return m.ApproveResp, m.ApproveErr
+}
+
+func (m *MockInvoiceService) RejectInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, rejectorID string, reason string) (*models.Invoice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.RejectCalls = append(m.RejectCalls, struct{ InvoiceID, OrgID uuid.UUID; RejectorID, Reason string }{invoiceID, orgID, rejectorID, reason})
+	return m.RejectResp, m.RejectErr
 }
 
 // MockWeatherService is a spy for WeatherServicer.

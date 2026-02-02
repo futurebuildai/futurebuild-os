@@ -25,6 +25,18 @@ export enum UserRole {
 }
 
 /**
+ * InvoiceStatus defines the lifecycle of an Invoice.
+ * See PHASE_13_PRD.md Section 3.1 and models/financial.go
+ */
+export enum InvoiceStatus {
+    Draft = "Draft",
+    Pending = "Pending",
+    Approved = "Approved",
+    Rejected = "Rejected",
+    Exported = "Exported",
+}
+
+/**
  * ArtifactType defines the visual components displayed in the Chat Orchestrator.
  * See API_AND_TYPES_SPEC.md Section 1.3
  */

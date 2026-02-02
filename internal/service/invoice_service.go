@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/colton/futurebuild/internal/config"
@@ -223,7 +226,7 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 		extraction.TotalAmountCents,
 		lineItems,
 		extraction.SuggestedWBSCode,
-		models.InvoiceStatusPending,
+		models.InvoiceStatusDraft,
 		extraction.Confidence,
 		extraction.Date,
 		extraction.InvoiceNumber,
@@ -236,4 +239,167 @@ func (s *InvoiceService) SaveExtraction(ctx context.Context, projectID uuid.UUID
 	}
 
 	return finalID, nil
+}
+
+// GetInvoice fetches a single invoice by ID with multi-tenancy enforcement.
+// Returns the full invoice model including line items, status, and approval metadata.
+func (s *InvoiceService) GetInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID) (*models.Invoice, error) {
+	query := fmt.Sprintf(`
+		SELECT i.%s
+		FROM invoices i
+		JOIN projects p ON i.project_id = p.id
+		WHERE i.id = $1 AND p.org_id = $2
+	`, invoiceReturnColumns)
+
+	inv, err := scanInvoice(s.db.QueryRow(ctx, query, invoiceID, orgID))
+	if err != nil {
+		return nil, fmt.Errorf("invoice not found or unauthorized: %w", err)
+	}
+	return inv, nil
+}
+
+// ErrInvoiceNotEditable is returned when an edit is attempted on a non-Draft invoice.
+var ErrInvoiceNotEditable = fmt.Errorf("invoice is not editable")
+
+// UpdateInvoiceItems replaces the line items on a Draft invoice and recalculates the total.
+// Uses atomic UPDATE with status + org_id guards to prevent TOCTOU races.
+// See STEP_82_INTERACTIVE_INVOICE.md Section 2.2
+func (s *InvoiceService) UpdateInvoiceItems(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, items []models.LineItem) (*models.Invoice, error) {
+	// 1. Validate line items and recalculate total (server-side — never trust client totals)
+	var totalCents int64
+	for i, item := range items {
+		if item.Quantity <= 0 {
+			return nil, fmt.Errorf("line item %d: quantity must be greater than 0", i)
+		}
+		if item.UnitPriceCents < 0 {
+			return nil, fmt.Errorf("line item %d: unit_price_cents cannot be negative", i)
+		}
+		// C2 Fix: Use math.Round to prevent float truncation drift
+		items[i].TotalCents = int64(math.Round(item.Quantity * float64(item.UnitPriceCents)))
+		totalCents += items[i].TotalCents
+	}
+
+	// 2. Atomic UPDATE with status guard + multi-tenancy guard (C1 + C3 fix)
+	// Single query eliminates TOCTOU race: status and org_id are checked in the same
+	// atomic operation as the write. If the invoice is no longer Draft or the org doesn't
+	// match, the WHERE clause excludes the row and RETURNING yields no rows.
+	lineItemsJSON := models.LineItems(items)
+	query := fmt.Sprintf(`
+		UPDATE invoices
+		SET line_items = $1, amount_cents = $2, updated_at = NOW()
+		WHERE id = $3
+		  AND status = 'Draft'
+		  AND project_id IN (SELECT id FROM projects WHERE org_id = $4)
+		RETURNING %s
+	`, invoiceReturnColumns)
+
+	updated, err := scanInvoice(s.db.QueryRow(ctx, query, lineItemsJSON, totalCents, invoiceID, orgID))
+	if err != nil {
+		// pgx returns "no rows" when the WHERE clause excludes the row.
+		// This means either: invoice not found, wrong org, or not in Draft status.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: invoice %s not found, not Draft, or unauthorized", ErrInvoiceNotEditable, invoiceID)
+		}
+		return nil, fmt.Errorf("failed to update invoice: %w", err)
+	}
+
+	slog.Info("invoice: items updated",
+		"invoice_id", invoiceID,
+		"item_count", len(items),
+		"new_total_cents", totalCents,
+	)
+
+	return updated, nil
+}
+
+// ErrInvoiceNotApprovable is returned when an approve is attempted on a non-Draft invoice.
+var ErrInvoiceNotApprovable = fmt.Errorf("invoice is not approvable")
+
+// ErrInvoiceNotRejectable is returned when a reject is attempted on a non-Draft invoice.
+var ErrInvoiceNotRejectable = fmt.Errorf("invoice is not rejectable")
+
+// invoiceScanColumns is the ordered list of columns scanned from invoice queries.
+// Centralized to prevent column mismatch bugs across multiple queries.
+const invoiceReturnColumns = `id, project_id, vendor_name, amount_cents, line_items,
+	detected_wbs_code, status, invoice_date, invoice_number,
+	confidence, is_human_review_required, source_document_id,
+	approved_by_id, approved_at, rejected_by_id, rejected_at, rejection_reason`
+
+// scanInvoice scans a row into an Invoice struct using the standard column order.
+func scanInvoice(scanner interface{ Scan(dest ...interface{}) error }) (*models.Invoice, error) {
+	var inv models.Invoice
+	err := scanner.Scan(
+		&inv.ID, &inv.ProjectID, &inv.VendorName, &inv.AmountCents, &inv.LineItems,
+		&inv.DetectedWBSCode, &inv.Status, &inv.InvoiceDate, &inv.InvoiceNumber,
+		&inv.Confidence, &inv.IsHumanReviewRequired, &inv.SourceDocumentID,
+		&inv.ApprovedByID, &inv.ApprovedAt, &inv.RejectedByID, &inv.RejectedAt, &inv.RejectionReason,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &inv, nil
+}
+
+// ApproveInvoice atomically transitions a Draft invoice to Approved.
+// Records the approver's identity and timestamp. Irreversible without Admin intervention.
+// See STEP_83_APPROVAL_ACTIONS.md Section 2.3
+func (s *InvoiceService) ApproveInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, approverID string) (*models.Invoice, error) {
+	query := fmt.Sprintf(`
+		UPDATE invoices
+		SET status = 'Approved', approved_by_id = $1, approved_at = NOW(), updated_at = NOW()
+		WHERE id = $2
+		  AND status = 'Draft'
+		  AND project_id IN (SELECT id FROM projects WHERE org_id = $3)
+		RETURNING %s
+	`, invoiceReturnColumns)
+
+	inv, err := scanInvoice(s.db.QueryRow(ctx, query, approverID, invoiceID, orgID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: invoice %s not found, not Draft, or unauthorized", ErrInvoiceNotApprovable, invoiceID)
+		}
+		return nil, fmt.Errorf("failed to approve invoice: %w", err)
+	}
+
+	slog.Info("invoice: approved",
+		"invoice_id", invoiceID,
+		"approver_id", approverID,
+	)
+
+	return inv, nil
+}
+
+// RejectInvoice atomically transitions a Draft invoice to Rejected.
+// Records the rejector's identity, timestamp, and reason.
+// See STEP_83_APPROVAL_ACTIONS.md Section 2.3
+func (s *InvoiceService) RejectInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, rejectorID string, reason string) (*models.Invoice, error) {
+	query := fmt.Sprintf(`
+		UPDATE invoices
+		SET status = 'Rejected', rejected_by_id = $1, rejected_at = NOW(), rejection_reason = $2, updated_at = NOW()
+		WHERE id = $3
+		  AND status = 'Draft'
+		  AND project_id IN (SELECT id FROM projects WHERE org_id = $4)
+		RETURNING %s
+	`, invoiceReturnColumns)
+
+	inv, err := scanInvoice(s.db.QueryRow(ctx, query, rejectorID, reason, invoiceID, orgID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: invoice %s not found, not Draft, or unauthorized", ErrInvoiceNotRejectable, invoiceID)
+		}
+		return nil, fmt.Errorf("failed to reject invoice: %w", err)
+	}
+
+	// Truncate reason for logging (prevent log injection / pollution)
+	logReason := reason
+	if len(logReason) > 100 {
+		logReason = logReason[:100] + "..."
+	}
+	slog.Info("invoice: rejected",
+		"invoice_id", invoiceID,
+		"rejector_id", rejectorID,
+		"reason_preview", logReason,
+	)
+
+	return inv, nil
 }

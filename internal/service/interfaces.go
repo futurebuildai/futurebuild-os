@@ -35,6 +35,10 @@ type ScheduleServicer interface {
 type InvoiceServicer interface {
 	AnalyzeInvoice(ctx context.Context, orgID uuid.UUID, docID uuid.UUID) (uuid.UUID, *types.InvoiceExtraction, error)
 	SaveExtraction(ctx context.Context, projectID uuid.UUID, extraction *types.InvoiceExtraction, sourceDocID *uuid.UUID) (uuid.UUID, error)
+	GetInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID) (*models.Invoice, error)
+	UpdateInvoiceItems(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, items []models.LineItem) (*models.Invoice, error)
+	ApproveInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, approverID string) (*models.Invoice, error)
+	RejectInvoice(ctx context.Context, invoiceID uuid.UUID, orgID uuid.UUID, rejectorID string, reason string) (*models.Invoice, error)
 }
 
 // DocumentServicer defines the contract for document RAG (Chunk/Embed) operations.
@@ -68,6 +72,13 @@ type WeatherServicer interface {
 // Aligns with pkg/types.VisionService.
 type VisionServicer interface {
 	VerifyTask(ctx context.Context, imageURL string, taskDescription string) (bool, float64, error)
+}
+
+// AssetServicer defines the contract for project asset (photo) operations.
+// See STEP_84_FIELD_FEEDBACK.md Section 2, STEP_85_VISION_BADGES.md Section 2
+type AssetServicer interface {
+	GetAssetStatus(ctx context.Context, assetID uuid.UUID, orgID uuid.UUID) (*models.ProjectAsset, error)
+	ListProjectAssets(ctx context.Context, projectID uuid.UUID, orgID uuid.UUID) ([]models.ProjectAsset, error)
 }
 
 // GitHubServicer defines the contract for GitHub API operations.

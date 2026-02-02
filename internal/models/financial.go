@@ -14,10 +14,18 @@ import (
 type InvoiceStatus string
 
 const (
+	InvoiceStatusDraft    InvoiceStatus = "Draft"
 	InvoiceStatusPending  InvoiceStatus = "Pending"
 	InvoiceStatusApproved InvoiceStatus = "Approved"
+	InvoiceStatusRejected InvoiceStatus = "Rejected"
 	InvoiceStatusExported InvoiceStatus = "Exported"
 )
+
+// IsEditable returns true if the invoice can be modified by a user.
+// Only Draft invoices are editable. All other states are locked.
+func (s InvoiceStatus) IsEditable() bool {
+	return s == InvoiceStatusDraft
+}
 
 // ProjectBudget represents the financial tracking for a specific WBS Phase.
 // See DATA_SPINE_SPEC.md Section 4.1
@@ -71,7 +79,25 @@ type Invoice struct {
 	Status                InvoiceStatus `json:"status" db:"status"`
 	InvoiceDate           *time.Time    `json:"invoice_date" db:"invoice_date"`
 	InvoiceNumber         *string       `json:"invoice_number" db:"invoice_number"`
-	Confidence            float64       `json:"confidence" db:"confidence"` // Confidence remains float (0.0-1.0)
+	Confidence            float64       `json:"confidence" db:"confidence"`
 	IsHumanReviewRequired bool          `json:"is_human_review_required" db:"is_human_review_required"`
-	SourceDocumentID      *uuid.UUID    `json:"source_document_id,omitempty" db:"source_document_id"` // See PRODUCTION_PLAN.md Step 41
+	SourceDocumentID      *uuid.UUID    `json:"source_document_id,omitempty" db:"source_document_id"`
+	// Step 83: Approval/Rejection metadata
+	ApprovedByID    *string    `json:"approved_by_id,omitempty" db:"approved_by_id"`
+	ApprovedAt      *time.Time `json:"approved_at,omitempty" db:"approved_at"`
+	RejectedByID    *string    `json:"rejected_by_id,omitempty" db:"rejected_by_id"`
+	RejectedAt      *time.Time `json:"rejected_at,omitempty" db:"rejected_at"`
+	RejectionReason *string    `json:"rejection_reason,omitempty" db:"rejection_reason"`
+}
+
+// IsApprovable returns true if the invoice can be approved.
+// Only Draft invoices can be approved.
+func (s InvoiceStatus) IsApprovable() bool {
+	return s == InvoiceStatusDraft
+}
+
+// IsRejectable returns true if the invoice can be rejected.
+// Only Draft invoices can be rejected.
+func (s InvoiceStatus) IsRejectable() bool {
+	return s == InvoiceStatusDraft
 }

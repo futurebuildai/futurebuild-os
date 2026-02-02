@@ -1,18 +1,20 @@
 /**
  * FBVisionBadge - AI Verification Status Badge
- * See LAUNCH_PLAN.md P2: Field Portal (Mobile)
+ * See STEP_85_VISION_BADGES.md Section 1.1
  *
- * Shows AI verification status for photos:
- * - pending: Awaiting verification
- * - verified: AI confirmed task completion
- * - flagged: AI detected potential issues
- * - failed: Verification could not complete
+ * Badge Variants:
+ * - verifying: Yellow with spinner animation (AI is processing)
+ * - verified: Green with check icon (AI confirmed)
+ * - flagged: Red with warning icon (AI detected issues)
+ * - failed: Red with error icon (Verification could not complete)
+ *
+ * @fires fb-badge-click - When user clicks the badge (detail includes status + summary)
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 
-export type VisionStatus = 'pending' | 'verified' | 'flagged' | 'failed';
+export type VisionBadgeStatus = 'verifying' | 'verified' | 'flagged' | 'failed';
 
 /**
  * Vision verification badge component.
@@ -33,60 +35,93 @@ export class FBVisionBadge extends FBElement {
                 gap: 6px;
                 padding: 4px 10px;
                 font-size: 12px;
-                font-weight: 500;
+                font-weight: 600;
                 border-radius: 20px;
+                cursor: default;
+                user-select: none;
+                white-space: nowrap;
             }
 
             .badge svg {
                 width: 14px;
                 height: 14px;
+                flex-shrink: 0;
             }
 
-            .badge--pending {
-                background: var(--fb-text-muted-alpha, rgba(102, 102, 102, 0.2));
-                color: var(--fb-text-muted, #666);
+            /* Verifying: Yellow/Warning — AI is processing */
+            .badge--verifying {
+                background: rgba(245, 158, 11, 0.15);
+                color: #d97706;
             }
 
+            /* Verified: Green/Success — AI confirmed */
             .badge--verified {
-                background: var(--fb-success-alpha, rgba(46, 125, 50, 0.2));
-                color: var(--fb-success, #2e7d32);
+                background: rgba(5, 150, 105, 0.15);
+                color: #059669;
+                cursor: pointer;
             }
+            .badge--verified:hover { background: rgba(5, 150, 105, 0.25); }
 
+            /* Flagged: Red/Danger — AI detected issues */
             .badge--flagged {
-                background: var(--fb-warning-alpha, rgba(249, 168, 37, 0.2));
-                color: var(--fb-warning, #f9a825);
+                background: rgba(220, 38, 38, 0.15);
+                color: #dc2626;
+                cursor: pointer;
             }
+            .badge--flagged:hover { background: rgba(220, 38, 38, 0.25); }
 
+            /* Failed: Gray/Muted — Verification could not complete */
             .badge--failed {
-                background: var(--fb-error-alpha, rgba(198, 40, 40, 0.2));
-                color: var(--fb-error, #c62828);
+                background: rgba(107, 114, 128, 0.15);
+                color: #6b7280;
             }
 
-            .pulse {
-                animation: pulse 2s infinite;
+            /* Spinner animation for verifying state */
+            .spin {
+                animation: spin 1s linear infinite;
             }
 
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
+            /* Overlay positioning (when used inside gallery) */
+            :host([overlay]) {
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                z-index: 2;
             }
         `,
     ];
 
-    @property({ type: String }) status: VisionStatus = 'pending';
+    /** Current verification status */
+    @property({ type: String }) status: VisionBadgeStatus = 'verifying';
+
+    /** Optional summary text (shown on click for flagged/verified) */
+    @property({ type: String }) summary = '';
+
+    private _handleClick(): void {
+        if (this.status === 'flagged' || this.status === 'verified') {
+            this.emit('fb-badge-click', {
+                status: this.status,
+                summary: this.summary,
+            });
+        }
+    }
 
     private _renderIcon(): TemplateResult {
         switch (this.status) {
-            case 'pending':
+            case 'verifying':
                 return html`
-                    <svg viewBox="0 0 24 24" fill="currentColor" class="pulse">
-                        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin">
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                     </svg>
                 `;
             case 'verified':
                 return html`
                     <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                     </svg>
                 `;
             case 'flagged':
@@ -106,20 +141,25 @@ export class FBVisionBadge extends FBElement {
 
     private _getLabel(): string {
         switch (this.status) {
-            case 'pending':
+            case 'verifying':
                 return 'Verifying...';
             case 'verified':
-                return 'AI Verified';
+                return 'Verified';
             case 'flagged':
-                return 'Needs Review';
+                return 'Flagged';
             case 'failed':
-                return 'Check Failed';
+                return 'Failed';
         }
     }
 
     override render(): TemplateResult {
+        const isClickable = this.status === 'flagged' || this.status === 'verified';
         return html`
-            <span class="badge badge--${this.status}">
+            <span
+                class="badge badge--${this.status}"
+                @click=${this._handleClick}
+                title=${isClickable && this.summary ? this.summary : nothing}
+            >
                 ${this._renderIcon()}
                 ${this._getLabel()}
             </span>

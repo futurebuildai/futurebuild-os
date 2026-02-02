@@ -8,6 +8,7 @@
  */
 
 import { InvoiceExtraction, GanttData } from './models';
+import { InvoiceStatus } from './enums';
 
 // ============================================================================
 // Invoice Artifact
@@ -16,10 +17,21 @@ import { InvoiceExtraction, GanttData } from './models';
 /**
  * Invoice view data.
  * Extends core InvoiceExtraction with display-specific fields.
+ * See PHASE_13_PRD.md Step 82: Interactive Invoice
  */
 export interface InvoiceArtifactData extends InvoiceExtraction {
+    /** Invoice ID for API operations (edit, approve, reject) */
+    id?: string;
     /** Optional display address for the vendor (not always in extraction) */
     address?: string;
+    /** Current invoice status — controls edit/approve affordances */
+    status?: InvoiceStatus;
+    /** Approval metadata (Step 83) */
+    approved_by_id?: string;
+    approved_at?: string;
+    rejected_by_id?: string;
+    rejected_at?: string;
+    rejection_reason?: string;
 }
 
 // ============================================================================

@@ -26,9 +26,10 @@ const (
 	ScopeTaskRead  Scope = "task:read"
 	ScopeTaskWrite Scope = "task:write"
 
-	// Budget scopes
+	// Budget/Finance scopes
 	ScopeBudgetRead    Scope = "budget:read"
 	ScopeBudgetApprove Scope = "budget:approve"
+	ScopeFinanceEdit   Scope = "finance:edit"
 
 	// Document scopes
 	ScopeDocumentRead  Scope = "document:read"
@@ -58,6 +59,7 @@ var rolePermissions = map[types.UserRole][]Scope{
 		ScopeTaskRead,
 		ScopeTaskWrite,
 		ScopeBudgetRead,
+		ScopeFinanceEdit,
 		ScopeDocumentRead,
 		ScopeDocumentWrite,
 		ScopeChatRead,

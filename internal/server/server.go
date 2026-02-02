@@ -46,6 +46,8 @@ type Server struct {
 	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
 	ClerkWebhookHandler  *handlers.ClerkWebhookHandler  // See PHASE_12_PRD.md Step 80
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
+	InvoiceHandler       *handlers.InvoiceHandler       // See PHASE_13_PRD.md Step 82: Interactive Invoice
+	AssetHandler         *handlers.AssetHandler         // See STEP_84_FIELD_FEEDBACK.md: Vision status
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -65,6 +67,13 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See PRODUCTION_PLAN.md Step 41
 	documentService := service.NewDocumentService(db, aiClient)
 	documentHandler := handlers.NewDocumentHandler(invoiceService, documentService)
+
+	// See PHASE_13_PRD.md Step 82: Interactive Invoice
+	invoiceHandler := handlers.NewInvoiceHandler(invoiceService)
+
+	// See STEP_84_FIELD_FEEDBACK.md: Vision status endpoint
+	assetService := service.NewAssetService(db)
+	assetHandler := handlers.NewAssetHandler(assetService)
 
 	// See PRODUCTION_PLAN.md Step 43.5: Chat Orchestrator wiring
 	// ENGINEERING STANDARD: Instantiate MessagePersister explicitly, then inject.
@@ -224,6 +233,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
 		ClerkWebhookHandler:  clerkWebhookHandler,  // See PHASE_12_PRD.md Step 80
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
+		InvoiceHandler:       invoiceHandler,       // See PHASE_13_PRD.md Step 82
+		AssetHandler:         assetHandler,         // See STEP_84_FIELD_FEEDBACK.md
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -302,6 +313,9 @@ func (s *Server) routes() {
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}", s.ProjectHandler.GetProject)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/procurement", s.ProjectHandler.GetProcurementItems)
 
+			// Step 85: Project asset gallery with vision badges
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/assets", s.AssetHandler.ListProjectAssets)
+
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Put("/{task_id}", s.TaskHandler.UpdateTask)
@@ -309,6 +323,23 @@ func (s *Server) routes() {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{task_id}/inspection", s.TaskHandler.RecordInspection)
 			})
 		})
+		// See STEP_84_FIELD_FEEDBACK.md: Vision analysis status polling
+		// M1 Fix: Requires auth + budget:read scope (field users need to see analysis results)
+		r.Route("/vision", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/status/{id}", s.AssetHandler.GetVisionStatus)
+		})
+
+		// See PHASE_13_PRD.md Steps 82-83: Invoice CRUD + Approval
+		r.Route("/invoices", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}", s.InvoiceHandler.GetInvoice)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Put("/{id}", s.InvoiceHandler.UpdateInvoice)
+			// Step 83: Approval requires budget:approve scope (Admin + explicit grant)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetApprove)).Post("/{id}/approve", s.InvoiceHandler.ApproveInvoice)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetApprove)).Post("/{id}/reject", s.InvoiceHandler.RejectInvoice)
+		})
+
 		r.Route("/documents", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			// Step 81: Document write operations require document:write scope

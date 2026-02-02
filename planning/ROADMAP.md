@@ -2,7 +2,7 @@
 
 **Version:** 2.1.0 (Beta Remediation + Identity Overhaul)
 **Previous Status:** Completed Phase 9 (FutureShade / Step 69)
-**Current Focus:** Bridging the gap between "Static UI" and "AI-Driven Action" for Public Beta.
+**Current Focus:** Phase 14 — Physics Calibration (Settings & Gantt). Phases 10-13 complete.
 
 ---
 
@@ -33,18 +33,18 @@
 |--------|------|------|---------------|-----------|
 | [x] | 78 | **Auth Provider Integration**: Replace `fb-view-login` and backend handlers with Clerk/Auth0 SDKs. | User Request (Auth) | 1 |
 | [x] | 79 | **Middleware Swap**: Update Go middleware to validate 3rd-party JWTs instead of internal tokens. | User Request (Auth) | 1 |
-| [ ] | 80 | **Organization Manager**: Build a "Team Settings" view to invite/remove members via the Provider API. | Gap (Org Mgmt) | 2 |
-| [ ] | 81 | **Role Mapping**: Map Provider roles (Admin/Member) to FutureBuild's `PermissionMatrix`. | Gap (Org Mgmt) | 0.5 |
+| [x] | 80 | **Organization Manager**: Build a "Team Settings" view to invite/remove members via the Provider API. | Gap (Org Mgmt) | 2 |
+| [x] | 81 | **Role Mapping**: Map Provider roles (Admin/Member) to FutureBuild's `PermissionMatrix`. | Gap (Org Mgmt) | 0.5 |
 
 ## 🔄 Phase 13: The Action Loop (Invoice & Field)
 **Goal:** Make Artifacts interactive so users can validate and approve AI decisions.
 
 | Status | Step | Task | Gap Addressed | Est. Days |
 |--------|------|------|---------------|-----------|
-| [ ] | 82 | **Interactive Invoice**: Rewrite `fb-artifact-invoice.ts` to use `<input>` fields for values (Edit Mode). | Gap 3 (Invoice Loop) | 2 |
-| [ ] | 83 | **Approval Actions**: Add "Approve" & "Reject" buttons to artifacts that call `api.finance.approve`. | Gap 3 (Invoice Loop) | 1 |
-| [ ] | 84 | **Field Feedback Loop**: Update `fb-photo-upload.ts` to poll `api.vision.status` after upload. | Gap 6 (Field Portal) | 1 |
-| [ ] | 85 | **Vision Badges**: Implement "Verifying..." vs "Verified ✅" UI states in the portal. | Gap 6 (Field Portal) | 0.5 |
+| [x] | 82 | **Interactive Invoice**: Rewrite `fb-artifact-invoice.ts` to use `<input>` fields for values (Edit Mode). | Gap 3 (Invoice Loop) | 2 |
+| [x] | 83 | **Approval Actions**: Add "Approve" & "Reject" buttons to artifacts that call `api.finance.approve`. | Gap 3 (Invoice Loop) | 1 |
+| [x] | 84 | **Field Feedback Loop**: Update `fb-photo-upload.ts` to poll `api.vision.status` after upload. | Gap 6 (Field Portal) | 1 |
+| [x] | 85 | **Vision Badges**: Implement "Verifying..." vs "Verified ✅" UI states in the portal. | Gap 6 (Field Portal) | 0.5 |
 
 ## ⚙️ Phase 14: Physics Calibration (Settings & Gantt)
 **Goal:** Allow users to tune the engine and see the results visually.
