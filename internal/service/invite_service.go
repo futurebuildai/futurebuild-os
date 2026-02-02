@@ -52,7 +52,7 @@ func (s *InviteService) CreateInvitation(ctx context.Context, input CreateInvita
 	if input.Role == "" {
 		input.Role = types.UserRoleBuilder
 	}
-	if input.Role != types.UserRoleAdmin && input.Role != types.UserRoleBuilder && input.Role != types.UserRoleSubcontractor {
+	if !types.ValidUserRole(string(input.Role)) {
 		return "", nil, fmt.Errorf("invalid role: %s", input.Role)
 	}
 

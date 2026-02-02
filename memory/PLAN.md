@@ -23,7 +23,7 @@ Before executing any step, the Engineer MUST verify alignment with:
   - **Spec:** [STEP_79_MIDDLEWARE_SWAP.md](../specs/phase12/STEP_79_MIDDLEWARE_SWAP.md)
   - **Core Requirement:** Stateless verification. Hard cutover (legacy tokens invalid). Security Audit: Ensure no algorithmic confusion attacks possible on JWT.
 
-- [ ] Step 80: Organization Manager @Frontend
+- [x] Step 80: Organization Manager @Frontend
   - **Task:** Implement "Team Settings" to invite/manage members.
   - **Spec:** [STEP_80_ORG_MANAGER.md](../specs/phase12/STEP_80_ORG_MANAGER.md)
   - **Core Requirement:** Org-switching in UI must trigger immediate data store reset to prevent data leaks between tenants.

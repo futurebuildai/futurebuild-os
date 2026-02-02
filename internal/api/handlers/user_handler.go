@@ -7,6 +7,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -122,7 +123,8 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
+	// Parse request body (L7: limit body size)
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req UpdateProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("user: invalid request body", "error", err)

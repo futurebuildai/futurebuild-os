@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/colton/futurebuild/pkg/types"
 )
 
@@ -31,6 +32,7 @@ func NewPortalAuthHandler(authService *service.AuthService, notificationService 
 // Login handles POST /api/v1/portal/auth/login
 // Sends a magic link to a contact's email address.
 func (h *PortalAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req types.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")

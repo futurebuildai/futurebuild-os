@@ -1,0 +1,8 @@
+-- PostgreSQL does not support removing enum values directly.
+-- To rollback, recreate the type without 'Viewer' and update all references.
+-- This is intentionally left as a no-op; Viewer role removal requires a full
+-- type recreation migration if ever needed.
+--
+-- If rollback is required:
+-- 1. UPDATE users SET role = 'Builder' WHERE role = 'Viewer';
+-- 2. Recreate enum without 'Viewer' value.

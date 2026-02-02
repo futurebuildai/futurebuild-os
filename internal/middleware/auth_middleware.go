@@ -9,6 +9,7 @@ import (
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/colton/futurebuild/internal/api/response"
+	"github.com/colton/futurebuild/internal/auth"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
@@ -154,6 +155,33 @@ func (m *AuthMiddleware) RequireRole(allowedRoles ...types.UserRole) func(next h
 	}
 }
 
+// RequirePermission returns middleware that checks if the authenticated user's role
+// has the given scope permission. Uses the RBAC matrix from internal/auth.
+// See STEP_81_ROLE_MAPPING.md Section 3.1.
+func (m *AuthMiddleware) RequirePermission(scope auth.Scope) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, err := GetClaims(r.Context())
+			if err != nil {
+				response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+				return
+			}
+
+			if !auth.Can(claims.Role, scope) {
+				slog.Debug("auth: permission denied",
+					"user_id", claims.UserID,
+					"role", claims.Role,
+					"scope", scope,
+				)
+				response.JSONError(w, http.StatusForbidden, "Forbidden")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func GetClaims(ctx context.Context) (*types.Claims, error) {
 	claims, ok := ctx.Value(claimsContextKey).(*types.Claims)
 	if !ok {
@@ -180,9 +208,12 @@ func mapClerkRoleToInternal(clerkRole string) types.UserRole {
 		return types.UserRoleAdmin
 	case "member", "basic_member":
 		return types.UserRoleBuilder
+	case "viewer", "guest":
+		return types.UserRoleViewer
 	default:
-		// Default to Builder for unknown roles
-		return types.UserRoleBuilder
+		// L7: Default to Viewer (least privilege) for unknown roles
+		slog.Warn("auth: unknown Clerk role, defaulting to Viewer", "clerk_role", clerkRole)
+		return types.UserRoleViewer
 	}
 }
 

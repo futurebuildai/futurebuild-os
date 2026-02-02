@@ -8,6 +8,7 @@ import (
 	"github.com/colton/futurebuild/internal/adapters"
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/api/handlers"
+	"github.com/colton/futurebuild/internal/auth"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/futureshade"
@@ -47,6 +48,7 @@ type Server struct {
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
+	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -151,6 +153,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	authService := service.NewAuthService(db, cfg)
 	portalAuthHandler := handlers.NewPortalAuthHandler(authService, notificationService, cfg.BaseURL)
 	portalRateLimiter := middleware.NewIPRateLimiter(rate.Every(12*time.Second), 2, cfg.TrustedProxies)
+	publicRateLimiter := middleware.NewIPRateLimiter(rate.Every(5*time.Second), 5, cfg.TrustedProxies)
 
 	// See FUTURESHADE_INIT_specs.md: Initialize FutureShade with Fail Open strategy.
 	// If configuration is missing, the service returns a disabled NoOp instance.
@@ -223,6 +226,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
+		PublicRateLimiter:    publicRateLimiter,
 	}
 
 	s.routes()
@@ -232,6 +236,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 func (s *Server) routes() {
 	s.Router.Use(chiMiddleware.Logger)
 	s.Router.Use(chiMiddleware.Recoverer)
+	s.Router.Use(securityHeaders)
 
 	s.Router.Get("/health", s.HandleHealth)
 
@@ -244,8 +249,9 @@ func (s *Server) routes() {
 		})
 
 		// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
-		// Public endpoints for accepting invitations
+		// Public endpoints for accepting invitations (L7: rate-limited)
 		r.Route("/invites", func(r chi.Router) {
+			r.Use(middleware.RateLimit(s.PublicRateLimiter))
 			r.Get("/info", s.InviteHandler.GetInviteInfo) // Public: get invite info by token
 			r.Post("/accept", s.InviteHandler.AcceptInvite) // Public: accept invite and create account
 		})
@@ -260,8 +266,9 @@ func (s *Server) routes() {
 		})
 
 		// See LAUNCH_PLAN.md P2: Field Portal (Mobile)
-		// Public endpoints for one-time action links
+		// Public endpoints for one-time action links (L7: rate-limited)
 		r.Route("/portal", func(r chi.Router) {
+			r.Use(middleware.RateLimit(s.PublicRateLimiter))
 			r.Get("/action/{token}", s.PortalHandler.HandleVerifyActionToken)
 			r.Post("/action/{token}", s.PortalHandler.HandleSubmitAction)
 
@@ -290,28 +297,31 @@ func (s *Server) routes() {
 
 		r.Route("/projects", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
-			r.Post("/", s.ProjectHandler.CreateProject)
-			r.Get("/{id}", s.ProjectHandler.GetProject)
-			r.Get("/{id}/procurement", s.ProjectHandler.GetProcurementItems)
+			// Step 81: Scope-based RBAC — write operations require specific permissions
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/", s.ProjectHandler.CreateProject)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}", s.ProjectHandler.GetProject)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/procurement", s.ProjectHandler.GetProcurementItems)
 
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {
-				r.Put("/{task_id}", s.TaskHandler.UpdateTask)
-				r.Post("/{task_id}/progress", s.TaskHandler.RecordProgress)
-				r.Post("/{task_id}/inspection", s.TaskHandler.RecordInspection)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Put("/{task_id}", s.TaskHandler.UpdateTask)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{task_id}/progress", s.TaskHandler.RecordProgress)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{task_id}/inspection", s.TaskHandler.RecordInspection)
 			})
 		})
 		r.Route("/documents", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
-			r.Post("/analyze", s.DocumentHandler.AnalyzeDocument)
+			// Step 81: Document write operations require document:write scope
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeDocumentWrite)).Post("/analyze", s.DocumentHandler.AnalyzeDocument)
 			// See PRODUCTION_PLAN.md Step 41
-			r.Post("/{id}/reprocess", s.DocumentHandler.ReprocessDocument)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeDocumentWrite)).Post("/{id}/reprocess", s.DocumentHandler.ReprocessDocument)
 		})
 
 		// See PRODUCTION_PLAN.md Step 43.5: Chat endpoint with Auth
 		r.Route("/chat", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
-			r.Post("/", s.ChatHandler.HandleChat)
+			// Step 81: Chat write requires chat:write scope (Viewers can read but not send)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/", s.ChatHandler.HandleChat)
 		})
 
 		// See PHASE_11_PRD.md Step 75: Interrogator Agent
@@ -404,4 +414,16 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
+}
+
+// securityHeaders adds standard HTTP security headers to every response.
+// See OWASP Secure Headers Project.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
 }

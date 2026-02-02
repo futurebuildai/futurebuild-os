@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -45,7 +47,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
 		slog.Warn("task: invalid project/org IDs", "error", err, "method", r.Method)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid project or organization ID", http.StatusBadRequest)
 		return
 	}
 
@@ -57,6 +59,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req UpdateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("task: invalid request body", "error", err, "task_id", taskID)
@@ -89,7 +92,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
 			slog.Error("task: schedule recalculation failed", "project_id", projectID, "error", err)
-			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Schedule recalculation failed", http.StatusInternalServerError)
 			return
 		}
 		recalculated = true
@@ -127,7 +130,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
 		slog.Warn("task: invalid project/org IDs for progress", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid project or organization ID", http.StatusBadRequest)
 		return
 	}
 
@@ -139,6 +142,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req ProgressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("task: invalid progress request body", "error", err, "task_id", taskID)
@@ -190,7 +194,7 @@ func (h *TaskHandler) RecordProgress(w http.ResponseWriter, r *http.Request) {
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
 			slog.Error("task: schedule recalculation failed after completion", "project_id", projectID, "error", err)
-			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Schedule recalculation failed", http.StatusInternalServerError)
 			return
 		}
 		recalculated = true
@@ -233,7 +237,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
 		slog.Warn("task: invalid project/org IDs for inspection", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid project or organization ID", http.StatusBadRequest)
 		return
 	}
 
@@ -245,6 +249,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req InspectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("task: invalid inspection request body", "error", err, "task_id", taskID)
@@ -313,7 +318,7 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 		_, err = h.scheduleService.RecalculateSchedule(r.Context(), projectID, orgID)
 		if err != nil {
 			slog.Error("task: schedule recalculation failed after inspection", "project_id", projectID, "error", err)
-			http.Error(w, "Schedule recalculation failed: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Schedule recalculation failed", http.StatusInternalServerError)
 			return
 		}
 		recalculated = true
@@ -332,21 +337,22 @@ func (h *TaskHandler) RecordInspection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// extractProjectAndOrgIDs extracts project ID from URL param and org ID from header.
+// extractProjectAndOrgIDs extracts project ID from URL param and org ID from JWT claims.
+// L7 Confused Deputy Fix: OrgID is derived from authenticated token, not request headers.
 func extractProjectAndOrgIDs(r *http.Request) (projectID, orgID uuid.UUID, err error) {
 	projectIDStr := chi.URLParam(r, "id")
 	projectID, err = uuid.Parse(projectIDStr)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid project ID: %w", err)
+		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid project ID")
 	}
 
-	orgIDStr := r.Header.Get("X-Org-ID")
-	if orgIDStr == "" {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("X-Org-ID header is required")
-	}
-	orgID, err = uuid.Parse(orgIDStr)
+	claims, err := middleware.GetClaims(r.Context())
 	if err != nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid organization ID: %w", err)
+		return uuid.Nil, uuid.Nil, fmt.Errorf("missing authentication context")
+	}
+	orgID, err = uuid.Parse(claims.OrgID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid organization ID in token")
 	}
 
 	return projectID, orgID, nil

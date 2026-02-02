@@ -34,6 +34,7 @@ type UserRole string
 const (
 	UserRoleAdmin         UserRole = "Admin"
 	UserRoleBuilder       UserRole = "Builder"
+	UserRoleViewer        UserRole = "Viewer"        // Step 81: Read-only access
 	UserRoleClient        UserRole = "Client"
 	UserRoleSubcontractor UserRole = "Subcontractor"
 )

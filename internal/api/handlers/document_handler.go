@@ -7,6 +7,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -50,7 +51,8 @@ func (h *DocumentHandler) AnalyzeDocument(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 2. Parse request body
+	// 2. Parse request body (L7: limit body size to prevent DoS)
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req AnalyzeDocumentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("doc: invalid request payload", "error", err, "org_id", orgID)
@@ -70,7 +72,7 @@ func (h *DocumentHandler) AnalyzeDocument(w http.ResponseWriter, r *http.Request
 	projectID, extraction, err := h.invoiceService.AnalyzeInvoice(r.Context(), orgID, req.DocumentID)
 	if err != nil {
 		slog.Error("doc: analysis failed", "document_id", req.DocumentID, "org_id", orgID, "error", err)
-		http.Error(w, "Analysis failed: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Analysis failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -79,7 +81,7 @@ func (h *DocumentHandler) AnalyzeDocument(w http.ResponseWriter, r *http.Request
 	_, err = h.invoiceService.SaveExtraction(r.Context(), projectID, extraction, &req.DocumentID)
 	if err != nil {
 		slog.Error("doc: failed to save extraction", "document_id", req.DocumentID, "project_id", projectID, "error", err)
-		http.Error(w, "Failed to save extraction: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to save extraction", http.StatusInternalServerError)
 		return
 	}
 
@@ -132,7 +134,7 @@ func (h *DocumentHandler) ReprocessDocument(w http.ResponseWriter, r *http.Reque
 	err = h.documentService.ReprocessDocument(r.Context(), orgID, docID)
 	if err != nil {
 		slog.Error("doc: reprocess failed", "document_id", docID, "org_id", orgID, "error", err)
-		http.Error(w, "Reprocess failed: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Reprocess failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -140,7 +142,7 @@ func (h *DocumentHandler) ReprocessDocument(w http.ResponseWriter, r *http.Reque
 	projectID, extraction, err := h.invoiceService.AnalyzeInvoice(r.Context(), orgID, docID)
 	if err != nil {
 		slog.Error("doc: re-extraction failed", "document_id", docID, "org_id", orgID, "error", err)
-		http.Error(w, "Re-extraction failed: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Re-extraction failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -148,7 +150,7 @@ func (h *DocumentHandler) ReprocessDocument(w http.ResponseWriter, r *http.Reque
 	_, err = h.invoiceService.SaveExtraction(r.Context(), projectID, extraction, &docID)
 	if err != nil {
 		slog.Error("doc: failed to save re-extraction", "document_id", docID, "project_id", projectID, "error", err)
-		http.Error(w, "Failed to save re-extraction: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to save re-extraction", http.StatusInternalServerError)
 		return
 	}
 

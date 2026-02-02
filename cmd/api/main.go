@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/colton/futurebuild/internal/config"
+	"github.com/colton/futurebuild/internal/platform/errormon"
 	"github.com/colton/futurebuild/internal/server"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +23,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
+
+	// Initialize error monitoring (slog-based default; swap for Sentry/Datadog in production).
+	// See L7 Gate Audit Item 15.
+	errormon.Init(errormon.NewSlogReporter(nil))
+	defer errormon.Get().Flush()
 
 	ctx := context.Background()
 

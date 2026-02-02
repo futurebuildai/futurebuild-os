@@ -76,8 +76,10 @@ const registered = registerComponents({
     'shadow-docs-viewer': ShadowDocsViewer,
 });
 
-console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);
-console.log('[FutureBuild] Frontend initialized');
+if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true) {
+    console.log(`[FutureBuild] Registered ${String(registered)} component(s)`);
+    console.log('[FutureBuild] Frontend initialized');
+}
 
 // Step 60.2.2: Load Test Harness - DEV only
 // Exposes window.fb.loadTest for console stress-testing

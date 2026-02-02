@@ -165,7 +165,7 @@ func LoadConfig() (*Config, error) {
 		TwilioAccountSID:           os.Getenv("TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
-		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/tmp/audit.wal"),
+		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/lib/futurebuild/audit.wal"),
 		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
 		ClerkAudience:              os.Getenv("CLERK_AUDIENCE"),
 		ClerkWebhookSecret:         os.Getenv("CLERK_WEBHOOK_SECRET"),

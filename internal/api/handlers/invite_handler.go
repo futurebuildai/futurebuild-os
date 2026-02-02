@@ -8,6 +8,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -62,7 +63,8 @@ func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
+	// Parse request body (L7: limit body size)
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req CreateInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("invite: invalid request body", "error", err)
@@ -106,7 +108,7 @@ func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Warn("invite: failed to create invitation", "error", err, "email", req.Email)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Failed to create invitation", http.StatusBadRequest)
 		return
 	}
 
@@ -213,7 +215,7 @@ func (h *InviteHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.inviteService.RevokeInvitation(ctx, inviteID, orgID); err != nil {
 		slog.Warn("invite: failed to revoke invitation", "error", err, "invite_id", inviteID)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Failed to revoke invitation", http.StatusBadRequest)
 		return
 	}
 
@@ -232,6 +234,7 @@ type AcceptInviteRequest struct {
 func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req AcceptInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("invite: invalid accept request body", "error", err)
@@ -251,7 +254,7 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	user, err := h.inviteService.AcceptInvitation(ctx, req.Token, req.Name)
 	if err != nil {
 		slog.Warn("invite: failed to accept invitation", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid or expired invitation", http.StatusBadRequest)
 		return
 	}
 

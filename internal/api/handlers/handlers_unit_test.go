@@ -88,13 +88,12 @@ func TestProjectHandler_CreateProject_MissingClaims(t *testing.T) {
 	mock := &mockProjectService{}
 	handler := NewProjectHandler(mock)
 
-	// No claims in context - should return 500 (middleware normally catches this)
+	// No claims in context - should return 401 (L7: generic error, no info leak)
 	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "missing authentication context")
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 }
 
 func TestProjectHandler_CreateProject_InvalidOrgIDInClaims(t *testing.T) {
@@ -111,8 +110,7 @@ func TestProjectHandler_CreateProject_InvalidOrgIDInClaims(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.CreateProject(rr, req)
 
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "invalid OrgID in token")
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 }
 
 func TestProjectHandler_CreateProject_OrgMismatch(t *testing.T) {
@@ -261,8 +259,7 @@ func TestProjectHandler_GetProject_MissingClaims(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.GetProject(rr, req)
 
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "missing authentication context")
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 }
 
 // --- taskHandlerMockScheduleService (for TaskHandler tests) ---
@@ -342,12 +339,11 @@ func TestTaskHandler_UpdateTask_Success(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -373,12 +369,11 @@ func TestTaskHandler_UpdateTask_RecalcFail(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -402,12 +397,11 @@ func TestTaskHandler_RecordProgress_Complete(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/progress", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordProgress(rr, req)
@@ -432,12 +426,11 @@ func TestTaskHandler_RecordProgress_Partial(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/progress", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordProgress(rr, req)
@@ -468,12 +461,11 @@ func TestTaskHandler_RecordInspection_Pass(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)
@@ -503,12 +495,11 @@ func TestTaskHandler_RecordInspection_Fail(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)
@@ -537,12 +528,11 @@ func TestTaskHandler_RecordInspection_InvalidEnum(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)
@@ -569,12 +559,11 @@ func TestTaskHandler_RecordInspection_NotInspectionTask(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)
@@ -597,12 +586,11 @@ func TestTaskHandler_UpdateTask_TaskNotFound(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx))
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -621,12 +609,12 @@ func TestTaskHandler_UpdateTask_InvalidBody(t *testing.T) {
 	handler := NewTaskHandler(mock)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader([]byte("invalid")))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -642,12 +630,12 @@ func TestTaskHandler_UpdateTask_InvalidTaskID(t *testing.T) {
 	handler := NewTaskHandler(mock)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/invalid", bytes.NewReader([]byte("{}")))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", "not-a-uuid")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -669,12 +657,12 @@ func TestTaskHandler_UpdateTask_NoOverride(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -700,12 +688,12 @@ func TestTaskHandler_UpdateTask_UpdateDurationFails(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPut, "/tasks/"+taskID.String(), bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.UpdateTask(rr, req)
@@ -722,12 +710,12 @@ func TestTaskHandler_RecordProgress_InvalidBody(t *testing.T) {
 	handler := NewTaskHandler(mock)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/progress", bytes.NewReader([]byte("invalid")))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.RecordProgress(rr, req)
@@ -749,12 +737,12 @@ func TestTaskHandler_RecordProgress_TaskNotFound(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/progress", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.RecordProgress(rr, req)
@@ -777,12 +765,12 @@ func TestTaskHandler_RecordProgress_CreateProgressFails(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/progress", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.RecordProgress(rr, req)
@@ -808,12 +796,12 @@ func TestTaskHandler_RecordInspection_InvalidDate(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)
@@ -841,12 +829,12 @@ func TestTaskHandler_RecordInspection_CreateRecordFails(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/tasks/"+taskID.String()+"/inspection", bytes.NewReader(jsonBody))
-	req.Header.Set("X-Org-ID", orgID.String())
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", projectID.String())
 	rctx.URLParams.Add("task_id", taskID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := context.WithValue(ctxWithClaims(orgID), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.RecordInspection(rr, req)

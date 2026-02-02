@@ -185,8 +185,10 @@ export class MockRealtimeService implements IRealtimeServiceDevTools {
     private _pendingTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
 
     constructor() {
-        // Expose to window.fb for DevTools access
-        this._exposeDevTools();
+        // Expose to window.fb for DevTools access (dev only)
+        if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true) {
+            this._exposeDevTools();
+        }
     }
 
     // ---- IRealtimeService Implementation ----
@@ -265,8 +267,7 @@ export class MockRealtimeService implements IRealtimeServiceDevTools {
     triggerScenario(scenarioId: string): void {
         const scenario = SCENARIOS[scenarioId];
         if (!scenario) {
-            console.warn(`[MockRealtime] Unknown scenario: ${scenarioId}`);
-            console.log('[MockRealtime] Available scenarios:', Object.keys(SCENARIOS));
+            this._log('triggerScenario', `Unknown scenario: ${scenarioId}. Available: ${Object.keys(SCENARIOS).join(', ')}`);
             return;
         }
 
@@ -358,6 +359,7 @@ export class MockRealtimeService implements IRealtimeServiceDevTools {
     }
 
     private _log(method: string, data: unknown): void {
+        if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV !== true) return;
         console.groupCollapsed(`[MockRealtime] ${method}`);
         console.log(data);
         console.groupEnd();

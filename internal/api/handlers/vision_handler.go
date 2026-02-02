@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,7 +48,7 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 	projectID, orgID, err := extractProjectAndOrgIDs(r)
 	if err != nil {
 		slog.Warn("vision: invalid project/org IDs", "error", err, "method", r.Method)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid project or organization ID", http.StatusBadRequest)
 		return
 	}
 
@@ -59,7 +60,8 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Parse request body
+	// 2. Parse request body (L7: limit body size)
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req VerifyTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("vision: invalid request body", "error", err, "task_id", taskID)
@@ -96,7 +98,7 @@ func (h *VisionHandler) VerifyTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("vision: verification failed",
 			"task_id", taskID, "project_id", projectID, "error", err)
-		http.Error(w, "Vision verification failed: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Vision verification failed", http.StatusInternalServerError)
 		return
 	}
 

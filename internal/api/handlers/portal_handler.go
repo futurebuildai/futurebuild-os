@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/colton/futurebuild/internal/service"
+	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -42,6 +43,7 @@ type CreateActionLinkResponse struct {
 // HandleCreateActionLink creates and sends a one-time action link via SMS.
 // POST /api/v1/admin/portal/link
 func (h *PortalHandler) HandleCreateActionLink(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req CreateActionLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("portal: invalid request body", "error", err)
@@ -86,7 +88,7 @@ func (h *PortalHandler) HandleCreateActionLink(w http.ResponseWriter, r *http.Re
 	err = h.portalService.SendActionLink(r.Context(), contactID, projectID, taskID, actionType)
 	if err != nil {
 		slog.Error("portal: failed to send action link", "error", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, "Failed to send action link")
 		return
 	}
 
@@ -140,7 +142,7 @@ func (h *PortalHandler) HandleVerifyActionToken(w http.ResponseWriter, r *http.R
 	ctx, err := h.portalService.VerifyActionToken(r.Context(), token)
 	if err != nil {
 		slog.Warn("portal: token verification failed", "error", err)
-		respondError(w, http.StatusUnauthorized, err.Error())
+		respondError(w, http.StatusUnauthorized, "Invalid or expired token")
 		return
 	}
 
@@ -193,11 +195,12 @@ func (h *PortalHandler) HandleSubmitAction(w http.ResponseWriter, r *http.Reques
 	ctx, err := h.portalService.VerifyActionToken(r.Context(), token)
 	if err != nil {
 		slog.Warn("portal: token verification failed", "error", err)
-		respondError(w, http.StatusUnauthorized, err.Error())
+		respondError(w, http.StatusUnauthorized, "Invalid or expired token")
 		return
 	}
 
-	// Parse request
+	// Parse request (L7: limit body size)
+	r.Body = http.MaxBytesReader(w, r.Body, httputil.MaxBodySize)
 	var req SubmitActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -214,13 +217,13 @@ func (h *PortalHandler) HandleSubmitAction(w http.ResponseWriter, r *http.Reques
 		// Validate status
 		status, err := parseTaskStatus(*req.Status)
 		if err != nil {
-			respondError(w, http.StatusBadRequest, err.Error())
+			respondError(w, http.StatusBadRequest, "Invalid task status")
 			return
 		}
 		// Update task status
 		if err := h.portalService.UpdateTaskStatus(r.Context(), ctx.Token.TaskID, ctx.Token.ProjectID, status); err != nil {
 			slog.Error("portal: failed to update task status", "error", err)
-			respondError(w, http.StatusInternalServerError, err.Error())
+			respondError(w, http.StatusInternalServerError, "Failed to update task status")
 			return
 		}
 		slog.Info("portal: task status updated", "task_id", ctx.Token.TaskID, "status", status)
@@ -242,7 +245,7 @@ func (h *PortalHandler) HandleSubmitAction(w http.ResponseWriter, r *http.Reques
 	// Mark token as used
 	if err := h.portalService.UseActionToken(r.Context(), ctx.Token.ID); err != nil {
 		slog.Error("portal: failed to mark token as used", "error", err)
-		respondError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, "Failed to complete action")
 		return
 	}
 

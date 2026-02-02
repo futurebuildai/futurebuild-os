@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/api/response"
+	"github.com/colton/futurebuild/internal/auth"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
@@ -377,5 +378,257 @@ func TestRequireRole(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "Builder Access", rec.Body.String())
+	})
+}
+
+// Step 81: RequirePermission tests
+func TestRequirePermission(t *testing.T) {
+	mw := newTestMiddleware()
+
+	okHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	})
+
+	t.Run("Admin has all permissions", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeProjectDelete)(okHandler))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:admin"
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Builder can create projects", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeProjectCreate)(okHandler))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:member"
+		})
+		req := httptest.NewRequest("POST", "/projects", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Builder cannot delete projects", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeProjectDelete)(okHandler))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:member"
+		})
+		req := httptest.NewRequest("DELETE", "/projects/1", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("Viewer can read projects", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeProjectRead)(okHandler))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:viewer"
+		})
+		req := httptest.NewRequest("GET", "/projects", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Viewer cannot write to chat", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeChatWrite)(okHandler))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:viewer"
+		})
+		req := httptest.NewRequest("POST", "/chat", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("Unauthenticated request returns 401", func(t *testing.T) {
+		handler := mw.RequireAuth(mw.RequirePermission(auth.ScopeProjectRead)(okHandler))
+
+		req := httptest.NewRequest("GET", "/projects", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+}
+
+// Step 81: Viewer role mapping test
+func TestMapClerkRoleToInternal_Viewer(t *testing.T) {
+	mw := newTestMiddleware()
+
+	t.Run("org:viewer maps to Viewer", func(t *testing.T) {
+		h := mw.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := GetClaims(r.Context())
+			assert.Equal(t, types.UserRoleViewer, claims.Role)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:viewer"
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("org:guest maps to Viewer", func(t *testing.T) {
+		h := mw.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := GetClaims(r.Context())
+			assert.Equal(t, types.UserRoleViewer, claims.Role)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:guest"
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+// L7 Audit: E2E auth pipeline test — validates JWT → Role Mapping → RBAC → Route in a single chain
+func TestE2E_AuthPipeline_ViewerBlockedFromWrite(t *testing.T) {
+	mw := newTestMiddleware()
+
+	writeHandler := mw.RequireAuth(
+		mw.RequirePermission(auth.ScopeChatWrite)(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("WRITE_OK"))
+			}),
+		),
+	)
+
+	readHandler := mw.RequireAuth(
+		mw.RequirePermission(auth.ScopeProjectRead)(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("READ_OK"))
+			}),
+		),
+	)
+
+	// Viewer JWT hits write endpoint → 403
+	t.Run("Viewer blocked from write endpoint", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:viewer"
+		})
+		req := httptest.NewRequest("POST", "/chat", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		writeHandler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	// Viewer JWT hits read endpoint → 200
+	t.Run("Viewer allowed on read endpoint", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:viewer"
+		})
+		req := httptest.NewRequest("GET", "/projects/123", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		readHandler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "READ_OK", rec.Body.String())
+	})
+
+	// Builder JWT hits write endpoint → 200
+	t.Run("Builder allowed on write endpoint", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_role"] = "org:member"
+		})
+		req := httptest.NewRequest("POST", "/chat", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		writeHandler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "WRITE_OK", rec.Body.String())
+	})
+
+	// No JWT → 401
+	t.Run("No auth returns 401", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/chat", nil)
+		rec := httptest.NewRecorder()
+		writeHandler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+}
+
+// L7 Audit: Tenant isolation — claims from Org A cannot be used to imply access to Org B
+func TestTenantIsolation_ClaimsOrgID(t *testing.T) {
+	mw := newTestMiddleware()
+
+	orgA := "org_aaaa-aaaa-aaaa-aaaa"
+	orgB := "org_bbbb-bbbb-bbbb-bbbb"
+
+	handler := mw.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, err := GetClaims(r.Context())
+		assert.NoError(t, err)
+		// The handler receives only the org from the JWT — no cross-org access
+		w.Header().Set("X-Org-ID", claims.OrgID)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Run("OrgA token gets OrgA claims", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_id"] = orgA
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, orgA, rec.Header().Get("X-Org-ID"))
+	})
+
+	t.Run("OrgB token gets OrgB claims", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_id"] = orgB
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, orgB, rec.Header().Get("X-Org-ID"))
+	})
+
+	t.Run("Header-based org override is ignored", func(t *testing.T) {
+		// Token has OrgA, but attacker sets X-Org-ID header to OrgB
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["org_id"] = orgA
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Org-ID", orgB) // Attacker tries to override
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		// Claims should still reflect OrgA from JWT, not the header
+		assert.Equal(t, orgA, rec.Header().Get("X-Org-ID"))
 	})
 }

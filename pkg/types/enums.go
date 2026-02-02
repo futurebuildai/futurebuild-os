@@ -21,6 +21,7 @@ type UserRole string
 const (
 	UserRoleAdmin         UserRole = "Admin"
 	UserRoleBuilder       UserRole = "Builder"
+	UserRoleViewer        UserRole = "Viewer"        // Step 81: Read-only access
 	UserRoleClient        UserRole = "Client"
 	UserRoleSubcontractor UserRole = "Subcontractor"
 )
@@ -29,7 +30,7 @@ const (
 // See API_AND_TYPES_SPEC.md Section 1.2
 func ValidUserRole(s string) bool {
 	switch UserRole(s) {
-	case UserRoleAdmin, UserRoleBuilder, UserRoleClient, UserRoleSubcontractor:
+	case UserRoleAdmin, UserRoleBuilder, UserRoleViewer, UserRoleClient, UserRoleSubcontractor:
 		return true
 	default:
 		return false

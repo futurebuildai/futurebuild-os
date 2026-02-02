@@ -42,7 +42,8 @@ func (h *OnboardingHandler) HandleOnboard(w http.ResponseWriter, r *http.Request
 		r.Body = http.MaxBytesReader(w, r.Body, 50*1024*1024)
 		req, err = parseMultipartOnboard(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			slog.Warn("onboarding: multipart parse error", "error", err)
+			http.Error(w, "Invalid file upload", http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -57,7 +58,8 @@ func (h *OnboardingHandler) HandleOnboard(w http.ResponseWriter, r *http.Request
 
 	// L7: Input validation
 	if err := validateOnboardRequest(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		slog.Warn("onboarding: validation error", "error", err)
+		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
 		return
 	}
 

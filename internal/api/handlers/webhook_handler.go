@@ -36,9 +36,13 @@ func NewWebhookHandler(processor *agents.InboundProcessor, webhookSecret string)
 //
 // See PRODUCTION_PLAN.md Step 48
 func (h *WebhookHandler) HandleSMS(w http.ResponseWriter, r *http.Request) {
-	// Step 1: Signature Verification
-	// See L7 Security Amendment
-	if h.webhookSecret != "" {
+	// Step 1: Signature Verification (L7: fail-closed)
+	if h.webhookSecret == "" {
+		slog.Error("webhook/sms: webhook secret not configured (fail-closed)")
+		response.JSONError(w, http.StatusForbidden, "Webhook not configured")
+		return
+	}
+	{
 		// Prevent DoS: Limit body reading to 1MB
 		r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
 
@@ -118,8 +122,13 @@ func (h *WebhookHandler) HandleSMS(w http.ResponseWriter, r *http.Request) {
 //
 // See PRODUCTION_PLAN.md Step 48
 func (h *WebhookHandler) HandleEmail(w http.ResponseWriter, r *http.Request) {
-	// Step 1: Signature Verification
-	if h.webhookSecret != "" {
+	// Step 1: Signature Verification (L7: fail-closed)
+	if h.webhookSecret == "" {
+		slog.Error("webhook/email: webhook secret not configured (fail-closed)")
+		response.JSONError(w, http.StatusForbidden, "Webhook not configured")
+		return
+	}
+	{
 		// Prevent DoS: Limit body reading to 10MB (emails can be larger)
 		r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
 

@@ -40,7 +40,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	// Extract OrgID from authenticated JWT claims (secure, not from header)
 	authOrgID, err := getAuthOrgID(r)
 	if err != nil {
-		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.CreateProject(r.Context(), &p); err != nil {
 		if errors.Is(err, types.ErrConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			http.Error(w, "Project already exists", http.StatusConflict)
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -91,7 +91,7 @@ func (h *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 	// Extract OrgID from authenticated JWT claims (secure, not from header)
 	orgID, err := getAuthOrgID(r)
 	if err != nil {
-		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -120,7 +120,7 @@ func (h *ProjectHandler) GetProcurementItems(w http.ResponseWriter, r *http.Requ
 	// Extract OrgID from authenticated JWT claims
 	orgID, err := getAuthOrgID(r)
 	if err != nil {
-		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 

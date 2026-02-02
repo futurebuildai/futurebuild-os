@@ -174,9 +174,13 @@ func (h *ClerkWebhookHandler) handleMembershipEvent(ctx context.Context, w http.
 	}
 
 	// Map Clerk role to internal role
+	// See STEP_81_ROLE_MAPPING.md: admin → Admin, member → Builder, viewer → Viewer
 	role := "Builder"
-	if memberData.Role == "org:admin" {
+	switch memberData.Role {
+	case "org:admin":
 		role = "Admin"
+	case "org:viewer", "org:guest":
+		role = "Viewer"
 	}
 
 	name := memberData.PublicUserData.FirstName
