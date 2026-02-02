@@ -41,10 +41,11 @@ type Server struct {
 	InviteHandler        *handlers.InviteHandler        // See LAUNCH_STRATEGY.md Task B2
 	UserHandler          *handlers.UserHandler          // See LAUNCH_PLAN.md User Profile Endpoint
 	PortalHandler        *handlers.PortalHandler        // See LAUNCH_PLAN.md P2: Field Portal
+	PortalAuthHandler    *handlers.PortalAuthHandler    // Phase 12: Portal magic-link auth (separate from Clerk)
 	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	AuthMiddleware       *middleware.AuthMiddleware
-	AuthRateLimiter      *middleware.IPRateLimiter
+	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -140,11 +141,15 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	)
 	webhookHandler := handlers.NewWebhookHandler(inboundProcessor, cfg.WebhookSecret)
 
-	authService := service.NewAuthService(db, cfg)
-	authHandler := handlers.NewAuthHandler(authService, notificationService, cfg.BaseURL)
+	// Phase 12: Main app auth via Clerk; AuthHandler serves /auth/me only.
+	authHandler := handlers.NewAuthHandler()
 	authMiddleware := middleware.NewAuthMiddleware(cfg)
 
-	authRateLimiter := middleware.NewIPRateLimiter(rate.Every(12*time.Second), 2, cfg.TrustedProxies)
+	// Phase 12: Portal contacts still use magic-link auth (separate from Clerk).
+	// AuthService provides token generation, storage, and verification for portal.
+	authService := service.NewAuthService(db, cfg)
+	portalAuthHandler := handlers.NewPortalAuthHandler(authService, notificationService, cfg.BaseURL)
+	portalRateLimiter := middleware.NewIPRateLimiter(rate.Every(12*time.Second), 2, cfg.TrustedProxies)
 
 	// See FUTURESHADE_INIT_specs.md: Initialize FutureShade with Fail Open strategy.
 	// If configuration is missing, the service returns a disabled NoOp instance.
@@ -204,10 +209,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		InviteHandler:        inviteHandler,        // See LAUNCH_STRATEGY.md Task B2
 		UserHandler:          userHandler,          // See LAUNCH_PLAN.md User Profile Endpoint
 		PortalHandler:        portalHandler,        // See LAUNCH_PLAN.md P2: Field Portal
+		PortalAuthHandler:    portalAuthHandler,    // Phase 12: Portal magic-link auth
 		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
 		AuthMiddleware:       authMiddleware,
-		AuthRateLimiter:      authRateLimiter,
+		PortalRateLimiter:    portalRateLimiter,
 	}
 
 	s.routes()
@@ -221,10 +227,11 @@ func (s *Server) routes() {
 	s.Router.Get("/health", s.HandleHealth)
 
 	s.Router.Route("/api/v1", func(r chi.Router) {
+		// Phase 12: Legacy /auth/login and /auth/verify removed — Clerk handles sign-in.
+		// See STEP_78_AUTH_PROVIDER.md Section 2.1
 		r.Route("/auth", func(r chi.Router) {
-			r.Use(middleware.RateLimit(s.AuthRateLimiter))
-			r.Post("/login", s.AuthHandler.Login)
-			r.Get("/verify", s.AuthHandler.Verify)
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Get("/me", s.AuthHandler.Me)
 		})
 
 		// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
@@ -248,6 +255,14 @@ func (s *Server) routes() {
 		r.Route("/portal", func(r chi.Router) {
 			r.Get("/action/{token}", s.PortalHandler.HandleVerifyActionToken)
 			r.Post("/action/{token}", s.PortalHandler.HandleSubmitAction)
+
+			// Phase 12: Portal magic-link auth (separate from Clerk).
+			// Contacts use email magic links, not Clerk SSO.
+			r.Route("/auth", func(r chi.Router) {
+				r.Use(middleware.RateLimit(s.PortalRateLimiter))
+				r.Post("/login", s.PortalAuthHandler.Login)
+				r.Get("/verify", s.PortalAuthHandler.Verify)
+			})
 		})
 
 		// Admin endpoint for creating action links

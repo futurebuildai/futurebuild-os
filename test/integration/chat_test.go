@@ -5,8 +5,12 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,22 +43,87 @@ func (m *noOpClient) GenerateEmbedding(ctx context.Context, text string) ([]floa
 }
 func (m *noOpClient) Close() error { return nil }
 
+// ============================================================================
+// Test RSA Key + JWKS Server
+// Phase 12: Integration tests use RS256 (Clerk JWKS) instead of HS256.
+// ============================================================================
+
+var integrationRSAKey *rsa.PrivateKey
+
+func init() {
+	var err error
+	integrationRSAKey, err = rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic("failed to generate integration test RSA key: " + err.Error())
+	}
+}
+
+// startJWKSServer starts an HTTP server that serves a JWKS JSON for the test RSA key.
+// Returns the server (caller must defer Close) and the issuer URL.
+func startJWKSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	// Encode RSA public key as JWK
+	nBytes := integrationRSAKey.PublicKey.N.Bytes()
+	eBytes := big.NewInt(int64(integrationRSAKey.PublicKey.E)).Bytes()
+
+	jwksJSON := fmt.Sprintf(`{"keys":[{"kty":"RSA","n":"%s","e":"%s","kid":"integration-test","alg":"RS256","use":"sig"}]}`,
+		base64.RawURLEncoding.EncodeToString(nBytes),
+		base64.RawURLEncoding.EncodeToString(eBytes),
+	)
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwksJSON))
+	}))
+}
+
+// signTestTokenRS256 creates an RS256-signed JWT for integration tests.
+func signTestTokenRS256(issuer string, claims *types.Claims) (string, error) {
+	mapClaims := jwt.MapClaims{
+		"sub":      claims.UserID,
+		"org_id":   claims.OrgID,
+		"org_role": "org:member",
+		"email":    claims.Email,
+		"name":     claims.Name,
+		"iss":      issuer,
+	}
+
+	if claims.RegisteredClaims.ExpiresAt != nil {
+		mapClaims["exp"] = claims.RegisteredClaims.ExpiresAt
+	}
+	mapClaims["iat"] = jwt.NewNumericDate(time.Now())
+	mapClaims["nbf"] = jwt.NewNumericDate(time.Now())
+
+	if claims.Role == types.UserRoleAdmin {
+		mapClaims["org_role"] = "org:admin"
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, mapClaims)
+	token.Header["kid"] = "integration-test"
+	return token.SignedString(integrationRSAKey)
+}
+
 // getTestConfig creates configuration suitable for integration tests.
 // Uses defaults if environment variables are not set.
-func getTestConfig() *config.Config {
+// Phase 12: ClerkIssuerURL is set to the JWKS test server.
+func getTestConfig(jwksIssuerURL string) *config.Config {
 	cfg, err := config.LoadConfig()
 	if err == nil {
+		// Override with test JWKS server so the middleware validates our test tokens
+		cfg.ClerkIssuerURL = jwksIssuerURL
 		return cfg
 	}
 
 	// Create a test config with sensible defaults
 	return &config.Config{
-		DatabaseURL:   "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable",
-		RedisURL:      "localhost:6379",
-		AppPort:       8080,
-		JWTSecret:     "test-secret-for-integration-tests",
-		JWTExpiry:     24 * time.Hour,
-		WebhookSecret: "test-webhook-secret",
+		DatabaseURL:    "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable",
+		RedisURL:       "localhost:6379",
+		AppPort:        8080,
+		JWTSecret:      "test-secret-for-integration-tests",
+		JWTExpiry:      24 * time.Hour,
+		WebhookSecret:  "test-webhook-secret",
+		ClerkIssuerURL: jwksIssuerURL,
 	}
 }
 
@@ -63,8 +132,12 @@ func TestChat_EndToEnd(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// 0. Start JWKS server for RS256 token validation
+	jwksServer := startJWKSServer(t)
+	defer jwksServer.Close()
+
 	// 1. Setup DB Connection
-	cfg := getTestConfig()
+	cfg := getTestConfig(jwksServer.URL)
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -95,17 +168,18 @@ func TestChat_EndToEnd(t *testing.T) {
 	_, err = db.Exec(ctx, "INSERT INTO projects (id, org_id, name, status) VALUES ($1, $2, 'Chat Test Project', 'Active')", projectID, orgID)
 	require.NoError(t, err)
 
-	// 3. Generate JWT
+	// 3. Generate RS256 JWT (Phase 12: Clerk JWKS)
 	claims := &types.Claims{
 		UserID: userID.String(),
 		OrgID:  orgID.String(),
 		Role:   types.UserRoleBuilder,
+		Email:  "test@example.com",
+		Name:   "Test User",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(cfg.JWTSecret))
+	signedToken, err := signTestTokenRS256(jwksServer.URL, claims)
 	require.NoError(t, err)
 
 	// 4. Start Test Server
@@ -172,8 +246,10 @@ func TestChat_NoToken_Unauthorized(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Setup
-	cfg := getTestConfig()
+	jwksServer := startJWKSServer(t)
+	defer jwksServer.Close()
+
+	cfg := getTestConfig(jwksServer.URL)
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -216,8 +292,10 @@ func TestChat_InvalidToken_Unauthorized(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Setup
-	cfg := getTestConfig()
+	jwksServer := startJWKSServer(t)
+	defer jwksServer.Close()
+
+	cfg := getTestConfig(jwksServer.URL)
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -260,8 +338,10 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Setup
-	cfg := getTestConfig()
+	jwksServer := startJWKSServer(t)
+	defer jwksServer.Close()
+
+	cfg := getTestConfig(jwksServer.URL)
 	ctx := context.Background()
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -277,7 +357,7 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(s.Router)
 	defer ts.Close()
 
-	// Generate EXPIRED JWT
+	// Generate EXPIRED RS256 JWT
 	claims := &types.Claims{
 		UserID: uuid.New().String(),
 		OrgID:  uuid.New().String(),
@@ -286,8 +366,7 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-24 * time.Hour)), // EXPIRED
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(cfg.JWTSecret))
+	signedToken, err := signTestTokenRS256(jwksServer.URL, claims)
 	require.NoError(t, err)
 
 	// Request with expired token

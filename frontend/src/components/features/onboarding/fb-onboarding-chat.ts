@@ -25,10 +25,9 @@ import {
 } from '../../../store/onboarding-store';
 import type { FBOnboardingDropzone } from './fb-onboarding-dropzone';
 
+import { clerkService } from '../../../services/clerk';
 import '../../chat/fb-input-bar';
 import './fb-onboarding-dropzone';
-
-const STORAGE_KEY_TOKEN = 'fb_token';
 
 @customElement('fb-onboarding-chat')
 export class FBOnboardingChat extends SignalWatcher(FBElement) {
@@ -231,7 +230,8 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
             dropzone?.setProgress(30);
 
             // POST multipart to /agent/onboard
-            const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+            // Phase 12: Use Clerk's cached token instead of legacy localStorage
+            const token = clerkService.getToken();
             const headers: Record<string, string> = {};
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;

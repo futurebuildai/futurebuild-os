@@ -44,20 +44,6 @@ func (s *AuthService) HashToken(token string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// StoreToken transactionally saves the token hash for a USER.
-func (s *AuthService) StoreToken(ctx context.Context, userID uuid.UUID, tokenHash string) error {
-	expiresAt := time.Now().UTC().Add(15 * time.Minute)
-	query := `
-		INSERT INTO auth_tokens (token_hash, user_id, expires_at, used)
-		VALUES ($1, $2, $3, false)
-	`
-	_, err := s.db.Exec(ctx, query, tokenHash, userID, expiresAt)
-	if err != nil {
-		return fmt.Errorf("failed to store auth token: %w", err)
-	}
-	return nil
-}
-
 // StorePortalToken transactionally saves the token hash for a CONTACT.
 func (s *AuthService) StorePortalToken(ctx context.Context, contactID uuid.UUID, tokenHash string) error {
 	expiresAt := time.Now().UTC().Add(15 * time.Minute)
@@ -200,10 +186,10 @@ func (s *AuthService) LookupIdentityByEmail(ctx context.Context, email string) (
 	return nil, fmt.Errorf("identity not found")
 }
 
-// ConstructLink formats the magic link URL.
-// Points to frontend /auth/verify route which calls the API and handles the auth flow.
-func (s *AuthService) ConstructLink(baseURL string, rawToken string) string {
-	return fmt.Sprintf("%s/auth/verify?token=%s", baseURL, rawToken)
+// ConstructPortalLink formats the magic link URL for portal contacts.
+// Points to frontend /portal/verify route.
+func (s *AuthService) ConstructPortalLink(baseURL string, rawToken string) string {
+	return fmt.Sprintf("%s/portal/verify?token=%s", baseURL, rawToken)
 }
 
 // GenerateJWT creates a signed token response for an identity.

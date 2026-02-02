@@ -161,7 +161,7 @@ export class FBViewPortalLogin extends FBViewElement {
         this._submitting = true;
 
         try {
-            const response = await fetch('/api/v1/auth/login', {
+            const response = await fetch('/api/v1/portal/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: this._email }),

@@ -6,7 +6,7 @@
  * Key patterns:
  * - Readonly signal exposure to prevent arbitrary mutation
  * - Action-based mutations for predictable state changes
- * - localStorage persistence for auth token
+ * - Clerk-managed auth (Phase 12: no localStorage for auth)
  * - Computed values for derived state
  * - 3-panel architecture state (left/center/right)
  */
@@ -28,6 +28,7 @@ import type {
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 import { realtimeService, type ConnectionStatus, type ArtifactPayload } from '../services/realtime';
 import { normalizeArtifactType } from '../utils/artifact-helpers';
+import { clerkService } from '../services/clerk';
 
 /**
  * Formats an ISO timestamp to a display time string (e.g., "2:30 PM").
@@ -46,8 +47,6 @@ function formatDisplayTime(isoString: string): string {
 // Constants
 // ============================================================================
 
-const STORAGE_KEY_TOKEN = 'fb_token';
-const STORAGE_KEY_USER = 'fb_user';
 const STORAGE_KEY_THEME = 'fb_theme';
 
 // Step 56: Allowed MIME types for drag-and-drop file ingestion
@@ -173,9 +172,8 @@ const actions: StoreActions = {
         _token$.value = token;
         _authError$.value = null;
         _authLoading$.value = false;
-        // Sync persistence - ensures data survives page reload
-        localStorage.setItem(STORAGE_KEY_TOKEN, token);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+        // Phase 12: Token persistence is managed by Clerk SDK (cookies/session storage).
+        // No localStorage writes for auth data.
     },
 
     logout(): void {
@@ -189,8 +187,7 @@ const actions: StoreActions = {
         _focusTasks$.value = [];
         _agentActivity$.value = [];
         _authError$.value = null;
-        localStorage.removeItem(STORAGE_KEY_TOKEN);
-        localStorage.removeItem(STORAGE_KEY_USER);
+        // Phase 12: No localStorage auth cleanup needed — Clerk manages session.
     },
 
     setAuthLoading(loading: boolean): void {
@@ -654,50 +651,31 @@ export const store = {
 // ============================================================================
 
 /**
- * Initialize the store with persisted state.
- * Call this once at application bootstrap.
+ * Initialize the store with persisted state and Clerk auth observer.
+ * Call this once at application bootstrap, after Clerk has loaded.
  *
  * L7 Fix: Side-effect effects are registered here instead of at module level.
  * This prevents localStorage access during import (e.g., JSDOM tests).
+ *
+ * Phase 12: Auth state is driven by Clerk session observer, not localStorage.
+ * Token persistence is managed by Clerk SDK (cookies/session storage).
  */
 export function initializeStore(): void {
-    // Effect: Persist auth token to localStorage.
-    effect(() => {
-        const token = _token$.value;
-        if (token) {
-            localStorage.setItem(STORAGE_KEY_TOKEN, token);
-        } else {
-            localStorage.removeItem(STORAGE_KEY_TOKEN);
-        }
-    });
-
     // Effect: Persist theme preference to localStorage.
     effect(() => {
         const theme = _theme$.value;
         localStorage.setItem(STORAGE_KEY_THEME, theme);
     });
-    // Restore token and user from localStorage
-    const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const storedUser = localStorage.getItem(STORAGE_KEY_USER);
-    if (storedToken && storedUser) {
-        try {
-            _token$.value = storedToken;
-            _user$.value = JSON.parse(storedUser) as User;
-        } catch {
-            // Invalid stored data, clear it
-            localStorage.removeItem(STORAGE_KEY_TOKEN);
-            localStorage.removeItem(STORAGE_KEY_USER);
-        }
-    } else if (storedToken) {
-        // Token without user - clear stale token
-        localStorage.removeItem(STORAGE_KEY_TOKEN);
-    }
 
     // Restore theme from localStorage
     const storedTheme = localStorage.getItem(STORAGE_KEY_THEME) as Theme | null;
     if (storedTheme && ['light', 'dark', 'system'].includes(storedTheme)) {
         _theme$.value = storedTheme;
     }
+
+    // Clean up legacy localStorage keys from magic-link auth
+    localStorage.removeItem('fb_token');
+    localStorage.removeItem('fb_user');
 
     // Detect mobile/tablet viewport
     if (typeof window !== 'undefined') {
@@ -723,10 +701,29 @@ export function initializeStore(): void {
         });
     }
 
-    // Wire up HTTP service callbacks to prevent circular dependencies
-    setTokenGetter(() => _token$.value);
+    // Wire up HTTP service callbacks to use Clerk token cache
+    // See STEP_78_AUTH_PROVIDER.md Section 1.4
+    setTokenGetter(() => clerkService.getToken());
     setUnauthorizedHandler(() => {
-        actions.logout();
+        void clerkService.signOut();
+    });
+
+    // Wire Clerk auth state changes into the store
+    // On sign-in: Clerk fires callback with user info and cached token
+    // On sign-out: Clerk fires callback with (null, null)
+    clerkService.onAuthChange((clerkUser, token) => {
+        if (clerkUser && token) {
+            const user: User = {
+                id: clerkUser.id,
+                email: clerkUser.email,
+                name: clerkUser.name,
+                role: clerkUser.role as User['role'],
+                orgId: clerkUser.orgId,
+            };
+            actions.login(user, token);
+        } else {
+            actions.logout();
+        }
     });
 
     // Step 57: Initialize RealtimeService and wire event handlers

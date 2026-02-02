@@ -3,7 +3,7 @@
  * See FRONTEND_SCOPE.md Section 5.2
  *
  * Provides typed API methods organized by domain:
- * - auth: Magic link authentication
+ * - auth: Authentication (Clerk-managed, backend principal lookup)
  * - projects: Project CRUD operations
  * - chat: Chat messaging
  * - schedule: Gantt/Schedule data
@@ -20,30 +20,6 @@ import type { UserRole } from '../types/enums';
 // ============================================================================
 // Auth Types
 // ============================================================================
-
-/**
- * Magic link request payload.
- */
-export interface MagicLinkRequest {
-    email: string;
-}
-
-/**
- * Magic link response.
- */
-export interface MagicLinkResponse {
-    message: string;
-}
-
-/**
- * Token verification response (matches Go types.TokenResponse).
- */
-export interface AuthResponse {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-    principal: AuthPrincipal;
-}
 
 /**
  * Authenticated principal data (matches Go types.Principal).
@@ -204,9 +180,8 @@ export interface TaskProgressRequest {
  *
  * @example
  * ```typescript
- * // Authentication
- * await api.auth.requestMagicLink('user@example.com');
- * const { access_token, principal } = await api.auth.verifyToken('abc123');
+ * // Authentication (sign-in handled by Clerk SDK)
+ * const me = await api.auth.me();
  *
  * // Projects
  * const projects = await api.projects.list();
@@ -219,40 +194,13 @@ export interface TaskProgressRequest {
 export const api = {
     /**
      * Authentication endpoints.
+     * Note: Sign-in/sign-out are handled by Clerk SDK directly.
+     * See STEP_78_AUTH_PROVIDER.md Section 1.
      */
     auth: {
         /**
-         * Request a magic link email.
-         * @param email - User's email address
-         */
-        requestMagicLink(email: string): Promise<MagicLinkResponse> {
-            return post<MagicLinkResponse>(
-                '/auth/login',
-                { email } satisfies MagicLinkRequest,
-                { skipAuth: true }
-            );
-        },
-
-        /**
-         * Verify a magic link token and get auth credentials.
-         * @param token - The magic link token from email
-         */
-        verifyToken(token: string): Promise<AuthResponse> {
-            return get<AuthResponse>(
-                `/auth/verify?token=${encodeURIComponent(token)}`,
-                { skipAuth: true }
-            );
-        },
-
-        /**
-         * Logout and invalidate the current session.
-         */
-        async logout(): Promise<void> {
-            await post<undefined>('/auth/logout');
-        },
-
-        /**
-         * Get the current authenticated user.
+         * Get the current authenticated user's principal from the backend.
+         * Validates that the Clerk JWT is accepted by the backend.
          */
         me(): Promise<AuthPrincipal> {
             return get<AuthPrincipal>('/auth/me');

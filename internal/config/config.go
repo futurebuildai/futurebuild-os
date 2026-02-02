@@ -56,7 +56,7 @@ type Config struct {
 	EmailFromName    string
 
 	// BaseURL is the public URL of the application (e.g., https://app.futurebuild.app).
-	// Used for constructing magic links and other URLs.
+	// Used for constructing portal magic links and other URLs.
 	BaseURL string
 
 	// Twilio SMS configuration. See LAUNCH_PLAN.md P2 (Notifications/Toast UI).
@@ -67,6 +67,10 @@ type Config struct {
 	// AuditWALPath is the file path for the audit Write-Ahead Log.
 	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
 	AuditWALPath string
+
+	// Clerk Identity Provider configuration. See STEP_78_AUTH_PROVIDER.md.
+	// JWKS URL is derived as {ClerkIssuerURL}/.well-known/jwks.json
+	ClerkIssuerURL string
 
 	// GitHub configuration for Automated PR Review.
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -154,6 +158,7 @@ func LoadConfig() (*Config, error) {
 		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/tmp/audit.wal"),
+		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{
@@ -179,8 +184,10 @@ func (c *Config) Validate() error {
 	if c.DatabaseURL == "" {
 		return errors.New("DATABASE_URL environment variable is required")
 	}
-	if c.JWTSecret == "" {
-		return errors.New("JWT_SECRET environment variable is required")
+	// Phase 12: JWT_SECRET is no longer required — Clerk uses JWKS (RS256).
+	// CLERK_ISSUER_URL is required for JWKS-based JWT validation.
+	if c.ClerkIssuerURL == "" {
+		return errors.New("CLERK_ISSUER_URL environment variable is required")
 	}
 	return nil
 }

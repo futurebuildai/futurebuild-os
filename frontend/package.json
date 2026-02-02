@@ -16,6 +16,7 @@
         "test:contract": "npm run generate:schemas && node scripts/validate-contract.js"
     },
     "dependencies": {
+        "@clerk/clerk-js": "^5.122.0",
         "@lit-labs/preact-signals": "^1.0.0",
         "@lit-labs/virtualizer": "^2.1.1",
         "@preact/signals-core": "^1.12.1",

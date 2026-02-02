@@ -3,6 +3,8 @@ import { resolve } from 'path';
 
 // See FRONTEND_SCOPE.md Section 12.1 - Vite Configuration
 export default defineConfig({
+    // Phase 12: Load .env from project root (parent dir) so Clerk keys are accessible
+    envDir: resolve(__dirname, '..'),
     resolve: {
         alias: {
             '@': resolve(__dirname, './src'),

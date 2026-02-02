@@ -15,8 +15,10 @@ const (
 type Claims struct {
 	UserID      string      `json:"user_id"`
 	OrgID       string      `json:"org_id"`       // REQUIRED per Data Spine for multi-tenancy
-	Role        UserRole    `json:"role"`         // REQUIRED per API Spec for role enforcement
-	SubjectType SubjectType `json:"subject_type"` // REQUIRED to distinguish between USERS and CONTACTS
+	Role        UserRole    `json:"role"`          // REQUIRED per API Spec for role enforcement
+	SubjectType SubjectType `json:"subject_type"`  // REQUIRED to distinguish between USERS and CONTACTS
+	Email       string      `json:"email"`         // Phase 12: Extracted from Clerk JWT template
+	Name        string      `json:"name"`          // Phase 12: Extracted from Clerk JWT template
 	jwt.RegisteredClaims
 }
 

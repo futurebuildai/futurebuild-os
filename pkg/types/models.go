@@ -70,12 +70,12 @@ type GanttTask struct {
 	IsCritical   bool       `json:"is_critical"`
 }
 
-// AuthRequest is the payload for requesting a magic link.
+// AuthRequest is the payload for requesting a portal magic link.
 type AuthRequest struct {
 	Email string `json:"email"`
 }
 
-// AuthResponse is the generic response for auth requests.
+// AuthResponse is the generic response for portal auth requests.
 type AuthResponse struct {
 	Message string `json:"message"`
 }

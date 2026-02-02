@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	cloud.google.com/go/vertexai v0.15.0
+	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -35,6 +36,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.7 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
+	github.com/MicahParks/jwkset v0.11.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect

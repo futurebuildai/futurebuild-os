@@ -13,7 +13,7 @@ FutureBuild is an AI-powered construction project management platform. It uses t
 | Backend | Go 1.24+, Chi Router, PostgreSQL 15+ (pgvector), Redis (Asynq) |
 | Frontend | Lit 3.0, TypeScript 5.0+ (Strict Mode), Vite, Signals (@lit-labs/preact-signals) |
 | AI | Google Vertex AI (Gemini 2.5 Flash/Pro) |
-| Auth | Magic link email, JWT tokens |
+| Auth | Clerk (main app), Magic link email (portal contacts), JWT tokens |
 
 **Hard Constraints:**
 - NO React, NO ORMs (use raw SQL/pgx), NO Python logic (Go only)

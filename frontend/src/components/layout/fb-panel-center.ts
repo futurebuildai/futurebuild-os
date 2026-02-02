@@ -11,7 +11,7 @@ import type { ProjectSummary, Thread } from '../../store/types';
 
 // Import view components
 import '../views/fb-view-login';
-import '../views/fb-view-verify';
+// fb-view-verify removed — Clerk handles email verification internally (Phase 12)
 import '../views/fb-view-invite-accept';
 import '../views/fb-view-admin-invites';
 import '../views/fb-view-settings';
@@ -123,7 +123,6 @@ export class FBPanelCenter extends FBElement {
             }
 
             fb-view-login,
-            fb-view-verify,
             fb-view-invite-accept,
             fb-view-chat,
             fb-view-onboarding {
@@ -137,7 +136,6 @@ export class FBPanelCenter extends FBElement {
     @state() private _activeProject: ProjectSummary | null = null;
     @state() private _activeThread: Thread | null = null;
     @state() private _isMobile = false;
-    @state() private _isVerifyRoute = false;
     @state() private _isInviteAcceptRoute = false;
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
@@ -180,7 +178,6 @@ export class FBPanelCenter extends FBElement {
 
     private _checkRoute(): void {
         const path = window.location.pathname;
-        this._isVerifyRoute = path === '/auth/verify';
         this._isInviteAcceptRoute = path === '/invite/accept';
         this._isAdminInvitesRoute = path === '/admin/invites';
         this._isSettingsRoute = path === '/settings';
@@ -235,11 +232,6 @@ export class FBPanelCenter extends FBElement {
         }
         if (this._isPortalDashboardRoute) {
             return html`<fb-view-portal-dashboard></fb-view-portal-dashboard>`;
-        }
-
-        // Show verify view for magic link verification
-        if (this._isVerifyRoute) {
-            return html`<fb-view-verify></fb-view-verify>`;
         }
 
         // Show invite acceptance view

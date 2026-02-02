@@ -92,11 +92,11 @@ func (c *Contact) GetName() string   { return c.Name }
 func (c *Contact) GetRole() UserRole { return c.Role }
 func (c *Contact) GetCreatedAt() time.Time { return c.CreatedAt }
 func (c *Contact) IsInternal() bool  { return false }
-// AuthToken represents a stateful magic link token.
-// See Technical Specification: Magic Link Authentication (Stateful)
-type AuthToken struct {
+// PortalToken represents a stateful magic link token for portal contacts.
+// Main app auth uses Clerk (Phase 12). Only portal contacts use magic links.
+type PortalToken struct {
 	TokenHash string    `db:"token_hash"`
-	UserID    uuid.UUID `db:"user_id"`
+	ContactID uuid.UUID `db:"contact_id"`
 	ExpiresAt time.Time `db:"expires_at"`
 	CreatedAt time.Time `db:"created_at"`
 	Used      bool      `db:"used"`

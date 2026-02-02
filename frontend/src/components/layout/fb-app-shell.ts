@@ -12,6 +12,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store, initializeStore } from '../../store/store';
+import { clerkService } from '../../services/clerk';
 
 // Import panel components
 import './fb-panel-left';
@@ -205,6 +206,7 @@ export class FBAppShell extends FBElement {
 
     @state() private _resolvedTheme: 'light' | 'dark' = 'dark';
     @state() private _isAuthenticated = false;
+    @state() private _clerkLoaded = false;
     @state() private _leftPanelOpen = true;
     @state() private _rightPanelOpen = true;
     @state() private _isMobile = false;
@@ -263,8 +265,9 @@ export class FBAppShell extends FBElement {
     override connectedCallback(): void {
         super.connectedCallback();
 
-        // Initialize store on shell mount
-        initializeStore();
+        // Phase 12: Initialize Clerk before the store.
+        // Clerk must load first so the store can wire its auth observer.
+        void this._initClerkAndStore();
 
         // Drag-and-drop event listeners (Step 56)
         this.addEventListener('dragenter', this._handleDragEnter);
@@ -345,6 +348,31 @@ export class FBAppShell extends FBElement {
         );
     }
 
+    /**
+     * Initialize Clerk identity provider, then bootstrap the store.
+     * Clerk must be loaded before initializeStore() so the Clerk auth
+     * observer is available when the store wires its callbacks.
+     * See STEP_78_AUTH_PROVIDER.md Section 1.2
+     */
+    private async _initClerkAndStore(): Promise<void> {
+        const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+        if (!publishableKey) {
+            console.error('[FBAppShell] VITE_CLERK_PUBLISHABLE_KEY not set. Auth will not work.');
+            this._clerkLoaded = true;
+            initializeStore();
+            return;
+        }
+
+        try {
+            await clerkService.init(publishableKey);
+        } catch (err) {
+            console.error('[FBAppShell] Clerk initialization failed:', err);
+        }
+
+        this._clerkLoaded = true;
+        initializeStore();
+    }
+
     override disconnectedCallback(): void {
         // Remove drag listeners (Step 56)
         this.removeEventListener('dragenter', this._handleDragEnter);
@@ -371,6 +399,15 @@ export class FBAppShell extends FBElement {
     }
 
     override render(): TemplateResult {
+        // Phase 12: Gate rendering on Clerk initialization
+        if (!this._clerkLoaded) {
+            return html`
+                <div class="shell" data-theme="dark" style="position: relative; display: flex; align-items: center; justify-content: center; height: 100vh;">
+                    <span style="color: var(--fb-text-muted, #666);">Loading...</span>
+                </div>
+            `;
+        }
+
         const resizeHandleOffset = this._rightPanelOpen && !this._isMobile ? this._rightPanelWidth : 0;
 
         // Shadow mode replaces the standard layout with FutureShade
