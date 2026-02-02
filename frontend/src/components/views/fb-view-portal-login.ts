@@ -160,20 +160,30 @@ export class FBViewPortalLogin extends FBViewElement {
 
         this._submitting = true;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
+
         try {
             const response = await fetch('/api/v1/portal/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: this._email }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error('Failed to send login link');
             }
 
             this._submitted = true;
-        } catch {
-            notify.error('Failed to send login link. Please try again.');
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                notify.error('Request timed out. Please try again.');
+            } else {
+                notify.error('Failed to send login link. Please try again.');
+            }
         } finally {
             this._submitting = false;
         }

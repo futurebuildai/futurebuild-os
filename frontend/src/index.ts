@@ -20,6 +20,7 @@ import { FBAppShell } from './components/layout/fb-app-shell';
 import { FBPanelLeft } from './components/layout/fb-panel-left';
 import { FBPanelCenter } from './components/layout/fb-panel-center';
 import { FBPanelRight } from './components/layout/fb-panel-right';
+import { FBMobileNav } from './components/layout/fb-mobile-nav'; // Step 90
 
 // Chat Components (Step 52)
 import { FBMessageList } from './components/chat/fb-message-list';
@@ -39,6 +40,10 @@ import { FBFileDrop } from './components/features/fb-file-drop';
 // Base Components (Step 58.5: Fortress Hardening)
 import { FBErrorBoundary } from './components/base/fb-error-boundary';
 
+// Notification Components (Step 91)
+import { FBNotificationBell } from './components/notifications/fb-notification-bell';
+import { FBNotificationList } from './components/notifications/fb-notification-list';
+
 // Shadow Viewer Components (SHADOW_VIEWER_specs.md)
 import { ShadowToggle } from './components/shadow/shadow-toggle';
 import { ShadowLayout } from './components/shadow/shadow-layout';
@@ -57,6 +62,7 @@ const registered = registerComponents({
     'fb-panel-left': FBPanelLeft,
     'fb-panel-center': FBPanelCenter,
     'fb-panel-right': FBPanelRight,
+    'fb-mobile-nav': FBMobileNav,
     'fb-message-list': FBMessageList,
     'fb-action-card': FBActionCard,
     'fb-input-bar': FBInputBar,
@@ -67,6 +73,9 @@ const registered = registerComponents({
     'fb-file-drop': FBFileDrop,
     'fb-typing-indicator': FBTypingIndicator,
     'fb-error-boundary': FBErrorBoundary,
+    // Notification components (Step 91)
+    'fb-notification-bell': FBNotificationBell,
+    'fb-notification-list': FBNotificationList,
     // Shadow Viewer components (SHADOW_VIEWER_specs.md)
     'shadow-toggle': ShadowToggle,
     'shadow-layout': ShadowLayout,

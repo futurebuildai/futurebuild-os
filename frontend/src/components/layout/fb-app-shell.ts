@@ -31,6 +31,9 @@ import '../artifacts/fb-artifact-modal';
 // Import toast container (LAUNCH_PLAN.md P2)
 import '../feedback/fb-toast-container';
 
+// Import mobile navigation (Step 90: Mobile Navigation)
+import './fb-mobile-nav';
+
 // Import shadow layout (FutureShade)
 import '../shadow/shadow-layout';
 
@@ -92,11 +95,13 @@ export class FBAppShell extends FBElement {
                 display: none;
             }
 
-            /* Mobile: Only center panel visible */
-            @media (max-width: 768px) {
+            /* Mobile: Only center panel visible + bottom padding for mobile nav */
+            @media (max-width: 767px) {
                 :host {
                     grid-template-columns: 1fr;
                     grid-template-areas: "center";
+                    /* Step 90: Reserve space for fixed mobile nav bar */
+                    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
                 }
 
                 fb-panel-left,
@@ -146,6 +151,7 @@ export class FBAppShell extends FBElement {
             :host([login-mode]) {
                 grid-template-columns: 1fr;
                 grid-template-areas: "center";
+                padding-bottom: 0;
             }
 
             :host([login-mode]) fb-panel-left,
@@ -436,6 +442,9 @@ export class FBAppShell extends FBElement {
                 ` : nothing}
 
                 ${this._hasPopoutArtifact ? html`<fb-artifact-modal></fb-artifact-modal>` : nothing}
+
+                <!-- Step 90: Mobile bottom navigation bar (authenticated only) -->
+                ${this._isAuthenticated ? html`<fb-mobile-nav></fb-mobile-nav>` : nothing}
 
                 <fb-toast-container></fb-toast-container>
             </div>

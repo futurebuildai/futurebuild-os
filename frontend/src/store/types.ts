@@ -44,6 +44,12 @@ export interface AuthState {
 // ============================================================================
 
 /**
+ * Risk level for project health indicators.
+ * See STEP_92_RISK_INDICATORS.md
+ */
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+/**
  * Project data stored in state.
  * Simplified view for list/selection.
  */
@@ -55,6 +61,16 @@ export interface ProjectSummary {
     completionPercentage: number;
     createdAt: string;
     updatedAt: string;
+    /** Step 92: Optional risk assessment data */
+    riskLevel?: RiskLevel;
+    /** Step 92: Human-readable risk explanation */
+    riskReason?: string;
+    /** Step 92: Schedule delay in days (positive = behind schedule) */
+    scheduleSlipDays?: number;
+    /** Step 92: Whether the project has active blocking issues */
+    hasBlockers?: boolean;
+    /** Step 92: Budget overrun percentage (0 = on budget, 15 = 15% over) */
+    budgetOverrunPct?: number;
 }
 
 /**

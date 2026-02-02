@@ -502,7 +502,7 @@ export class FBPanelLeft extends FBElement {
                 <div class="avatar" aria-hidden="true">${this._userInitials}</div>
                 <div class="user-info">
                     <div class="user-name">${this._userName || 'Guest'}</div>
-                    <div class="user-role">${this._formatRole(this._userRole)}</div>
+                    <div class="user-role">${this._formatRole(this._userRole)} · v2.1.0-beta</div>
                 </div>
                 <button
                     class="theme-toggle"

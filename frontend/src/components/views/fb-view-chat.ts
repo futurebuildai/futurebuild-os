@@ -114,6 +114,7 @@ export class FBViewChat extends FBViewElement {
     @state() private _projectId: string | null = null;
 
     private _disposeEffects: (() => void)[] = [];
+    private _loadAbortController: AbortController | null = null;
 
     override connectedCallback(): void {
         super.connectedCallback();
@@ -143,6 +144,8 @@ export class FBViewChat extends FBViewElement {
     override disconnectedCallback(): void {
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
+        this._loadAbortController?.abort();
+        this._loadAbortController = null;
         super.disconnectedCallback();
     }
 
@@ -153,9 +156,18 @@ export class FBViewChat extends FBViewElement {
     }
 
     private async _loadHistory(projectId: string): Promise<void> {
+        // Abort any in-flight load to prevent race conditions when switching projects
+        this._loadAbortController?.abort();
+        const controller = new AbortController();
+        this._loadAbortController = controller;
+
         store.actions.setChatLoading(true);
         try {
             const history = await api.chat.history(projectId);
+
+            // If this load was aborted while awaiting, discard the stale result
+            if (controller.signal.aborted) return;
+
             const messages: ChatMessage[] = history.map((msg) => ({
                 id: msg.id,
                 role: msg.role,
@@ -165,6 +177,9 @@ export class FBViewChat extends FBViewElement {
             }));
             store.actions.setMessages(messages);
         } catch (err) {
+            // Ignore errors from aborted requests
+            if (controller.signal.aborted) return;
+
             const message = err instanceof Error ? err.message : 'Failed to load chat history';
             store.actions.setChatError(message);
         }

@@ -411,8 +411,9 @@ const actions: StoreActions = {
         // Create user message with attachment info
         const fileNames = newUploads.map((u) => u.file.name).join(', ');
         const createdAt = new Date().toISOString();
+        const optimisticId = crypto.randomUUID();
         actions.addMessage({
-            id: crypto.randomUUID(),
+            id: optimisticId,
             role: 'user',
             content: `📎 Uploaded: ${fileNames}`,
             createdAt,
@@ -432,13 +433,19 @@ const actions: StoreActions = {
         // Step 57: Send file message via RealtimeService (replaces setTimeout)
         // See FRONTEND_SCOPE.md Section 8.4
         const firstUpload = newUploads[0];
-        realtimeService.send({
-            type: 'file',
-            payload: {
-                fileName: fileNames,
-                fileType: firstUpload?.file.type ?? 'application/octet-stream',
-            },
-        });
+        try {
+            realtimeService.send({
+                type: 'file',
+                payload: {
+                    fileName: fileNames,
+                    fileType: firstUpload?.file.type ?? 'application/octet-stream',
+                },
+            });
+        } catch (err) {
+            // Rollback the optimistic message on send failure
+            actions.removeMessage(optimisticId);
+            console.error('[Store] File upload send failed:', err);
+        }
     },
 
     clearPendingUploads(): void {
@@ -650,6 +657,12 @@ export const store = {
 // Initialization
 // ============================================================================
 
+// Module-level references for media query listeners so they can be cleaned up on re-init
+let _mobileQuery: MediaQueryList | null = null;
+let _tabletQuery: MediaQueryList | null = null;
+let _mobileHandler: ((e: MediaQueryListEvent) => void) | null = null;
+let _tabletHandler: ((e: MediaQueryListEvent) => void) | null = null;
+
 /**
  * Initialize the store with persisted state and Clerk auth observer.
  * Call this once at application bootstrap, after Clerk has loaded.
@@ -679,26 +692,37 @@ export function initializeStore(): void {
 
     // Detect mobile/tablet viewport
     if (typeof window !== 'undefined') {
-        const mobileQuery = window.matchMedia('(max-width: 768px)');
-        const tabletQuery = window.matchMedia('(max-width: 1024px)');
+        // Remove previous listeners if they exist (prevents leak on re-init)
+        if (_mobileQuery && _mobileHandler) {
+            _mobileQuery.removeEventListener('change', _mobileHandler);
+        }
+        if (_tabletQuery && _tabletHandler) {
+            _tabletQuery.removeEventListener('change', _tabletHandler);
+        }
 
-        _isMobile$.value = mobileQuery.matches;
-        _isTablet$.value = tabletQuery.matches && !mobileQuery.matches;
+        _mobileQuery = window.matchMedia('(max-width: 768px)');
+        _tabletQuery = window.matchMedia('(max-width: 1024px)');
+
+        _isMobile$.value = _mobileQuery.matches;
+        _isTablet$.value = _tabletQuery.matches && !_mobileQuery.matches;
 
         // Auto-collapse panels on smaller screens
-        if (mobileQuery.matches) {
+        if (_mobileQuery.matches) {
             _leftPanelOpen$.value = false;
             _rightPanelOpen$.value = false;
-        } else if (tabletQuery.matches) {
+        } else if (_tabletQuery.matches) {
             _rightPanelOpen$.value = false;
         }
 
-        mobileQuery.addEventListener('change', (e) => {
+        _mobileHandler = (e: MediaQueryListEvent) => {
             actions.setIsMobile(e.matches);
-        });
-        tabletQuery.addEventListener('change', (e) => {
-            actions.setIsTablet(e.matches && !mobileQuery.matches);
-        });
+        };
+        _tabletHandler = (e: MediaQueryListEvent) => {
+            actions.setIsTablet(e.matches && !(_mobileQuery?.matches ?? false));
+        };
+
+        _mobileQuery.addEventListener('change', _mobileHandler);
+        _tabletQuery.addEventListener('change', _tabletHandler);
     }
 
     // Wire up HTTP service callbacks to use Clerk token cache

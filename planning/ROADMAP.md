@@ -61,10 +61,10 @@
 
 | Status | Step | Task | Gap Addressed | Est. Days |
 |--------|------|------|---------------|-----------|
-| [ ] | 90 | **Mobile Navigation**: Implement the bottom tab bar `<fb-mobile-nav>` for screens < 768px. | Gap 8 (Navigation) | 1 |
-| [ ] | 91 | **Notification UI**: Build the Notification Bell/Stream in the App Shell. | Gap 10 (Notifications) | 1 |
-| [ ] | 92 | **Risk Indicators**: Add the "Red Dot" logic to `<fb-project-card>` based on blocking issues. | Gap 9 (Command Center) | 0.5 |
-| [ ] | 93 | **Beta Release Tag**: Final regression test and deployment to Production. | Release | 1 |
+| [x] | 90 | **Mobile Navigation**: Implement the bottom tab bar `<fb-mobile-nav>` for screens < 768px. | Gap 8 (Navigation) | 1 |
+| [x] | 91 | **Notification UI**: Build the Notification Bell/Stream in the App Shell. | Gap 10 (Notifications) | 1 |
+| [x] | 92 | **Risk Indicators**: Add the "Red Dot" logic to `<fb-project-card>` based on blocking issues. | Gap 9 (Command Center) | 0.5 |
+| [x] | 93 | **Beta Release Tag**: Final regression test and deployment to Production. | Release | 1 |
 
 ---
 

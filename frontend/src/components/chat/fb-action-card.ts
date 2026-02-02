@@ -125,22 +125,24 @@ export class FBActionCard extends FBElement {
         `
     ];
 
-    @property({ type: Object }) card!: ActionCard;
-    @property({ type: String, attribute: 'message-id' }) messageId!: string;
+    @property({ type: Object }) card: ActionCard | undefined;
+    @property({ type: String, attribute: 'message-id' }) messageId: string | undefined;
 
     /**
      * Type guard to check if the card is in pending status.
      */
     private _isPending(): boolean {
-        return this.card.status === 'pending';
+        return this.card?.status === 'pending';
     }
 
     private _handleAction(status: 'approved' | 'denied'): void {
+        if (!this.card || !this.messageId) return;
         store.actions.updateActionCard(this.messageId, status);
         this.emit('action', { id: this.card.id, status });
     }
 
     override render(): TemplateResult {
+        if (!this.card || !this.messageId) return html``;
         const isPending = this._isPending();
         const typeLabel = this.card.type.replace(/_/g, ' ');
 

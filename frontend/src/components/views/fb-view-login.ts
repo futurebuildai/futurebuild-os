@@ -60,28 +60,48 @@ export class FBViewLogin extends FBViewElement {
                 color: var(--fb-text-muted);
                 font-size: var(--fb-text-sm);
             }
+
+            .error {
+                color: var(--fb-error, #e74c3c);
+                font-size: var(--fb-text-sm);
+                text-align: center;
+            }
         `,
     ];
 
     @state() private _clerkReady = false;
+    @state() private _clerkError = false;
     private _signInContainer: HTMLDivElement | null = null;
+    private _clerkPollInterval: ReturnType<typeof setInterval> | null = null;
 
     override firstUpdated(): void {
         this._mountClerkSignIn();
     }
 
     override disconnectedCallback(): void {
+        if (this._clerkPollInterval) {
+            clearInterval(this._clerkPollInterval);
+            this._clerkPollInterval = null;
+        }
         this._unmountClerkSignIn();
         super.disconnectedCallback();
     }
 
     private _mountClerkSignIn(): void {
         if (!clerkService.loaded) {
-            // Clerk not yet loaded — wait and retry
-            const interval = setInterval(() => {
+            // Clerk not yet loaded — wait and retry (max 10s)
+            let attempts = 0;
+            const maxAttempts = 100;
+            this._clerkPollInterval = setInterval(() => {
+                attempts++;
                 if (clerkService.loaded) {
-                    clearInterval(interval);
+                    clearInterval(this._clerkPollInterval!);
+                    this._clerkPollInterval = null;
                     this._mountClerkSignIn();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(this._clerkPollInterval!);
+                    this._clerkPollInterval = null;
+                    this._clerkError = true;
                 }
             }, 100);
             return;
@@ -137,7 +157,11 @@ export class FBViewLogin extends FBViewElement {
                 <p class="tagline">Give Your Construction Project a Mind of Its Own</p>
 
                 <div class="clerk-container">
-                    ${!this._clerkReady ? html`<span class="loading">Loading...</span>` : ''}
+                    ${this._clerkError
+                        ? html`<span class="error">Unable to load authentication. Please refresh the page and try again.</span>`
+                        : !this._clerkReady
+                            ? html`<span class="loading">Loading...</span>`
+                            : ''}
                     <div id="clerk-sign-in"></div>
                 </div>
             </div>

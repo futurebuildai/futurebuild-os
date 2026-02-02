@@ -7,7 +7,7 @@
  *
  * @element fb-project-dialog
  */
-import { html, css, TemplateResult, nothing } from 'lit';
+import { html, css, TemplateResult, nothing, PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../../base/FBElement';
 
@@ -132,6 +132,7 @@ export class FBProjectDialog extends FBElement {
     @property({ type: Boolean, reflect: true })
     open = false;
 
+    private _previouslyFocused: HTMLElement | null = null;
     private _boundHandleKeyDown = this._handleKeyDown.bind(this);
 
     override connectedCallback(): void {
@@ -144,10 +145,70 @@ export class FBProjectDialog extends FBElement {
         super.disconnectedCallback();
     }
 
+    override updated(changedProperties: PropertyValues): void {
+        super.updated(changedProperties);
+        if (changedProperties.has('open')) {
+            if (this.open) {
+                this._previouslyFocused = document.activeElement as HTMLElement | null;
+                // Focus first focusable element in the modal after render
+                requestAnimationFrame(() => {
+                    const modal = this.shadowRoot?.querySelector('.modal') as HTMLElement | null;
+                    if (modal) {
+                        const focusable = modal.querySelectorAll<HTMLElement>(
+                            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                        );
+                        const firstEl = focusable[0];
+                        if (firstEl) {
+                            firstEl.focus();
+                        }
+                    }
+                });
+            } else {
+                // Restore focus to previously focused element
+                if (this._previouslyFocused && typeof this._previouslyFocused.focus === 'function') {
+                    this._previouslyFocused.focus();
+                    this._previouslyFocused = null;
+                }
+            }
+        }
+    }
+
+    private _handleFocusTrap(e: KeyboardEvent): void {
+        const modal = this.shadowRoot?.querySelector('.modal') as HTMLElement | null;
+        if (!modal) return;
+
+        const focusable = modal.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!first || !last) return;
+
+        if (e.shiftKey) {
+            // Shift+Tab: wrap from first to last
+            if (this.shadowRoot?.activeElement === first || document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            }
+        } else {
+            // Tab: wrap from last to first
+            if (this.shadowRoot?.activeElement === last || document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }
+
     private _handleKeyDown(e: KeyboardEvent): void {
-        if (this.open && e.key === 'Escape') {
+        if (!this.open) return;
+
+        if (e.key === 'Escape') {
             e.preventDefault();
             this._close();
+        } else if (e.key === 'Tab') {
+            this._handleFocusTrap(e);
         }
     }
 

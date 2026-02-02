@@ -261,8 +261,15 @@ export class FBViewPortalAction extends FBViewElement {
             return;
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
+
         try {
-            const response = await fetch(`/api/v1/portal/action/${this.token}`);
+            const response = await fetch(`/api/v1/portal/action/${this.token}`, {
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
                 const data = await response.json() as { error?: string };
                 throw new Error(data.error ?? 'Invalid or expired link');
@@ -272,7 +279,12 @@ export class FBViewPortalAction extends FBViewElement {
             // Set initial status from task
             this._selectedStatus = this._mapStatus(this._context.task.status);
         } catch (err) {
-            this._error = err instanceof Error ? err.message : 'Failed to load task';
+            clearTimeout(timeoutId);
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                this._error = 'Request timed out. Please try again.';
+            } else {
+                this._error = err instanceof Error ? err.message : 'Failed to load task';
+            }
         } finally {
             this._loading = false;
         }
@@ -298,6 +310,9 @@ export class FBViewPortalAction extends FBViewElement {
 
         this._submitting = true;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
+
         try {
             const body: Record<string, string> = {};
 
@@ -309,7 +324,9 @@ export class FBViewPortalAction extends FBViewElement {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const data = await response.json() as { error?: string };
@@ -319,8 +336,13 @@ export class FBViewPortalAction extends FBViewElement {
             this._submitted = true;
             notify.success('Task updated successfully!');
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to submit';
-            notify.error(message);
+            clearTimeout(timeoutId);
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                notify.error('Request timed out. Please try again.');
+            } else {
+                const message = err instanceof Error ? err.message : 'Failed to submit';
+                notify.error(message);
+            }
         } finally {
             this._submitting = false;
         }

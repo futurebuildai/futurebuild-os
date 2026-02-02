@@ -31,6 +31,10 @@ import '../views/fb-view-chat';
 // Import onboarding view (Step 74 Split-Screen Wizard)
 import '../views/fb-view-onboarding';
 
+// Import notification components (Step 91)
+import '../notifications/fb-notification-bell';
+import '../notifications/fb-notification-list';
+
 @customElement('fb-panel-center')
 export class FBPanelCenter extends FBElement {
     static override styles = [
@@ -130,6 +134,12 @@ export class FBPanelCenter extends FBElement {
             fb-view-team {
                 flex: 1;
             }
+
+            /* Step 91: Notification bell container */
+            .notification-container {
+                position: relative;
+                margin-left: auto;
+            }
         `,
     ];
 
@@ -138,6 +148,7 @@ export class FBPanelCenter extends FBElement {
     @state() private _activeProject: ProjectSummary | null = null;
     @state() private _activeThread: Thread | null = null;
     @state() private _isMobile = false;
+    @state() private _notificationOpen = false;
     @state() private _isInviteAcceptRoute = false;
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
@@ -177,6 +188,10 @@ export class FBPanelCenter extends FBElement {
 
     private _handlePopState = (): void => {
         this._checkRoute();
+        // Step 91: Close notification dropdown on navigation
+        if (this._notificationOpen) {
+            this._handleNotificationClose();
+        }
     };
 
     private _checkRoute(): void {
@@ -207,6 +222,7 @@ export class FBPanelCenter extends FBElement {
 
     override disconnectedCallback(): void {
         window.removeEventListener('popstate', this._handlePopState);
+        document.removeEventListener('click', this._handleClickOutside);
         this._disposeEffects.forEach((d) => { d(); });
         this._disposeEffects = [];
         super.disconnectedCallback();
@@ -219,6 +235,33 @@ export class FBPanelCenter extends FBElement {
     private _toggleRightPanel(): void {
         store.actions.toggleRightPanel();
     }
+
+    // Step 91: Notification dropdown handlers
+    private _handleNotificationToggle(): void {
+        this._notificationOpen = !this._notificationOpen;
+        if (this._notificationOpen) {
+            // Add click-outside listener
+            requestAnimationFrame(() => {
+                document.addEventListener('click', this._handleClickOutside);
+            });
+        } else {
+            document.removeEventListener('click', this._handleClickOutside);
+        }
+    }
+
+    private _handleNotificationClose(): void {
+        this._notificationOpen = false;
+        document.removeEventListener('click', this._handleClickOutside);
+    }
+
+    private _handleClickOutside = (e: MouseEvent): void => {
+        const path = e.composedPath();
+        // Check if click was inside the notification container
+        const container = this.shadowRoot?.querySelector('.notification-container');
+        if (container && !path.includes(container)) {
+            this._handleNotificationClose();
+        }
+    };
 
     override render(): TemplateResult {
         // Portal routes (LAUNCH_PLAN.md P2) - These use portal-specific auth, not main app auth
@@ -296,9 +339,20 @@ export class FBPanelCenter extends FBElement {
                     <span class="breadcrumb-current">Select a project</span>
                 `}
                 
-                <button 
-                    class="panel-toggle" 
-                    @click=${this._toggleRightPanel.bind(this)} 
+                <!-- Step 91: Notification Bell -->
+                <div class="notification-container">
+                    <fb-notification-bell
+                        @notification-toggle=${this._handleNotificationToggle.bind(this)}
+                    ></fb-notification-bell>
+                    <fb-notification-list
+                        ?open=${this._notificationOpen}
+                        @notification-close=${this._handleNotificationClose.bind(this)}
+                    ></fb-notification-list>
+                </div>
+
+                <button
+                    class="panel-toggle"
+                    @click=${this._toggleRightPanel.bind(this)}
                     aria-label="Toggle artifacts panel"
                 >
                     <svg viewBox="0 0 24 24" aria-hidden="true">

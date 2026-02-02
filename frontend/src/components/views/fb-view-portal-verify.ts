@@ -119,12 +119,17 @@ export class FBViewPortalVerify extends FBViewElement {
             return;
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
+
         try {
             const response = await fetch('/api/v1/portal/auth/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const data = await response.json() as { error?: string };
@@ -133,9 +138,9 @@ export class FBViewPortalVerify extends FBViewElement {
 
             const data = await response.json() as { token: string; contact: unknown };
 
-            // Store portal JWT (different from main app JWT)
-            localStorage.setItem('portal_token', data.token);
-            localStorage.setItem('portal_contact', JSON.stringify(data.contact));
+            // Store portal JWT (different from main app JWT) - use sessionStorage for security
+            sessionStorage.setItem('portal_token', data.token);
+            sessionStorage.setItem('portal_contact', JSON.stringify(data.contact));
 
             this._success = true;
             this._verifying = false;
@@ -147,7 +152,12 @@ export class FBViewPortalVerify extends FBViewElement {
                 window.location.href = '/portal/dashboard';
             }, 1500);
         } catch (err) {
-            this._error = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+            clearTimeout(timeoutId);
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                this._error = 'Request timed out. Please try again.';
+            } else {
+                this._error = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+            }
             this._verifying = false;
         }
     }
