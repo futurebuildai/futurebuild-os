@@ -71,6 +71,10 @@ type Config struct {
 	// Clerk Identity Provider configuration. See STEP_78_AUTH_PROVIDER.md.
 	// JWKS URL is derived as {ClerkIssuerURL}/.well-known/jwks.json
 	ClerkIssuerURL string
+	// ClerkAudience is the expected audience (aud) claim for Clerk JWTs.
+	// Optional: only enforced when non-empty. Configure in Clerk Dashboard JWT template.
+	// See STEP_79_MIDDLEWARE_SWAP.md Section 1.2.
+	ClerkAudience string
 
 	// GitHub configuration for Automated PR Review.
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -159,6 +163,7 @@ func LoadConfig() (*Config, error) {
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/tmp/audit.wal"),
 		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
+		ClerkAudience:              os.Getenv("CLERK_AUDIENCE"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{

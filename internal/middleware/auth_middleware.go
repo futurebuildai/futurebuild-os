@@ -70,10 +70,16 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 
 		// Parse JWT with JWKS validation (RS256).
 		// Clerk JWTs use RSA signing, verified against the JWKS endpoint.
-		token, err := jwt.Parse(tokenString, m.jwks,
+		// See STEP_79_MIDDLEWARE_SWAP.md Section 1.2.
+		parserOpts := []jwt.ParserOption{
 			jwt.WithValidMethods([]string{"RS256"}),
 			jwt.WithIssuer(m.cfg.ClerkIssuerURL),
-		)
+		}
+		if m.cfg.ClerkAudience != "" {
+			parserOpts = append(parserOpts, jwt.WithAudience(m.cfg.ClerkAudience))
+		}
+
+		token, err := jwt.Parse(tokenString, m.jwks, parserOpts...)
 		if err != nil {
 			slog.Debug("auth: JWT validation failed", "error", err)
 			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
@@ -104,6 +110,14 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: getStringClaim(mapClaims, "sub"),
 			},
+		}
+
+		// Reject tokens with empty subject claim.
+		// Downstream handlers assume UserID is populated.
+		if claims.UserID == "" {
+			slog.Warn("auth: JWT has empty sub claim — rejecting")
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
 		}
 
 		// Multi-Tenancy Enforcement: OrgID is required for all authenticated requests.

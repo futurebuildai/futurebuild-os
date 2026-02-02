@@ -65,6 +65,15 @@ func newTestMiddleware() *AuthMiddleware {
 	return NewAuthMiddlewareWithKeyfunc(cfg, testKeyfunc)
 }
 
+// newTestMiddlewareWithAudience creates an AuthMiddleware with audience validation enabled.
+func newTestMiddlewareWithAudience(audience string) *AuthMiddleware {
+	cfg := &config.Config{
+		ClerkIssuerURL: testIssuer,
+		ClerkAudience:  audience,
+	}
+	return NewAuthMiddlewareWithKeyfunc(cfg, testKeyfunc)
+}
+
 func TestRequireAuth(t *testing.T) {
 	mw := newTestMiddleware()
 	handler := mw.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +229,92 @@ func TestRequireAuth(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Empty sub claim rejected", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["sub"] = ""
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		var body response.ErrorEnvelope
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "Unauthorized", body.Error.Message)
+	})
+
+	t.Run("Missing sub claim rejected", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			delete(*c, "sub")
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Audience validation — valid aud accepted", func(t *testing.T) {
+		const testAudience = "futurebuild-app"
+		mwAud := newTestMiddlewareWithAudience(testAudience)
+		h := mwAud.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["aud"] = testAudience
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Audience validation — wrong aud rejected", func(t *testing.T) {
+		mwAud := newTestMiddlewareWithAudience("futurebuild-app")
+		h := mwAud.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		token := generateTestTokenRS256(time.Hour, func(c *jwt.MapClaims) {
+			(*c)["aud"] = "other-app"
+		})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Audience validation — missing aud rejected when configured", func(t *testing.T) {
+		mwAud := newTestMiddlewareWithAudience("futurebuild-app")
+		h := mwAud.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		token := generateTestTokenRS256(time.Hour, nil)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Audience validation — skipped when config empty", func(t *testing.T) {
+		token := generateTestTokenRS256(time.Hour, nil)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
 }

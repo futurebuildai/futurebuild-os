@@ -31,8 +31,8 @@
 
 | Status | Step | Task | Gap Addressed | Est. Days |
 |--------|------|------|---------------|-----------|
-| [ ] | 78 | **Auth Provider Integration**: Replace `fb-view-login` and backend handlers with Clerk/Auth0 SDKs. | User Request (Auth) | 1 |
-| [ ] | 79 | **Middleware Swap**: Update Go middleware to validate 3rd-party JWTs instead of internal tokens. | User Request (Auth) | 1 |
+| [x] | 78 | **Auth Provider Integration**: Replace `fb-view-login` and backend handlers with Clerk/Auth0 SDKs. | User Request (Auth) | 1 |
+| [x] | 79 | **Middleware Swap**: Update Go middleware to validate 3rd-party JWTs instead of internal tokens. | User Request (Auth) | 1 |
 | [ ] | 80 | **Organization Manager**: Build a "Team Settings" view to invite/remove members via the Provider API. | Gap (Org Mgmt) | 2 |
 | [ ] | 81 | **Role Mapping**: Map Provider roles (Admin/Member) to FutureBuild's `PermissionMatrix`. | Gap (Org Mgmt) | 0.5 |
 

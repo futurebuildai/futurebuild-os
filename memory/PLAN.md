@@ -13,12 +13,12 @@ Before executing any step, the Engineer MUST verify alignment with:
 
 ---
 
-- [ ] Step 78: Auth Provider Integration @Frontend
+- [x] Step 78: Auth Provider Integration @Frontend
   - **Task:** Integrate Clerk/Auth0 to replace magic link system.
   - **Spec:** [STEP_78_AUTH_PROVIDER.md](../specs/phase12/STEP_78_AUTH_PROVIDER.md)
   - **Core Requirement:** Zero custom auth code in frontend; use Provider SDK. Validate strictly against the "Construction Professional" dark mode aesthetic.
 
-- [ ] Step 79: Middleware Swap @Backend
+- [x] Step 79: Middleware Swap @Backend
   - **Task:** Update Go middleware to validate JWKS from Provider instead of DB tokens.
   - **Spec:** [STEP_79_MIDDLEWARE_SWAP.md](../specs/phase12/STEP_79_MIDDLEWARE_SWAP.md)
   - **Core Requirement:** Stateless verification. Hard cutover (legacy tokens invalid). Security Audit: Ensure no algorithmic confusion attacks possible on JWT.
