@@ -422,6 +422,117 @@ func (s *ScheduleService) CreateInspectionRecord(ctx context.Context, projectID,
 	return err
 }
 
+// GetGanttData builds the full GanttData structure for a project, including tasks and dependencies.
+// Used by the ScheduleHandler to serve GET /projects/{id}/schedule.
+// See STEP_89_DEPENDENCY_ARROWS.md (Phase 14: Gantt dependency arrows)
+func (s *ScheduleService) GetGanttData(ctx context.Context, projectID, orgID uuid.UUID) (*types.GanttData, error) {
+	// Step 1: Verify project ownership and fetch metadata
+	var targetEndDate *time.Time
+	err := s.db.QueryRow(ctx, `
+		SELECT target_end_date FROM projects
+		WHERE id = $1 AND org_id = $2
+	`, projectID, orgID).Scan(&targetEndDate)
+	if err != nil {
+		return nil, fmt.Errorf("project not found or access denied: %w", err)
+	}
+
+	// Step 2: Fetch all tasks with CPM schedule data
+	rows, err := s.db.Query(ctx, `
+		SELECT wbs_code, name, status, early_start, early_finish,
+		       COALESCE(manual_override_days, weather_adjusted_duration, calculated_duration, 0) AS duration_days,
+		       is_on_critical_path
+		FROM project_tasks
+		WHERE project_id = $1
+		ORDER BY wbs_code ASC
+	`, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []types.GanttTask
+	var criticalPath []string
+
+	for rows.Next() {
+		var t types.GanttTask
+		var earlyStart, earlyFinish *time.Time
+
+		err := rows.Scan(&t.WBSCode, &t.Name, &t.Status, &earlyStart, &earlyFinish,
+			&t.DurationDays, &t.IsCritical)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan task: %w", err)
+		}
+
+		if earlyStart != nil {
+			t.EarlyStart = earlyStart.Format("2006-01-02")
+		}
+		if earlyFinish != nil {
+			t.EarlyFinish = earlyFinish.Format("2006-01-02")
+		}
+		if t.IsCritical {
+			criticalPath = append(criticalPath, t.WBSCode)
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate tasks: %w", err)
+	}
+
+	// Step 3: Fetch dependencies and map task UUIDs to WBS codes
+	// We need a join to resolve predecessor/successor UUIDs to WBS codes
+	depRows, err := s.db.Query(ctx, `
+		SELECT pred.wbs_code, succ.wbs_code
+		FROM task_dependencies td
+		JOIN project_tasks pred ON td.predecessor_id = pred.id
+		JOIN project_tasks succ ON td.successor_id = succ.id
+		WHERE td.project_id = $1
+	`, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch dependencies: %w", err)
+	}
+	defer depRows.Close()
+
+	var dependencies []types.GanttDependency
+	for depRows.Next() {
+		var dep types.GanttDependency
+		if err := depRows.Scan(&dep.From, &dep.To); err != nil {
+			return nil, fmt.Errorf("failed to scan dependency: %w", err)
+		}
+		dependencies = append(dependencies, dep)
+	}
+	if err := depRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate dependencies: %w", err)
+	}
+
+	// Step 4: Build GanttData
+	projectedEnd := ""
+	if targetEndDate != nil {
+		projectedEnd = targetEndDate.Format("2006-01-02")
+	}
+
+	ganttData := &types.GanttData{
+		ProjectID:        projectID,
+		CalculatedAt:     time.Now().UTC().Format(time.RFC3339),
+		ProjectedEndDate: projectedEnd,
+		CriticalPath:     criticalPath,
+		Tasks:            tasks,
+		Dependencies:     dependencies,
+	}
+
+	// Ensure non-nil slices for clean JSON serialization ([] not null)
+	if ganttData.Tasks == nil {
+		ganttData.Tasks = []types.GanttTask{}
+	}
+	if ganttData.CriticalPath == nil {
+		ganttData.CriticalPath = []string{}
+	}
+	if ganttData.Dependencies == nil {
+		ganttData.Dependencies = []types.GanttDependency{}
+	}
+
+	return ganttData, nil
+}
+
 // getMaterialConstraints fetches expected delivery dates for procurement items.
 // Returns map of TaskID -> EarliestAvailableDate for material constraint enforcement.
 // See PRODUCTION_PLAN.md Step 46 (MRP Feedback Loop)

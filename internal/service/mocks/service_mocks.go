@@ -83,6 +83,9 @@ type MockScheduleService struct {
 	RecalculateResp *physics.CPMResult
 	RecalculateErr  error
 
+	GetGanttDataResp *types.GanttData
+	GetGanttDataErr  error
+
 	GetTaskResp *models.ProjectTask
 	GetTaskErr  error
 
@@ -117,6 +120,12 @@ func (m *MockScheduleService) GetProjectSchedule(ctx context.Context, projectID,
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.GetScheduleResp, m.GetScheduleErr
+}
+
+func (m *MockScheduleService) GetGanttData(ctx context.Context, projectID, orgID uuid.UUID) (*types.GanttData, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.GetGanttDataResp, m.GetGanttDataErr
 }
 
 func (m *MockScheduleService) GetAgentFocusTasks(ctx context.Context, projectID uuid.UUID) ([]models.ProjectTask, error) {

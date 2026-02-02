@@ -64,6 +64,7 @@ var rolePermissions = map[types.UserRole][]Scope{
 		ScopeDocumentWrite,
 		ScopeChatRead,
 		ScopeChatWrite,
+		ScopeSettingsWrite, // Step 87: Builders can configure their org's physics settings
 	},
 
 	types.UserRoleViewer: {

@@ -48,6 +48,8 @@ type Server struct {
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	InvoiceHandler       *handlers.InvoiceHandler       // See PHASE_13_PRD.md Step 82: Interactive Invoice
 	AssetHandler         *handlers.AssetHandler         // See STEP_84_FIELD_FEEDBACK.md: Vision status
+	ConfigHandler        *handlers.ConfigHandler        // See STEP_87_CONFIG_PERSISTENCE.md: Physics settings
+	ScheduleHandler      *handlers.ScheduleHandler      // Phase 14: Gantt schedule data endpoint
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -60,6 +62,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See PRODUCTION_PLAN.md Step 32
 	scheduleService := service.NewScheduleService(db)
 	taskHandler := handlers.NewTaskHandler(scheduleService)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleService) // Phase 14: Gantt endpoint
 
 	// See PRODUCTION_PLAN.md Step 37
 	// See PRODUCTION_PLAN.md Step 37
@@ -74,6 +77,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See STEP_84_FIELD_FEEDBACK.md: Vision status endpoint
 	assetService := service.NewAssetService(db)
 	assetHandler := handlers.NewAssetHandler(assetService)
+
+	// See STEP_87_CONFIG_PERSISTENCE.md: Physics settings persistence
+	configService := service.NewConfigService(db)
+	configHandler := handlers.NewConfigHandler(configService)
 
 	// See PRODUCTION_PLAN.md Step 43.5: Chat Orchestrator wiring
 	// ENGINEERING STANDARD: Instantiate MessagePersister explicitly, then inject.
@@ -235,6 +242,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
 		InvoiceHandler:       invoiceHandler,       // See PHASE_13_PRD.md Step 82
 		AssetHandler:         assetHandler,         // See STEP_84_FIELD_FEEDBACK.md
+		ConfigHandler:        configHandler,        // See STEP_87_CONFIG_PERSISTENCE.md
+		ScheduleHandler:      scheduleHandler,      // Phase 14: Gantt schedule data
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -306,6 +315,14 @@ func (s *Server) routes() {
 			r.Put("/me", s.UserHandler.UpdateProfile)
 		})
 
+		// See STEP_87_CONFIG_PERSISTENCE.md: Org-level physics settings
+		// C-1 Fix: GET requires ScopeProjectRead (all roles), PUT requires ScopeSettingsWrite (Admin/Builder)
+		r.Route("/org/settings", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/physics", s.ConfigHandler.GetPhysics)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/physics", s.ConfigHandler.UpdatePhysics)
+		})
+
 		r.Route("/projects", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			// Step 81: Scope-based RBAC — write operations require specific permissions
@@ -315,6 +332,12 @@ func (s *Server) routes() {
 
 			// Step 85: Project asset gallery with vision badges
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/assets", s.AssetHandler.ListProjectAssets)
+
+			// Phase 14: Schedule/Gantt endpoint for frontend Gantt artifact
+			r.Route("/{id}/schedule", func(r chi.Router) {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.ScheduleHandler.GetSchedule)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/recalculate", s.ScheduleHandler.RecalculateSchedule)
+			})
 
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {

@@ -19,9 +19,10 @@ type ProjectServicer interface {
 }
 
 // ScheduleServicer defines the contract for schedule and task management.
-// Used by TaskHandler and Chat Orchestrator.
+// Used by TaskHandler, ScheduleHandler, and Chat Orchestrator.
 type ScheduleServicer interface {
 	GetProjectSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*ProjectScheduleSummary, error)
+	GetGanttData(ctx context.Context, projectID, orgID uuid.UUID) (*types.GanttData, error) // Phase 14: Full Gantt view data
 	GetAgentFocusTasks(ctx context.Context, projectID uuid.UUID) ([]models.ProjectTask, error)
 	RecalculateSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*physics.CPMResult, error)
 	GetTask(ctx context.Context, taskID, projectID, orgID uuid.UUID) (*models.ProjectTask, error)
@@ -79,6 +80,13 @@ type VisionServicer interface {
 type AssetServicer interface {
 	GetAssetStatus(ctx context.Context, assetID uuid.UUID, orgID uuid.UUID) (*models.ProjectAsset, error)
 	ListProjectAssets(ctx context.Context, projectID uuid.UUID, orgID uuid.UUID) ([]models.ProjectAsset, error)
+}
+
+// ConfigServicer defines the contract for org-level configuration operations.
+// See STEP_87_CONFIG_PERSISTENCE.md Section 2
+type ConfigServicer interface {
+	GetConfig(ctx context.Context, orgID uuid.UUID) (*models.BusinessConfig, error)
+	UpdateConfig(ctx context.Context, orgID uuid.UUID, speedMultiplier float64, workDays []int) (*models.BusinessConfig, error)
 }
 
 // GitHubServicer defines the contract for GitHub API operations.

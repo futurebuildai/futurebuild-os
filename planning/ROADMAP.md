@@ -2,7 +2,7 @@
 
 **Version:** 2.1.0 (Beta Remediation + Identity Overhaul)
 **Previous Status:** Completed Phase 9 (FutureShade / Step 69)
-**Current Focus:** Phase 14 — Physics Calibration (Settings & Gantt). Phases 10-13 complete.
+**Current Focus:** Phase 15 — Polish & Launch. Phases 10-14 complete.
 
 ---
 
@@ -51,10 +51,10 @@
 
 | Status | Step | Task | Gap Addressed | Est. Days |
 |--------|------|------|---------------|-----------|
-| [ ] | 86 | **Builder Profile UI**: Add "Speed" (Slider) and "Work Days" (Checkbox) to `fb-view-settings.ts`. | Gap 4 (Physics Tuning) | 1 |
-| [ ] | 87 | **Config Persistence**: Wire settings to update `business_config` table in the backend. | Gap 4 (Physics Tuning) | 1 |
-| [ ] | 88 | **Critical Path Visuals**: Add `.critical-path` CSS styling to `fb-artifact-gantt` tasks where `is_critical === true`. | Gap 5 (Gantt) | 1 |
-| [ ] | 89 | **Dependency Arrows**: Render SVG connectors between dependent tasks in the Gantt view. | Gap 5 (Gantt) | 2 |
+| [x] | 86 | **Builder Profile UI**: Add "Speed" (Slider) and "Work Days" (Checkbox) to `fb-view-settings.ts`. | Gap 4 (Physics Tuning) | 1 |
+| [x] | 87 | **Config Persistence**: Wire settings to update `business_config` table in the backend. | Gap 4 (Physics Tuning) | 1 |
+| [x] | 88 | **Critical Path Visuals**: Add `.critical-path` CSS styling to `fb-artifact-gantt` tasks where `is_critical === true`. | Gap 5 (Gantt) | 1 |
+| [x] | 89 | **Dependency Arrows**: Render SVG connectors between dependent tasks in the Gantt view. | Gap 5 (Gantt) | 2 |
 
 ## 💅 Phase 15: Polish & Launch
 **Goal:** Final UX implementations to ensure a professional feel.

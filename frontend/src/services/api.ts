@@ -523,6 +523,27 @@ export const api = {
     },
 
     /**
+     * Organization settings endpoints.
+     * See STEP_87_CONFIG_PERSISTENCE.md Section 2
+     */
+    settings: {
+        /**
+         * Get the current org's physics configuration.
+         */
+        getPhysics(): Promise<PhysicsConfigResponse> {
+            return get<PhysicsConfigResponse>('/org/settings/physics');
+        },
+
+        /**
+         * Update the current org's physics configuration.
+         * @param data - Physics config to save
+         */
+        updatePhysics(data: UpdatePhysicsRequest): Promise<PhysicsConfigResponse> {
+            return put<PhysicsConfigResponse>('/org/settings/physics', data);
+        },
+    },
+
+    /**
      * Invoice endpoints.
      * See PHASE_13_PRD.md Step 82: Interactive Invoice
      */
@@ -663,6 +684,28 @@ export interface UserProfile {
  */
 export interface UpdateProfileRequest {
     name: string;
+}
+
+// ============================================================================
+// Physics Config Types (Step 87)
+// ============================================================================
+
+/**
+ * Response from GET /api/v1/org/settings/physics.
+ * See STEP_87_CONFIG_PERSISTENCE.md Section 2
+ */
+export interface PhysicsConfigResponse {
+    speed_multiplier: number;
+    work_days: number[];
+}
+
+/**
+ * Request body for PUT /api/v1/org/settings/physics.
+ * See STEP_87_CONFIG_PERSISTENCE.md Section 2
+ */
+export interface UpdatePhysicsRequest {
+    speed_multiplier: number;
+    work_days: number[];
 }
 
 // ============================================================================

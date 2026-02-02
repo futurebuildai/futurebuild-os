@@ -65,6 +65,18 @@ func TestGenerateContractSamples(t *testing.T) {
 					DurationDays: 10,
 					IsCritical:   true,
 				},
+				{
+					WBSCode:      "1.2",
+					Name:         "Framing",
+					Status:       TaskStatusPending,
+					EarlyStart:   "2026-01-21",
+					EarlyFinish:  "2026-02-05",
+					DurationDays: 15,
+					IsCritical:   true,
+				},
+			},
+			Dependencies: []GanttDependency{
+				{From: "1.1", To: "1.2"},
 			},
 		},
 	}

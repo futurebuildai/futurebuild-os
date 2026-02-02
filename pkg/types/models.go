@@ -52,11 +52,12 @@ type InvoiceExtractionItem struct {
 // GanttData represents the project schedule for the Gantt view.
 // See API_AND_TYPES_SPEC.md Section 3.2
 type GanttData struct {
-	ProjectID        uuid.UUID   `json:"project_id"`
-	CalculatedAt     string      `json:"calculated_at"`
-	ProjectedEndDate string      `json:"projected_end_date"`
-	CriticalPath     []string    `json:"critical_path"`
-	Tasks            []GanttTask `json:"tasks"`
+	ProjectID        uuid.UUID         `json:"project_id"`
+	CalculatedAt     string            `json:"calculated_at"`
+	ProjectedEndDate string            `json:"projected_end_date"`
+	CriticalPath     []string          `json:"critical_path"`
+	Tasks            []GanttTask       `json:"tasks"`
+	Dependencies     []GanttDependency `json:"dependencies,omitempty"` // Step 89: Dependency edges for SVG arrows
 }
 
 // GanttTask represents an individual task in the Gantt data.
@@ -68,6 +69,13 @@ type GanttTask struct {
 	EarlyFinish  string     `json:"early_finish"`
 	DurationDays float64    `json:"duration_days"`
 	IsCritical   bool       `json:"is_critical"`
+}
+
+// GanttDependency represents a directed edge between two tasks (Finish-to-Start).
+// See STEP_89_DEPENDENCY_ARROWS.md Section 1.2
+type GanttDependency struct {
+	From string `json:"from"` // Predecessor WBS code
+	To   string `json:"to"`   // Successor WBS code
 }
 
 // AuthRequest is the payload for requesting a portal magic link.

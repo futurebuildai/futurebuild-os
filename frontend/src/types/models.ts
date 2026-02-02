@@ -60,6 +60,7 @@ export interface GanttData {
     projected_end_date: string; // ISO-8601 Date
     critical_path: string[];
     tasks: GanttTask[];
+    dependencies?: GanttDependency[]; // Step 89: Dependency edges for SVG arrows
 }
 
 /**
@@ -73,4 +74,13 @@ export interface GanttTask {
     early_finish: string; // ISO-8601 Date
     duration_days: number;
     is_critical: boolean;
+}
+
+/**
+ * GanttDependency represents a directed edge between two tasks.
+ * See STEP_89_DEPENDENCY_ARROWS.md Section 1.2
+ */
+export interface GanttDependency {
+    from: string; // Predecessor WBS code
+    to: string;   // Successor WBS code
 }
