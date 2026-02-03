@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/platform/errormon"
+	"github.com/colton/futurebuild/internal/readiness"
 	"github.com/colton/futurebuild/internal/server"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,6 +22,9 @@ import (
 )
 
 func main() {
+	readinessCheck := flag.Bool("readiness-check", false, "Run integration readiness checks and exit")
+	flag.Parse()
+
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
@@ -27,6 +33,12 @@ func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Configuration error: %v", err)
+	}
+
+	// Handle --readiness-check: build probes from config, run checks, print JSON, exit.
+	if *readinessCheck {
+		runReadinessCheckAndExit(cfg)
+		return
 	}
 
 	// Initialize error monitoring (slog-based default; swap for Sentry/Datadog in production).
@@ -88,4 +100,40 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 	log.Println("Server stopped")
+}
+
+// runReadinessCheckAndExit builds a readiness service from config, runs all probes,
+// prints the JSON report to stdout, and exits with 0 (healthy/degraded) or 1 (failed).
+// This is used by CI/CD pipelines and entrypoint.sh for pre-flight checks.
+func runReadinessCheckAndExit(cfg *config.Config) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Build a DB pool just for the probe (matches server config path).
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("readiness-check: failed to create DB pool: %v", err)
+	}
+	defer pool.Close()
+
+	svc := readiness.NewService(15*time.Second,
+		readiness.NewDatabaseProbe(pool),
+		readiness.NewClerkProbe(cfg.ClerkIssuerURL),
+		readiness.NewRedisProbe(cfg.RedisURL),
+		readiness.NewResendProbe(cfg.ResendAPIKey),
+		readiness.NewSendGridProbe(cfg.SendGridAPIKey),
+		readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
+		readiness.NewVertexAIProbe(cfg.VertexProjectID, cfg.VertexLocation),
+		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),
+	)
+
+	report := svc.Run(ctx, cfg.Environment)
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(report)
+
+	if report.Status == readiness.StatusFailed {
+		os.Exit(1)
+	}
 }

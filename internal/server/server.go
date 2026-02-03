@@ -15,6 +15,7 @@ import (
 	"github.com/colton/futurebuild/internal/futureshade/shadow"
 	"github.com/colton/futurebuild/internal/futureshade/tribunal"
 	"github.com/colton/futurebuild/internal/middleware"
+	"github.com/colton/futurebuild/internal/readiness"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/clock"
@@ -52,6 +53,7 @@ type Server struct {
 	ScheduleHandler      *handlers.ScheduleHandler      // Phase 14: Gantt schedule data endpoint
 	ThreadHandler        *handlers.ThreadHandler        // Thread support: conversation threads
 	CompletionHandler    *handlers.CompletionHandler    // Project Completion: complete + report
+	ReadinessHandler     *handlers.ReadinessHandler     // Integration readiness checks
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -220,6 +222,20 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	completionService := service.NewCompletionService(db)
 	completionHandler := handlers.NewCompletionHandler(completionService, notificationService, directoryService)
 
+	// Integration Readiness Check System: per-provider probes for 3P service health.
+	// Each probe creates a short-lived client from raw config — no interference with live services.
+	readinessService := readiness.NewService(15*time.Second,
+		readiness.NewDatabaseProbe(db),
+		readiness.NewClerkProbe(cfg.ClerkIssuerURL),
+		readiness.NewRedisProbe(cfg.RedisURL),
+		readiness.NewResendProbe(cfg.ResendAPIKey),
+		readiness.NewSendGridProbe(cfg.SendGridAPIKey),
+		readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
+		readiness.NewVertexAIProbe(cfg.VertexProjectID, cfg.VertexLocation),
+		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),
+	)
+	readinessHandler := handlers.NewReadinessHandler(readinessService, cfg.Environment)
+
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
 	var onboardingHandler *handlers.OnboardingHandler
@@ -254,6 +270,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ScheduleHandler:      scheduleHandler,      // Phase 14: Gantt schedule data
 		ThreadHandler:        threadHandler,        // Thread support
 		CompletionHandler:    completionHandler,    // Project Completion
+		ReadinessHandler:     readinessHandler,     // Integration readiness checks
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -449,6 +466,15 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
 			r.Get("/docs/tree", s.ShadowHandler.GetTree)
 			r.Get("/docs/content", s.ShadowHandler.GetContent)
+		})
+
+		// Integration Readiness: deep health checks for all 3P services (Admin only).
+		// Unlike /health (DB-only, polled by DO every 10s), this runs probes against
+		// Clerk, Redis, Resend, SendGrid, Twilio, Vertex AI, and S3.
+		r.Route("/readiness", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/", s.ReadinessHandler.HandleReadiness)
 		})
 	})
 

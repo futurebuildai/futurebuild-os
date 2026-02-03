@@ -24,5 +24,16 @@ else
     echo "WARNING: DATABASE_URL not set, skipping migrations"
 fi
 
+# Optional: Run integration readiness checks before starting the server.
+# Set READINESS_CHECK_ON_STARTUP=true to enable. Logs warnings but does not block startup.
+if [ "$READINESS_CHECK_ON_STARTUP" = "true" ]; then
+    echo "Running integration readiness checks..."
+    if /app/api --readiness-check; then
+        echo "Readiness checks passed."
+    else
+        echo "WARNING: Readiness checks reported failures. Check /api/v1/readiness after startup."
+    fi
+fi
+
 echo "Starting API server..."
 exec /app/api
