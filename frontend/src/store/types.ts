@@ -8,6 +8,7 @@
 
 import type { UserRole } from '../types/enums';
 import type { ArtifactPayload } from '../services/realtime/types';
+import type { CompletionReport } from '../types/models';
 
 // ============================================================================
 // Auth State
@@ -174,6 +175,10 @@ export interface Thread {
     id: string;
     projectId: string;
     title: string;
+    /** Whether this is the protected General thread */
+    isGeneral: boolean;
+    /** ISO-8601 timestamp if archived, undefined if active */
+    archivedAt?: string;
     createdAt: string;
     updatedAt: string;
     /** Messages in this thread */
@@ -310,6 +315,8 @@ export interface AppState {
     focusTasks: FocusTask[];
     /** Agent activity log */
     agentActivity: AgentActivity[];
+    /** Completion report for current project (if completed) */
+    completionReport: CompletionReport | null;
 }
 
 // ============================================================================
@@ -339,6 +346,8 @@ export interface StoreActions {
     selectThread(id: string | null): void;
     addThread(thread: Thread): void;
     markThreadRead(id: string): void;
+    archiveThread(id: string): void;
+    unarchiveThread(id: string, thread: Thread): void;
 
     // Chat actions
     addMessage(message: ChatMessage): void;
@@ -387,6 +396,9 @@ export interface StoreActions {
     selectDecision(id: string | null): void;
     selectDoc(path: string | null): void;
     exitShadowMode(): void;
+
+    // Completion actions
+    setCompletionReport(report: CompletionReport | null): void;
 
     // Session actions (Step 58.5: State Hygiene)
     resetSession(): void;

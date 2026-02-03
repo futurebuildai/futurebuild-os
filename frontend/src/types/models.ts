@@ -84,3 +84,77 @@ export interface GanttDependency {
     from: string; // Predecessor WBS code
     to: string;   // Successor WBS code
 }
+
+/**
+ * CompletionReport represents the project completion report.
+ * Rosetta Stone parity with Go pkg/types.CompletionReport.
+ */
+export interface CompletionReport {
+    id: string;
+    project_id: string;
+    generated_by?: string;
+    schedule_summary: ScheduleSummary;
+    budget_summary: BudgetSummary;
+    weather_impact_summary?: WeatherImpactSummary;
+    procurement_summary?: ProcurementSummary;
+    notes?: string;
+    created_at: string;
+}
+
+/**
+ * ScheduleSummary aggregates schedule metrics.
+ * Rosetta Stone parity with Go pkg/types.ScheduleSummary.
+ */
+export interface ScheduleSummary {
+    total_tasks: number;
+    completed_tasks: number;
+    on_time_percent: number;
+    total_duration_days: number;
+    actual_duration_days: number;
+}
+
+/**
+ * BudgetSummary aggregates financial metrics.
+ * All monetary values in int64 cents.
+ * Rosetta Stone parity with Go pkg/types.BudgetSummary.
+ */
+export interface BudgetSummary {
+    estimated_cents: number;
+    committed_cents: number;
+    actual_cents: number;
+    variance_cents: number;
+}
+
+/**
+ * WeatherImpactSummary aggregates weather delay data.
+ * Rosetta Stone parity with Go pkg/types.WeatherImpactSummary.
+ */
+export interface WeatherImpactSummary {
+    total_delay_days: number;
+    phases_affected: number;
+}
+
+/**
+ * ProcurementSummary aggregates procurement metrics.
+ * Rosetta Stone parity with Go pkg/types.ProcurementSummary.
+ */
+export interface ProcurementSummary {
+    total_items: number;
+    total_spend_cents: number;
+    vendor_count: number;
+}
+
+/**
+ * Thread represents a conversation thread within a project.
+ * Rosetta Stone parity with Go pkg/types.Thread.
+ */
+export interface Thread {
+    id: string;
+    project_id: string;
+    title: string;
+    is_general: boolean;
+    archived_at?: string;  // ISO-8601 Timestamp, nullable
+    created_by?: string;   // UUID string, nullable for system threads
+    created_at: string;    // ISO-8601 Timestamp
+    updated_at: string;    // ISO-8601 Timestamp
+}

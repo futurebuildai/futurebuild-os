@@ -50,6 +50,8 @@ type Server struct {
 	AssetHandler         *handlers.AssetHandler         // See STEP_84_FIELD_FEEDBACK.md: Vision status
 	ConfigHandler        *handlers.ConfigHandler        // See STEP_87_CONFIG_PERSISTENCE.md: Physics settings
 	ScheduleHandler      *handlers.ScheduleHandler      // Phase 14: Gantt schedule data endpoint
+	ThreadHandler        *handlers.ThreadHandler        // Thread support: conversation threads
+	CompletionHandler    *handlers.CompletionHandler    // Project Completion: complete + report
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -57,12 +59,14 @@ type Server struct {
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
 	projectService := service.NewProjectService(db)
-	projectHandler := handlers.NewProjectHandler(projectService)
+	threadService := service.NewThreadService(db)
+	projectHandler := handlers.NewProjectHandler(projectService, threadService)
 
 	// See PRODUCTION_PLAN.md Step 32
 	scheduleService := service.NewScheduleService(db)
 	taskHandler := handlers.NewTaskHandler(scheduleService)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService) // Phase 14: Gantt endpoint
+	threadHandler := handlers.NewThreadHandler(threadService)
 
 	// See PRODUCTION_PLAN.md Step 37
 	// See PRODUCTION_PLAN.md Step 37
@@ -212,6 +216,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		clerkWebhookHandler = handlers.NewClerkWebhookHandler(db, cfg.ClerkWebhookSecret)
 	}
 
+	// Project Completion: service + handler
+	completionService := service.NewCompletionService(db)
+	completionHandler := handlers.NewCompletionHandler(completionService, notificationService, directoryService)
+
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
 	var onboardingHandler *handlers.OnboardingHandler
@@ -244,6 +252,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		AssetHandler:         assetHandler,         // See STEP_84_FIELD_FEEDBACK.md
 		ConfigHandler:        configHandler,        // See STEP_87_CONFIG_PERSISTENCE.md
 		ScheduleHandler:      scheduleHandler,      // Phase 14: Gantt schedule data
+		ThreadHandler:        threadHandler,        // Thread support
+		CompletionHandler:    completionHandler,    // Project Completion
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -333,6 +343,10 @@ func (s *Server) routes() {
 			// Step 85: Project asset gallery with vision badges
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/assets", s.AssetHandler.ListProjectAssets)
 
+			// Project Completion: complete project + get report
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectComplete)).Post("/{id}/complete", s.CompletionHandler.CompleteProject)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/completion-report", s.CompletionHandler.GetCompletionReport)
+
 			// Phase 14: Schedule/Gantt endpoint for frontend Gantt artifact
 			r.Route("/{id}/schedule", func(r chi.Router) {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.ScheduleHandler.GetSchedule)
@@ -344,6 +358,16 @@ func (s *Server) routes() {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Put("/{task_id}", s.TaskHandler.UpdateTask)
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{task_id}/progress", s.TaskHandler.RecordProgress)
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{task_id}/inspection", s.TaskHandler.RecordInspection)
+			})
+
+			// Thread endpoints - conversation threads within projects
+			r.Route("/{id}/threads", func(r chi.Router) {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatRead)).Get("/", s.ThreadHandler.ListThreads)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/", s.ThreadHandler.CreateThread)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatRead)).Get("/{threadId}", s.ThreadHandler.GetThread)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/{threadId}/archive", s.ThreadHandler.ArchiveThread)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/{threadId}/unarchive", s.ThreadHandler.UnarchiveThread)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatRead)).Get("/{threadId}/messages", s.ThreadHandler.GetThreadMessages)
 			})
 		})
 		// See STEP_84_FIELD_FEEDBACK.md: Vision analysis status polling
@@ -453,10 +477,27 @@ func (s *Server) routes() {
 	})
 }
 
-func (s *Server) Start() error {
+// NewHTTPServer creates an http.Server with production-safe timeouts.
+// The caller is responsible for calling ListenAndServe and Shutdown.
+// See Staging Readiness Audit: Findings #1 (Graceful Shutdown) and #2 (Request Timeouts).
+func (s *Server) NewHTTPServer() *http.Server {
 	addr := fmt.Sprintf(":%d", s.Cfg.AppPort)
-	fmt.Printf("Server starting on %s\n", addr)
-	return http.ListenAndServe(addr, s.Router)
+	return &http.Server{
+		Addr:              addr,
+		Handler:           s.Router,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+}
+
+// Start is a convenience method that blocks until the server exits.
+// For production use, prefer NewHTTPServer() + signal handling in main().
+func (s *Server) Start() error {
+	httpServer := s.NewHTTPServer()
+	fmt.Printf("Server starting on %s\n", httpServer.Addr)
+	return httpServer.ListenAndServe()
 }
 
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {

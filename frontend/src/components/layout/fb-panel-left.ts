@@ -7,7 +7,9 @@ import { customElement, state, query } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
+import { api } from '../../services/api';
 import type { ProjectSummary, Thread, FocusTask } from '../../store/types';
+import type { Thread as ApiThread } from '../../types/models';
 import { UserRole } from '../../types/enums';
 import { clerkService } from '../../services/clerk';
 import '../agent/fb-agent-activity';
@@ -276,8 +278,31 @@ export class FBPanelLeft extends FBElement {
     @state() private _userInitials = '';
     @state() private _userRole: UserRole | null = null;
     @state() private _theme: 'light' | 'dark' | 'system' = 'system';
+    @state() private _isCreatingThread = false;
+    @state() private _newThreadTitle = '';
+    @state() private _showCompleteConfirm = false;
+    @state() private _isCompleting = false;
+    @state() private _completeError: string | null = null;
 
     private _disposeEffects: (() => void)[] = [];
+
+    /** Maps an API Thread to a store Thread. */
+    private _mapApiThread(t: ApiThread): Thread {
+        const thread: Thread = {
+            id: t.id,
+            projectId: t.project_id,
+            title: t.title,
+            isGeneral: t.is_general,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            messages: [],
+            hasUnread: false,
+        };
+        if (t.archived_at) {
+            thread.archivedAt = t.archived_at;
+        }
+        return thread;
+    }
 
     override connectedCallback(): void {
         super.connectedCallback();
@@ -293,7 +318,11 @@ export class FBPanelLeft extends FBElement {
                 this._focusTasks = store.focusTasks$.value;
             }),
             effect(() => {
-                this._activeProjectId = store.activeProjectId$.value;
+                const projectId = store.activeProjectId$.value;
+                if (projectId && projectId !== this._activeProjectId) {
+                    void this._loadThreads(projectId);
+                }
+                this._activeProjectId = projectId;
             }),
             effect(() => {
                 this._activeThreadId = store.activeThreadId$.value;
@@ -355,12 +384,103 @@ export class FBPanelLeft extends FBElement {
         store.actions.setActiveProject(task.projectId);
         if (task.threadId) {
             store.actions.setActiveThread(task.threadId);
+        } else {
+            // Agent-driven: create a thread with the task title
+            void this._createThreadFromFocus(task);
+        }
+    }
+
+    private async _createThreadFromFocus(task: FocusTask): Promise<void> {
+        try {
+            const apiThread = await api.threads.create(task.projectId, task.title);
+            const thread = this._mapApiThread(apiThread);
+            store.actions.addThread(thread);
+            store.actions.setActiveThread(thread.id);
+        } catch (err) {
+            console.error('[FBPanelLeft] Failed to create thread from focus task:', err);
+        }
+    }
+
+    private async _loadThreads(projectId: string): Promise<void> {
+        try {
+            const apiThreads = await api.threads.list(projectId);
+            const threads = apiThreads.map((t) => this._mapApiThread(t));
+            store.actions.setThreads(threads);
+            // Auto-select General thread
+            const general = threads.find((t) => t.isGeneral);
+            if (general) {
+                store.actions.setActiveThread(general.id);
+            }
+        } catch (err) {
+            console.error('[FBPanelLeft] Failed to load threads:', err);
+        }
+    }
+
+    private _showCreateThread(): void {
+        this._isCreatingThread = true;
+        this._newThreadTitle = '';
+    }
+
+    private _cancelCreateThread(): void {
+        this._isCreatingThread = false;
+        this._newThreadTitle = '';
+    }
+
+    private async _submitCreateThread(): Promise<void> {
+        const title = this._newThreadTitle.trim();
+        if (!title || !this._activeProjectId) return;
+
+        try {
+            const apiThread = await api.threads.create(this._activeProjectId, title);
+            const thread = this._mapApiThread(apiThread);
+            store.actions.addThread(thread);
+            store.actions.setActiveThread(thread.id);
+            this._isCreatingThread = false;
+            this._newThreadTitle = '';
+        } catch (err) {
+            console.error('[FBPanelLeft] Failed to create thread:', err);
+        }
+    }
+
+    private _handleCreateThreadKeydown(e: KeyboardEvent): void {
+        if (e.key === 'Enter') {
+            void this._submitCreateThread();
+        } else if (e.key === 'Escape') {
+            this._cancelCreateThread();
         }
     }
 
     private _handleThemeToggle(): void {
         const next = this._theme === 'dark' ? 'light' : 'dark';
         store.actions.setTheme(next);
+    }
+
+    private _canCompleteProject(project: ProjectSummary): boolean {
+        const role = this._userRole;
+        const isBuilderOrAdmin = role === UserRole.Admin || role === UserRole.Builder;
+        return isBuilderOrAdmin && project.status === 'Active' && this._activeProjectId === project.id;
+    }
+
+    private async _handleCompleteProject(): Promise<void> {
+        if (!this._activeProjectId || this._isCompleting) return;
+        this._isCompleting = true;
+        this._completeError = null;
+        try {
+            const report = await api.completion.complete(this._activeProjectId);
+            store.actions.setCompletionReport(report);
+            // Update the project status in the local list
+            const updated = this._projects.map((p) =>
+                p.id === this._activeProjectId ? { ...p, status: 'Completed' } : p
+            );
+            store.actions.setProjects(updated);
+            this._showCompleteConfirm = false;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to complete project';
+            this._completeError = message;
+            console.error('[FBPanelLeft] Failed to complete project:', err);
+        } finally {
+            this._isCompleting = false;
+        }
     }
 
     private _handleAdminNav(path: string): void {
@@ -440,7 +560,7 @@ export class FBPanelLeft extends FBElement {
                             ${this._activeProjectId === project.id ? html`
                                 <div class="threads" role="list" aria-label="Threads in ${project.name}">
                                     ${this._threads.map((thread) => html`
-                                        <button 
+                                        <button
                                             class="item thread-item ${thread.hasUnread ? 'unread' : ''} ${this._activeThreadId === thread.id ? 'active' : ''}"
                                             role="listitem"
                                             @click=${(): void => { this._handleThreadClick(thread.id); }}
@@ -449,7 +569,63 @@ export class FBPanelLeft extends FBElement {
                                             💬 ${thread.title}
                                         </button>
                                     `)}
+                                    ${this._isCreatingThread ? html`
+                                        <input
+                                            class="item thread-item"
+                                            type="text"
+                                            placeholder="Thread title..."
+                                            .value=${this._newThreadTitle}
+                                            @input=${(e: InputEvent): void => { this._newThreadTitle = (e.target as HTMLInputElement).value; }}
+                                            @keydown=${this._handleCreateThreadKeydown.bind(this)}
+                                            @blur=${(): void => { this._cancelCreateThread(); }}
+                                            style="border: 1px solid var(--fb-border); border-radius: var(--fb-radius-sm); outline: none;"
+                                        />
+                                    ` : html`
+                                        <button
+                                            class="item thread-item"
+                                            @click=${(): void => { this._showCreateThread(); }}
+                                            aria-label="Create new thread"
+                                        >
+                                            + New Thread
+                                        </button>
+                                    `}
                                 </div>
+                                ${this._canCompleteProject(project) ? html`
+                                    ${this._completeError ? html`
+                                        <div style="padding: 4px 12px; font-size: 11px; color: var(--fb-danger, #ef4444);">
+                                            ${this._completeError}
+                                        </div>
+                                    ` : nothing}
+                                    ${this._showCompleteConfirm ? html`
+                                        <div class="complete-confirm" style="padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
+                                            <span style="font-size: 12px; color: var(--fb-text-secondary);">Complete?</span>
+                                            <button
+                                                class="item thread-item"
+                                                style="color: var(--fb-success, #22c55e); font-size: 12px;"
+                                                @click=${(): void => { void this._handleCompleteProject(); }}
+                                                ?disabled=${this._isCompleting}
+                                            >
+                                                ${this._isCompleting ? 'Completing...' : 'Confirm'}
+                                            </button>
+                                            <button
+                                                class="item thread-item"
+                                                style="font-size: 12px;"
+                                                @click=${(): void => { this._showCompleteConfirm = false; this._completeError = null; }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    ` : html`
+                                        <button
+                                            class="item thread-item"
+                                            style="color: var(--fb-success, #22c55e);"
+                                            @click=${(): void => { this._showCompleteConfirm = true; this._completeError = null; }}
+                                            aria-label="Mark project as completed"
+                                        >
+                                            Complete Project
+                                        </button>
+                                    `}
+                                ` : nothing}
                             ` : null}
                         </div>
                     `)}

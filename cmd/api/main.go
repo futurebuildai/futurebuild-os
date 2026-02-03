@@ -4,6 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/platform/errormon"
@@ -57,7 +62,30 @@ func main() {
 	fmt.Println("Database connection established")
 
 	srv := server.NewServer(pool, cfg, aiClient)
-	if err := srv.Start(); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+
+	// Create HTTP server with production-safe timeouts.
+	// See Staging Readiness Audit: graceful shutdown + request timeouts.
+	httpServer := srv.NewHTTPServer()
+
+	// Start server in goroutine so we can handle shutdown signals.
+	go func() {
+		fmt.Printf("Server starting on %s\n", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	// Wait for SIGTERM or SIGINT for graceful shutdown.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+	log.Println("Server stopped")
 }

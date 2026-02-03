@@ -89,6 +89,24 @@ type ConfigServicer interface {
 	UpdateConfig(ctx context.Context, orgID uuid.UUID, speedMultiplier float64, workDays []int) (*models.BusinessConfig, error)
 }
 
+// ThreadServicer defines the contract for conversation thread operations.
+type ThreadServicer interface {
+	CreateThread(ctx context.Context, projectID, orgID, userID uuid.UUID, title string) (*models.Thread, error)
+	CreateGeneralThread(ctx context.Context, projectID uuid.UUID) (*models.Thread, error)
+	ListThreads(ctx context.Context, projectID, orgID uuid.UUID, includeArchived bool) ([]models.Thread, error)
+	GetThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) (*models.Thread, error)
+	ArchiveThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) error
+	UnarchiveThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) error
+	GetOrCreateGeneralThread(ctx context.Context, projectID uuid.UUID) (*models.Thread, error)
+	GetThreadMessages(ctx context.Context, threadID, projectID, orgID uuid.UUID, limit int) ([]models.ChatMessage, error)
+}
+
+// CompletionServicer defines the contract for project completion lifecycle operations.
+type CompletionServicer interface {
+	CompleteProject(ctx context.Context, projectID, orgID, userID uuid.UUID, notes string) (*models.CompletionReport, error)
+	GetCompletionReport(ctx context.Context, projectID, orgID uuid.UUID) (*models.CompletionReport, error)
+}
+
 // GitHubServicer defines the contract for GitHub API operations.
 // Used for Automated PR Review. See docs/AUTOMATED_PR_REVIEW_PRD.md
 type GitHubServicer interface {

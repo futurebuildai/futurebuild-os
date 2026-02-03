@@ -7,6 +7,7 @@ import "errors"
 var (
 	ErrNotFound       = errors.New("resource not found")
 	ErrConflict       = errors.New("resource conflict")
+	ErrForbidden      = errors.New("forbidden")
 	ErrUnauthorized   = errors.New("unauthorized access")
 	ErrInvalidInput   = errors.New("invalid input parameters")
 	ErrInternal       = errors.New("internal server error")

@@ -115,11 +115,70 @@ type ToolCall struct {
 type ChatMessage struct {
 	ID        uuid.UUID  `json:"id"`         // UUID string
 	ProjectID uuid.UUID  `json:"project_id"` // UUID string
+	ThreadID  uuid.UUID  `json:"thread_id"`  // UUID string
 	UserID    uuid.UUID  `json:"user_id"`    // UUID string
 	Role      ChatRole   `json:"role"`
 	Content   string     `json:"content"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"` // CTO-002: Typed struct
 	CreatedAt string     `json:"created_at"`           // ISO-8601 Timestamp
+}
+
+// Thread represents a conversation thread within a project.
+// See Thread Support Implementation Plan.
+type Thread struct {
+	ID         uuid.UUID `json:"id"`
+	ProjectID  uuid.UUID `json:"project_id"`
+	Title      string    `json:"title"`
+	IsGeneral  bool      `json:"is_general"`
+	ArchivedAt *string   `json:"archived_at,omitempty"` // ISO-8601 Timestamp, nullable
+	CreatedBy  *string   `json:"created_by,omitempty"`  // UUID string, nullable for system threads
+	CreatedAt  string    `json:"created_at"`             // ISO-8601 Timestamp
+	UpdatedAt  string    `json:"updated_at"`             // ISO-8601 Timestamp
+}
+
+// CompletionReport represents the project completion report (Rosetta Stone).
+// All monetary values in int64 cents.
+type CompletionReport struct {
+	ID                   string                `json:"id"`
+	ProjectID            string                `json:"project_id"`
+	GeneratedBy          *string               `json:"generated_by,omitempty"`
+	ScheduleSummary      ScheduleSummary        `json:"schedule_summary"`
+	BudgetSummary        BudgetSummary          `json:"budget_summary"`
+	WeatherImpactSummary *WeatherImpactSummary  `json:"weather_impact_summary,omitempty"`
+	ProcurementSummary   *ProcurementSummary    `json:"procurement_summary,omitempty"`
+	Notes                string                 `json:"notes,omitempty"`
+	CreatedAt            string                 `json:"created_at"`
+}
+
+// ScheduleSummary aggregates schedule metrics.
+type ScheduleSummary struct {
+	TotalTasks         int     `json:"total_tasks"`
+	CompletedTasks     int     `json:"completed_tasks"`
+	OnTimePercent      float64 `json:"on_time_percent"`
+	TotalDurationDays  int     `json:"total_duration_days"`
+	ActualDurationDays int     `json:"actual_duration_days"`
+}
+
+// BudgetSummary aggregates financial metrics.
+// All monetary values in int64 cents.
+type BudgetSummary struct {
+	EstimatedCents int64 `json:"estimated_cents"`
+	CommittedCents int64 `json:"committed_cents"`
+	ActualCents    int64 `json:"actual_cents"`
+	VarianceCents  int64 `json:"variance_cents"`
+}
+
+// WeatherImpactSummary aggregates weather delay data.
+type WeatherImpactSummary struct {
+	TotalDelayDays int `json:"total_delay_days"`
+	PhasesAffected int `json:"phases_affected"`
+}
+
+// ProcurementSummary aggregates procurement metrics.
+type ProcurementSummary struct {
+	TotalItems      int   `json:"total_items"`
+	TotalSpendCents int64 `json:"total_spend_cents"`
+	VendorCount     int   `json:"vendor_count"`
 }
 
 // DynamicComponent represents a recursive UI element.

@@ -112,6 +112,8 @@ export class FBViewChat extends FBViewElement {
     @state() private _error: string | null = null;
     @state() private _connectionStatus: ConnectionStatus = 'disconnected';
     @state() private _projectId: string | null = null;
+    @state() private _threadId: string | null = null;
+    @state() private _threadTitle: string | null = null;
 
     private _disposeEffects: (() => void)[] = [];
     private _loadAbortController: AbortController | null = null;
@@ -130,12 +132,17 @@ export class FBViewChat extends FBViewElement {
                 this._connectionStatus = store.connectionStatus$.value;
             }),
             effect(() => {
-                const projectId = store.activeProjectId$.value;
-                if (projectId && projectId !== this._projectId) {
-                    this._projectId = projectId;
-                    void this._loadHistory(projectId);
-                } else if (!projectId) {
-                    this._projectId = null;
+                this._projectId = store.activeProjectId$.value;
+            }),
+            effect(() => {
+                const threadId = store.activeThreadId$.value;
+                const thread = store.activeThread$.value;
+                this._threadTitle = thread?.title ?? null;
+                if (threadId && this._projectId && threadId !== this._threadId) {
+                    this._threadId = threadId;
+                    void this._loadHistory(this._projectId, threadId);
+                } else if (!threadId) {
+                    this._threadId = null;
                 }
             })
         );
@@ -150,20 +157,20 @@ export class FBViewChat extends FBViewElement {
     }
 
     override onViewActive(): void {
-        if (this._projectId) {
-            void this._loadHistory(this._projectId);
+        if (this._projectId && this._threadId) {
+            void this._loadHistory(this._projectId, this._threadId);
         }
     }
 
-    private async _loadHistory(projectId: string): Promise<void> {
-        // Abort any in-flight load to prevent race conditions when switching projects
+    private async _loadHistory(projectId: string, threadId: string): Promise<void> {
+        // Abort any in-flight load to prevent race conditions when switching threads
         this._loadAbortController?.abort();
         const controller = new AbortController();
         this._loadAbortController = controller;
 
         store.actions.setChatLoading(true);
         try {
-            const history = await api.chat.history(projectId);
+            const history = await api.chat.history(projectId, threadId);
 
             // If this load was aborted while awaiting, discard the stale result
             if (controller.signal.aborted) return;
@@ -189,8 +196,8 @@ export class FBViewChat extends FBViewElement {
         const content = e.detail.content.trim();
         if (!content) return;
 
-        if (!this._projectId) {
-            store.actions.setChatError('No active project selected');
+        if (!this._projectId || !this._threadId) {
+            store.actions.setChatError('No active project or thread selected');
             return;
         }
 
@@ -211,7 +218,7 @@ export class FBViewChat extends FBViewElement {
 
         try {
             // REST API call (spec-compliant)
-            const response = await api.chat.send(this._projectId, content);
+            const response = await api.chat.send(this._projectId, this._threadId, content);
 
             // Replace optimistic message with server-confirmed message
             store.actions.removeMessage(optimisticId);
@@ -251,7 +258,7 @@ export class FBViewChat extends FBViewElement {
                     title="Connection: ${this._connectionStatus}"
                     aria-label="Connection status: ${this._connectionStatus}"
                 ></span>
-                <span class="header-title">AI Assistant</span>
+                <span class="header-title">${this._threadTitle ?? 'AI Assistant'}</span>
             </div>
 
             ${this._error ? html`

@@ -41,6 +41,7 @@ func NewCommandExecutor(registry *PersistenceStrategyRegistry) *CommandExecutor 
 type ExecutionContext struct {
 	UserID    uuid.UUID
 	ProjectID uuid.UUID
+	ThreadID  uuid.UUID
 	Intent    types.Intent
 }
 
@@ -81,6 +82,7 @@ func (e *CommandExecutor) Execute(
 		errorMsg := models.ChatMessage{
 			ID:        uuid.New(),
 			ProjectID: execCtx.ProjectID,
+			ThreadID:  execCtx.ThreadID,
 			UserID:    execCtx.UserID,
 			Role:      types.ChatRoleModel,
 			Content:   "I encountered a system error trying to process your request. Please try again, or contact support if the problem persists.",
@@ -105,6 +107,7 @@ func (e *CommandExecutor) Execute(
 	modelMsg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: execCtx.ProjectID,
+		ThreadID:  execCtx.ThreadID,
 		UserID:    execCtx.UserID,
 		Role:      types.ChatRoleModel,
 		Content:   reply,

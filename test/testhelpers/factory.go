@@ -54,7 +54,8 @@ func NewIntegrationStack(t *testing.T) *IntegrationStack {
 	// 4. Wire Services
 	// ProjectService gets the hydration enqueuer (Event-Driven Trigger)
 	projectService := service.NewProjectServiceWithHydration(dbPool, hydrationEnqueuer)
-	projectHandler := handlers.NewProjectHandler(projectService)
+	threadService := service.NewThreadService(dbPool)
+	projectHandler := handlers.NewProjectHandler(projectService, threadService)
 
 	// ScheduleService (handles Task logic)
 	scheduleService := service.NewScheduleService(dbPool)

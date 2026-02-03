@@ -40,6 +40,7 @@ type Artifact struct {
 // authenticated Request Context (JWT) by the Orchestrator to prevent spoofing.
 type ChatRequest struct {
 	ProjectID uuid.UUID `json:"project_id"`
+	ThreadID  uuid.UUID `json:"thread_id"`
 	Message   string    `json:"message"`
 }
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/colton/futurebuild/internal/middleware"
@@ -29,11 +30,12 @@ func getAuthOrgID(r *http.Request) (uuid.UUID, error) {
 }
 
 type ProjectHandler struct {
-	service service.ProjectServicer
+	service       service.ProjectServicer
+	threadService service.ThreadServicer
 }
 
-func NewProjectHandler(s service.ProjectServicer) *ProjectHandler {
-	return &ProjectHandler{service: s}
+func NewProjectHandler(s service.ProjectServicer, ts service.ThreadServicer) *ProjectHandler {
+	return &ProjectHandler{service: s, threadService: ts}
 }
 
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +75,11 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Auto-create General thread for the new project (non-fatal on error — lazy fallback exists)
+	if _, err := h.threadService.CreateGeneralThread(r.Context(), p.ID); err != nil {
+		slog.Error("project: failed to create General thread", "project_id", p.ID, "error", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

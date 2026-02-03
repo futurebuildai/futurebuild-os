@@ -39,6 +39,9 @@ const (
 	ScopeChatRead  Scope = "chat:read"
 	ScopeChatWrite Scope = "chat:write"
 
+	// Project completion scope (Builder + Admin)
+	ScopeProjectComplete Scope = "project:complete"
+
 	// Settings & member management (Admin only)
 	ScopeSettingsWrite Scope = "settings:write"
 	ScopeMembersManage Scope = "members:manage"
@@ -56,6 +59,7 @@ var rolePermissions = map[types.UserRole][]Scope{
 	types.UserRoleBuilder: {
 		ScopeProjectRead,
 		ScopeProjectCreate,
+		ScopeProjectComplete, // Project Completion: Builders can mark projects complete
 		ScopeTaskRead,
 		ScopeTaskWrite,
 		ScopeBudgetRead,

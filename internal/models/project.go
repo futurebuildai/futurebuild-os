@@ -34,6 +34,8 @@ type Project struct {
 	FoundationType   string        `json:"foundation_type" db:"foundation_type"`
 	Topography       string        `json:"topography" db:"topography"`
 	SoilConditions   string        `json:"soil_conditions" db:"soil_conditions"`
+	CompletedAt      *time.Time    `json:"completed_at,omitempty" db:"completed_at"`
+	CompletedBy      *uuid.UUID    `json:"completed_by,omitempty" db:"completed_by"`
 }
 
 

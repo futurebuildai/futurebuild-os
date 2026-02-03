@@ -25,6 +25,7 @@ import type {
     ActionCard,
     PendingUpload,
 } from './types';
+import type { CompletionReport } from '../types/models';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
 import { realtimeService, type ConnectionStatus, type ArtifactPayload } from '../services/realtime';
 import { normalizeArtifactType } from '../utils/artifact-helpers';
@@ -111,6 +112,9 @@ const _activeArtifact$ = signal<ArtifactPayload | null>(null);
 const _rightPanelWidth$ = signal<number>(320);
 const _popoutArtifact$ = signal<ArtifactPayload | null>(null);
 
+// Completion report state
+const _completionReport$ = signal<CompletionReport | null>(null);
+
 // Shadow Mode state (SHADOW_VIEWER_specs.md)
 const _shadowModeEnabled$ = signal<boolean>(false);
 const _shadowActiveView$ = signal<'log' | 'docs'>('log');
@@ -145,12 +149,12 @@ const _activeThread$ = computed(() => {
 });
 
 /**
- * Computed: Threads for the currently active project.
+ * Computed: Active (non-archived) threads for the currently active project.
  */
 const _projectThreads$ = computed(() => {
     const projectId = _activeProjectId$.value;
     if (!projectId) return [];
-    return _threads$.value.filter((t) => t.projectId === projectId);
+    return _threads$.value.filter((t) => t.projectId === projectId && !t.archivedAt);
 });
 
 /**
@@ -255,6 +259,32 @@ const actions: StoreActions = {
         _threads$.value = _threads$.value.map((t) =>
             t.id === id ? { ...t, hasUnread: false } : t
         );
+    },
+
+    archiveThread(id: string): void {
+        _threads$.value = _threads$.value.map((t) =>
+            t.id === id ? { ...t, archivedAt: new Date().toISOString() } : t
+        );
+        // If the archived thread was active, deselect it
+        if (_activeThreadId$.value === id) {
+            _activeThreadId$.value = null;
+            _messages$.value = [];
+        }
+    },
+
+    unarchiveThread(id: string, thread: Thread): void {
+        // If thread is already in list, clear archivedAt. Otherwise add it.
+        const exists = _threads$.value.some((t) => t.id === id);
+        if (exists) {
+            _threads$.value = _threads$.value.map((t) => {
+                if (t.id !== id) return t;
+                // Remove archivedAt by destructuring it out
+                const { archivedAt: _, ...rest } = t;
+                return rest as Thread;
+            });
+        } else {
+            _threads$.value = [..._threads$.value, thread];
+        }
     },
 
     // ---- Chat Actions ----
@@ -521,6 +551,12 @@ const actions: StoreActions = {
         _selectedDocPath$.value = null;
     },
 
+    // ---- Completion Actions ----
+
+    setCompletionReport(report: CompletionReport | null): void {
+        _completionReport$.value = report;
+    },
+
     // ---- Session Reset (Step 58.5: State Hygiene) ----
 
     resetSession(): void {
@@ -566,6 +602,9 @@ const actions: StoreActions = {
         _leftPanelOpen$.value = false;
         _rightPanelWidth$.value = 320; // Step 59.5: Reset width
         _popoutArtifact$.value = null; // Step 59.5: Close modal
+
+        // Completion
+        _completionReport$.value = null;
 
         // Shadow Mode (SHADOW_VIEWER_specs.md)
         _shadowModeEnabled$.value = false;
@@ -642,6 +681,9 @@ export const store = {
     // ---- Panel Resize State (readonly, Step 59.5) ----
     rightPanelWidth$: _rightPanelWidth$ as ReadonlySignal<number>,
     popoutArtifact$: _popoutArtifact$ as ReadonlySignal<ArtifactPayload | null>,
+
+    // ---- Completion Report State (readonly) ----
+    completionReport$: _completionReport$ as ReadonlySignal<CompletionReport | null>,
 
     // ---- Shadow Mode State (readonly, SHADOW_VIEWER_specs.md) ----
     shadowModeEnabled$: _shadowModeEnabled$ as ReadonlySignal<boolean>,
@@ -822,4 +864,4 @@ export function initializeStore(): void {
 // Type Exports
 // ============================================================================
 
-export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions, Thread, AgentActivity, FocusTask, ConnectionStatus, ArtifactPayload };
+export type { User, ProjectSummary, ProjectDetail, ChatMessage, Theme, StoreActions, Thread, AgentActivity, FocusTask, ConnectionStatus, ArtifactPayload, CompletionReport };

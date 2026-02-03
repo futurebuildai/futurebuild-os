@@ -171,55 +171,40 @@ export class FBViewPortalDashboard extends FBViewElement {
     }
 
     private async _loadTasks(): Promise<void> {
-        // TODO: Implement actual API call
-        // For now, use mock data
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // TODO: Replace with actual API call: GET /api/v1/portal/tasks
+        const isDev = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
 
-        this._contactName = 'John';
-        this._taskGroups = [
-            {
-                projectId: '1',
-                projectName: '123 Main Street',
-                tasks: [
-                    {
-                        id: 't1',
-                        wbsCode: '7.1.1',
-                        name: 'Rough-In Plumbing',
-                        status: 'in_progress',
-                        projectName: '123 Main Street',
-                        dueDate: 'Jan 28',
-                    },
-                    {
-                        id: 't2',
-                        wbsCode: '7.2.1',
-                        name: 'Rough-In Electrical',
-                        status: 'pending',
-                        projectName: '123 Main Street',
-                        dueDate: 'Feb 1',
-                    },
-                ],
-            },
-            {
-                projectId: '2',
-                projectName: '456 Oak Avenue',
-                tasks: [
-                    {
-                        id: 't3',
-                        wbsCode: '6.1.2',
-                        name: 'Frame Second Floor',
-                        status: 'completed',
-                        projectName: '456 Oak Avenue',
-                        hasPhotos: true,
-                    },
-                ],
-            },
-        ];
+        if (isDev) {
+            // Mock data for development only
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            this._contactName = 'John';
+            this._taskGroups = [
+                {
+                    projectId: '1',
+                    projectName: '123 Main Street',
+                    tasks: [
+                        { id: 't1', wbsCode: '7.1.1', name: 'Rough-In Plumbing', status: 'in_progress', projectName: '123 Main Street', dueDate: 'Jan 28' },
+                        { id: 't2', wbsCode: '7.2.1', name: 'Rough-In Electrical', status: 'pending', projectName: '123 Main Street', dueDate: 'Feb 1' },
+                    ],
+                },
+                {
+                    projectId: '2',
+                    projectName: '456 Oak Avenue',
+                    tasks: [
+                        { id: 't3', wbsCode: '6.1.2', name: 'Frame Second Floor', status: 'completed', projectName: '456 Oak Avenue', hasPhotos: true },
+                    ],
+                },
+            ];
+        } else {
+            // Production: empty until API is wired
+            this._contactName = 'there';
+            this._taskGroups = [];
+        }
         this._loading = false;
     }
 
-    private _handleTaskSelect(e: CustomEvent<{ taskId: string }>): void {
-        // Navigate to task detail
-        console.log('Selected task:', e.detail.taskId);
+    private _handleTaskSelect(_e: CustomEvent<{ taskId: string }>): void {
+        // TODO: Navigate to task detail view
     }
 
     private _renderLoading(): TemplateResult {

@@ -14,7 +14,7 @@
  */
 
 import { get, post, put, del } from './http';
-import type { GanttData, Contact, InvoiceExtraction } from '../types/models';
+import type { GanttData, Contact, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
 
@@ -121,6 +121,7 @@ export interface OnboardProcessResponse {
  */
 export interface ChatRequest {
     project_id: string;
+    thread_id: string;
     message: string;
 }
 
@@ -257,29 +258,83 @@ export const api = {
     },
 
     /**
+     * Thread endpoints.
+     */
+    threads: {
+        /**
+         * List threads for a project.
+         * @param projectId - Project UUID
+         * @param includeArchived - Whether to include archived threads
+         */
+        list(projectId: string, includeArchived = false): Promise<ApiThread[]> {
+            const query = includeArchived ? '?archived=true' : '';
+            return get<ApiThread[]>(`/projects/${projectId}/threads${query}`);
+        },
+
+        /**
+         * Create a new thread in a project.
+         * @param projectId - Project UUID
+         * @param title - Thread title
+         */
+        create(projectId: string, title: string): Promise<ApiThread> {
+            return post<ApiThread>(`/projects/${projectId}/threads`, { title });
+        },
+
+        /**
+         * Get a single thread.
+         * @param projectId - Project UUID
+         * @param threadId - Thread UUID
+         */
+        get(projectId: string, threadId: string): Promise<ApiThread> {
+            return get<ApiThread>(`/projects/${projectId}/threads/${threadId}`);
+        },
+
+        /**
+         * Archive a thread (soft delete).
+         * @param projectId - Project UUID
+         * @param threadId - Thread UUID
+         */
+        async archive(projectId: string, threadId: string): Promise<void> {
+            await post<undefined>(`/projects/${projectId}/threads/${threadId}/archive`);
+        },
+
+        /**
+         * Unarchive a thread.
+         * @param projectId - Project UUID
+         * @param threadId - Thread UUID
+         */
+        async unarchive(projectId: string, threadId: string): Promise<void> {
+            await post<undefined>(`/projects/${projectId}/threads/${threadId}/unarchive`);
+        },
+    },
+
+    /**
      * Chat endpoints.
      */
     chat: {
         /**
          * Send a chat message and get a response.
          * @param projectId - Project UUID context
+         * @param threadId - Thread UUID context
          * @param message - User message text
          */
-        send(projectId: string, message: string): Promise<ChatResponse> {
+        send(projectId: string, threadId: string, message: string): Promise<ChatResponse> {
             return post<ChatResponse>('/chat', {
                 project_id: projectId,
+                thread_id: threadId,
                 message,
             } satisfies ChatRequest);
         },
 
         /**
-         * Get chat history for a project.
+         * Get chat history for a thread.
          * @param projectId - Project UUID
+         * @param threadId - Thread UUID
          * @param limit - Maximum messages to return (default 50)
          */
-        history(projectId: string, limit = 50): Promise<ChatResponse[]> {
+        history(projectId: string, threadId: string, limit = 50): Promise<ChatResponse[]> {
             return get<ChatResponse[]>(
-                `/projects/${projectId}/chat?limit=${String(limit)}`
+                `/projects/${projectId}/threads/${threadId}/messages?limit=${String(limit)}`
             );
         },
     },
@@ -580,6 +635,29 @@ export const api = {
          */
         reject(id: string, reason?: string): Promise<InvoiceResponse> {
             return post<InvoiceResponse>(`/invoices/${id}/reject`, { reason: reason ?? '' });
+        },
+    },
+
+    /**
+     * Project completion endpoints.
+     * Marks a project as completed and generates a completion report.
+     */
+    completion: {
+        /**
+         * Mark a project as completed and generate a completion report.
+         * @param projectId - Project UUID
+         * @param notes - Optional completion notes
+         */
+        complete(projectId: string, notes?: string): Promise<CompletionReport> {
+            return post<CompletionReport>(`/projects/${projectId}/complete`, { notes: notes ?? '' });
+        },
+
+        /**
+         * Get the completion report for a project.
+         * @param projectId - Project UUID
+         */
+        getReport(projectId: string): Promise<CompletionReport> {
+            return get<CompletionReport>(`/projects/${projectId}/completion-report`);
         },
     },
 } as const;

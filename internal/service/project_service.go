@@ -102,14 +102,16 @@ func (s *ProjectService) CreateProject(ctx context.Context, p *models.Project) e
 func (s *ProjectService) GetProject(ctx context.Context, id uuid.UUID, orgID uuid.UUID) (*models.Project, error) {
 	query := `
 		SELECT id, org_id, name, address, permit_issued_date, target_end_date, gsf, status,
-			bedrooms, bathrooms, stories, lot_size, foundation_type, topography, soil_conditions
+			bedrooms, bathrooms, stories, lot_size, foundation_type, topography, soil_conditions,
+			completed_at, completed_by
 		FROM projects
 		WHERE id = $1 AND org_id = $2
 	`
 	var p models.Project
 	err := s.db.QueryRow(ctx, query, id, orgID).Scan(
 		&p.ID, &p.OrgID, &p.Name, &p.Address, &p.PermitIssuedDate, &p.TargetEndDate, &p.GSF, &p.Status,
-		&p.Bedrooms, &p.Bathrooms, &p.Stories, &p.LotSize, &p.FoundationType, &p.Topography, &p.SoilConditions)
+		&p.Bedrooms, &p.Bathrooms, &p.Stories, &p.LotSize, &p.FoundationType, &p.Topography, &p.SoilConditions,
+		&p.CompletedAt, &p.CompletedBy)
 	if err != nil {
 		// L7 Fix: Return typed sentinel
 		if errors.Is(err, pgx.ErrNoRows) {
