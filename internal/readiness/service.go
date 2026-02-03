@@ -14,7 +14,6 @@ var criticalServices = map[string]bool{
 	"clerk":     true,
 	"redis":     true,
 	"resend":    true,
-	"sendgrid":  true,
 	"vertex_ai": true,
 }
 
@@ -68,7 +67,6 @@ func (s *Service) computeOverallStatus(results []CheckResult, env string) Status
 	isProd := env == "production" || env == "prod"
 	isStaging := env == "staging" || env == "stage"
 
-	hasEmail := false
 	overall := StatusHealthy
 
 	for _, r := range results {
@@ -82,12 +80,6 @@ func (s *Service) computeOverallStatus(results []CheckResult, env string) Status
 		case StatusNotConfigured:
 			isCritical := criticalServices[r.Name]
 
-			// Email is special: either Resend OR SendGrid satisfies the requirement.
-			if r.Name == "resend" || r.Name == "sendgrid" {
-				// Defer email evaluation until we've seen both.
-				continue
-			}
-
 			if isCritical {
 				if isProd {
 					return StatusFailed
@@ -99,30 +91,6 @@ func (s *Service) computeOverallStatus(results []CheckResult, env string) Status
 
 		case StatusDegraded:
 			if overall == StatusHealthy {
-				overall = StatusDegraded
-			}
-		}
-
-		// Track whether at least one email provider is healthy.
-		if (r.Name == "resend" || r.Name == "sendgrid") && r.Status == StatusHealthy {
-			hasEmail = true
-		}
-	}
-
-	// Evaluate email providers: at least one must be configured in prod/staging.
-	if !hasEmail {
-		emailConfigured := false
-		for _, r := range results {
-			if (r.Name == "resend" || r.Name == "sendgrid") && r.Status != StatusNotConfigured {
-				emailConfigured = true
-				break
-			}
-		}
-		if !emailConfigured {
-			if isProd {
-				return StatusFailed
-			}
-			if isStaging && overall == StatusHealthy {
 				overall = StatusDegraded
 			}
 		}

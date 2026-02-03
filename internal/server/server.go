@@ -130,12 +130,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	// Initialize notification service based on environment.
-	// Uses composite provider: Resend (preferred) or SendGrid for email, Twilio for SMS.
+	// Uses Resend for email, Twilio for SMS.
 	// Falls back to Console provider in development mode.
 	// See LAUNCH_STRATEGY.md Task A3 and LAUNCH_PLAN.md P2.
 	notificationService := service.NewNotificationService(
 		cfg.ResendAPIKey,
-		cfg.SendGridAPIKey,
 		cfg.EmailFromAddress,
 		cfg.EmailFromName,
 		cfg.TwilioAccountSID,
@@ -229,7 +228,6 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		readiness.NewClerkProbe(cfg.ClerkIssuerURL),
 		readiness.NewRedisProbe(cfg.RedisURL),
 		readiness.NewResendProbe(cfg.ResendAPIKey),
-		readiness.NewSendGridProbe(cfg.SendGridAPIKey),
 		readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
 		readiness.NewVertexAIProbe(cfg.VertexProjectID, cfg.VertexLocation),
 		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),
@@ -470,7 +468,7 @@ func (s *Server) routes() {
 
 		// Integration Readiness: deep health checks for all 3P services (Admin only).
 		// Unlike /health (DB-only, polled by DO every 10s), this runs probes against
-		// Clerk, Redis, Resend, SendGrid, Twilio, Vertex AI, and S3.
+		// Clerk, Redis, Resend, Twilio, Vertex AI, and S3.
 		r.Route("/readiness", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))

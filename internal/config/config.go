@@ -49,9 +49,7 @@ type Config struct {
 	ProjectRoot string
 
 	// Email provider configuration. See LAUNCH_STRATEGY.md A3.
-	// Resend is preferred; SendGrid is fallback.
 	ResendAPIKey     string
-	SendGridAPIKey   string
 	EmailFromAddress string
 	EmailFromName    string
 
@@ -158,7 +156,6 @@ func LoadConfig() (*Config, error) {
 		FutureShadeModelID:         getEnvOrDefault("FUTURESHADE_MODEL_ID", "gemini-2.5-flash"),
 		ProjectRoot:                getEnvOrDefault("PROJECT_ROOT", "."),
 		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
-		SendGridAPIKey:             os.Getenv("SENDGRID_API_KEY"),
 		EmailFromAddress:           getEnvOrDefault("EMAIL_FROM_ADDRESS", "noreply@futurebuild.ai"),
 		EmailFromName:              getEnvOrDefault("EMAIL_FROM_NAME", "FutureBuild"),
 		BaseURL:                    getEnvOrDefault("BASE_URL", "http://localhost:8080"),

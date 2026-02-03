@@ -113,7 +113,6 @@ func TestService_NotConfiguredInDev(t *testing.T) {
 		newMock("clerk", StatusNotConfigured),
 		newMock("redis", StatusNotConfigured),
 		newMock("resend", StatusNotConfigured),
-		newMock("sendgrid", StatusNotConfigured),
 		newMock("twilio", StatusNotConfigured),
 		newMock("vertex_ai", StatusNotConfigured),
 		newMock("s3", StatusNotConfigured),
@@ -145,39 +144,20 @@ func TestService_DegradableServiceFailed(t *testing.T) {
 	}
 }
 
-func TestService_EmailProvidersFallback(t *testing.T) {
-	// Resend not configured but SendGrid healthy — email requirement met.
+func TestService_ResendNotConfiguredInProd(t *testing.T) {
+	// Resend not configured in production — should fail since it's the only email provider.
 	svc := NewService(5*time.Second,
 		newMock("database", StatusHealthy),
 		newMock("clerk", StatusHealthy),
 		newMock("redis", StatusHealthy),
 		newMock("resend", StatusNotConfigured),
-		newMock("sendgrid", StatusHealthy),
-		newMock("vertex_ai", StatusHealthy),
-	)
-
-	report := svc.Run(context.Background(), "production")
-
-	if report.Status != StatusHealthy {
-		t.Errorf("expected healthy (sendgrid covers email), got %s", report.Status)
-	}
-}
-
-func TestService_NoEmailProviderInProd(t *testing.T) {
-	// Neither email provider configured in production.
-	svc := NewService(5*time.Second,
-		newMock("database", StatusHealthy),
-		newMock("clerk", StatusHealthy),
-		newMock("redis", StatusHealthy),
-		newMock("resend", StatusNotConfigured),
-		newMock("sendgrid", StatusNotConfigured),
 		newMock("vertex_ai", StatusHealthy),
 	)
 
 	report := svc.Run(context.Background(), "production")
 
 	if report.Status != StatusFailed {
-		t.Errorf("expected failed (no email in prod), got %s", report.Status)
+		t.Errorf("expected failed (resend not configured in prod), got %s", report.Status)
 	}
 }
 

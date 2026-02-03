@@ -121,7 +121,6 @@ func runReadinessCheckAndExit(cfg *config.Config) {
 		readiness.NewClerkProbe(cfg.ClerkIssuerURL),
 		readiness.NewRedisProbe(cfg.RedisURL),
 		readiness.NewResendProbe(cfg.ResendAPIKey),
-		readiness.NewSendGridProbe(cfg.SendGridAPIKey),
 		readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
 		readiness.NewVertexAIProbe(cfg.VertexProjectID, cfg.VertexLocation),
 		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),

@@ -7,14 +7,14 @@ import (
 )
 
 // CompositeNotificationProvider combines email and SMS providers into a single NotificationService.
-// Uses SendGrid for email and Twilio for SMS. See LAUNCH_PLAN.md P2.
+// Uses Resend for email and Twilio for SMS. See LAUNCH_PLAN.md P2.
 type CompositeNotificationProvider struct {
 	emailProvider types.NotificationService
 	smsProvider   types.NotificationService
 }
 
 // NewCompositeNotificationProvider creates a notification provider that routes
-// email to SendGrid and SMS to Twilio.
+// email to Resend and SMS to Twilio.
 //
 // If either provider is nil, it falls back to ConsoleEmailProvider for that channel.
 func NewCompositeNotificationProvider(
@@ -36,7 +36,7 @@ func NewCompositeNotificationProvider(
 	}
 }
 
-// SendEmail routes to the email provider (SendGrid or Console).
+// SendEmail routes to the email provider (Resend or Console).
 func (c *CompositeNotificationProvider) SendEmail(to string, subject string, body string) error {
 	return c.emailProvider.SendEmail(to, subject, body)
 }
@@ -50,25 +50,21 @@ func (c *CompositeNotificationProvider) SendSMS(contactID string, message string
 // This is a factory function that simplifies server.go wiring.
 //
 // Configuration logic:
-// - If Resend API key is set, use Resend for email (preferred)
-// - Else if SendGrid API key is set, use SendGrid for email (fallback)
+// - If Resend API key is set, use Resend for email
 // - If Twilio credentials are set, use Twilio for SMS
 // - Otherwise, fall back to console logging (development mode)
 func NewNotificationService(
 	resendAPIKey string,
-	sendGridAPIKey, emailFromAddress, emailFromName string,
+	emailFromAddress, emailFromName string,
 	twilioAccountSID, twilioAuthToken, twilioFromNumber string,
 ) types.NotificationService {
 	var emailProvider types.NotificationService
 	var smsProvider types.NotificationService
 
-	// Configure email provider: Resend > SendGrid > Console
+	// Configure email provider: Resend > Console
 	if resendAPIKey != "" {
 		emailProvider = NewResendProvider(resendAPIKey, emailFromAddress, emailFromName)
 		slog.Info("notification: using Resend for email")
-	} else if sendGridAPIKey != "" {
-		emailProvider = NewSendGridProvider(sendGridAPIKey, emailFromAddress, emailFromName)
-		slog.Info("notification: using SendGrid for email")
 	} else {
 		emailProvider = NewConsoleEmailProvider()
 		slog.Info("notification: using Console for email (development mode)")
