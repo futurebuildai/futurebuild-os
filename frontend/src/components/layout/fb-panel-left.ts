@@ -35,6 +35,11 @@ export class FBPanelLeft extends FBElement {
                 gap: var(--fb-spacing-sm);
                 padding: var(--fb-spacing-md);
                 border-bottom: 1px solid var(--fb-border-light);
+                cursor: pointer;
+            }
+
+            .header:hover {
+                background: var(--fb-bg-tertiary);
             }
 
             .logo {
@@ -490,7 +495,7 @@ export class FBPanelLeft extends FBElement {
 
     override render(): TemplateResult {
         return html`
-            <header class="header">
+            <header class="header" @click=${(): void => { this._handleAdminNav('/'); }}>
                 <svg class="logo" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M10 45 L50 15 L90 45"/>
                     <path d="M20 50 L50 25 L80 50"/>

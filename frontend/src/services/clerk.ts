@@ -153,12 +153,19 @@ export const clerkService = {
 
         clerk = new Clerk(publishableKey);
 
-        await clerk.load({
+        // Timeout Clerk load after 10s to prevent the app from hanging forever
+        // (e.g. stale session, network issues, CORS problems)
+        const loadPromise = clerk.load({
             appearance: CLERK_APPEARANCE,
             signInUrl: '/',
-            afterSignInUrl: '/',
-            afterSignUpUrl: '/',
+            signUpUrl: '/',
         });
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => { reject(new Error('Clerk load timed out after 10s')); }, 10_000);
+        });
+
+        await Promise.race([loadPromise, timeoutPromise]);
 
         isLoaded = true;
 
@@ -285,6 +292,14 @@ export const clerkService = {
     unmountOrganizationSwitcher(element: HTMLDivElement): void {
         if (!clerk) return;
         clerk.unmountOrganizationSwitcher(element);
+    },
+
+    /**
+     * Re-fire handleStateChange() so callers can trigger a state sync
+     * after registering their auth callback (fixes sign-in loop).
+     */
+    async syncAuthState(): Promise<void> {
+        await handleStateChange();
     },
 
     /**

@@ -369,14 +369,18 @@ export class FBAppShell extends FBElement {
             return;
         }
 
+        console.log('[FBAppShell] Initializing Clerk...');
         try {
             await clerkService.init(publishableKey);
+            console.log('[FBAppShell] Clerk initialized successfully');
         } catch (err) {
             console.error('[FBAppShell] Clerk initialization failed:', err);
         }
 
         this._clerkLoaded = true;
+        console.log('[FBAppShell] Initializing store...');
         initializeStore();
+        await clerkService.syncAuthState();
     }
 
     override disconnectedCallback(): void {

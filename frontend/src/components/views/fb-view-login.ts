@@ -4,11 +4,21 @@
  *
  * Replaces the magic-link login form with Clerk's pre-built Sign-In component.
  * Clerk handles email/password, social login (Google), MFA, and session management.
+ *
+ * PORTAL PATTERN: Clerk uses Emotion CSS-in-JS which injects <style> tags into
+ * document.head. Because this component lives inside multiple nested Shadow DOMs
+ * (app-root → fb-app-shell → fb-panel-center), those styles can never reach
+ * Clerk's rendered elements. To fix this, we mount the entire login UI as a
+ * "portal" div directly in document.body, outside all shadow boundaries.
+ * The component cleans up the portal when it disconnects (user logs in).
  */
 import { html, css, TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
 import { clerkService } from '../../services/clerk';
+
+/** Unique ID for the portal element to prevent duplicates. */
+const PORTAL_ID = 'fb-login-portal';
 
 @customElement('fb-view-login')
 export class FBViewLogin extends FBViewElement {
@@ -16,65 +26,22 @@ export class FBViewLogin extends FBViewElement {
         FBViewElement.styles,
         css`
             :host {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: var(--fb-bg-primary);
-            }
-
-            .login-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: var(--fb-spacing-xl);
-                max-width: 440px;
-                width: 100%;
-            }
-
-            .logo {
-                display: flex;
-                justify-content: center;
-            }
-
-            .logo svg {
-                width: 200px;
-                height: auto;
-                color: var(--fb-primary);
-            }
-
-            .tagline {
-                color: var(--fb-text-secondary);
-                text-align: center;
-                margin: 0;
-            }
-
-            .clerk-container {
-                width: 100%;
-                min-height: 300px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .loading {
-                color: var(--fb-text-muted);
-                font-size: var(--fb-text-sm);
-            }
-
-            .error {
-                color: var(--fb-error, #e74c3c);
-                font-size: var(--fb-text-sm);
-                text-align: center;
+                /* Host is invisible — all visible content is in the portal */
+                display: block;
+                width: 0;
+                height: 0;
+                overflow: hidden;
             }
         `,
     ];
 
-    @state() private _clerkReady = false;
     @state() private _clerkError = false;
+    private _portal: HTMLDivElement | null = null;
     private _signInContainer: HTMLDivElement | null = null;
     private _clerkPollInterval: ReturnType<typeof setInterval> | null = null;
 
     override firstUpdated(): void {
+        this._createPortal();
         this._mountClerkSignIn();
     }
 
@@ -84,46 +51,79 @@ export class FBViewLogin extends FBViewElement {
             this._clerkPollInterval = null;
         }
         this._unmountClerkSignIn();
+        this._removePortal();
         super.disconnectedCallback();
     }
 
-    private _mountClerkSignIn(): void {
-        if (!clerkService.loaded) {
-            // Clerk not yet loaded — wait and retry (max 10s)
-            let attempts = 0;
-            const maxAttempts = 100;
-            this._clerkPollInterval = setInterval(() => {
-                attempts++;
-                if (clerkService.loaded) {
-                    clearInterval(this._clerkPollInterval!);
-                    this._clerkPollInterval = null;
-                    this._mountClerkSignIn();
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(this._clerkPollInterval!);
-                    this._clerkPollInterval = null;
-                    this._clerkError = true;
+    // ---- Portal Lifecycle ----
+
+    private _createPortal(): void {
+        // Prevent duplicate portals
+        const existing = document.getElementById(PORTAL_ID);
+        if (existing) existing.remove();
+
+        const portal = document.createElement('div');
+        portal.id = PORTAL_ID;
+        portal.innerHTML = `
+            <style>
+                #${PORTAL_ID} {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #000;
+                    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    overflow-y: auto;
                 }
-            }, 100);
-            return;
-        }
 
-        const container = this.shadowRoot?.getElementById('clerk-sign-in') as HTMLDivElement | null;
-        if (!container) return;
+                #${PORTAL_ID} .login-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 2rem;
+                    max-width: 440px;
+                    width: 100%;
+                    padding: 2rem 1rem;
+                }
 
-        this._signInContainer = container;
-        clerkService.mountSignIn(container);
-        this._clerkReady = true;
-    }
+                #${PORTAL_ID} .logo {
+                    display: flex;
+                    justify-content: center;
+                }
 
-    private _unmountClerkSignIn(): void {
-        if (this._signInContainer) {
-            clerkService.unmountSignIn(this._signInContainer);
-            this._signInContainer = null;
-        }
-    }
+                #${PORTAL_ID} .logo svg {
+                    width: 200px;
+                    height: auto;
+                    color: #667eea;
+                }
 
-    override render(): TemplateResult {
-        return html`
+                #${PORTAL_ID} .tagline {
+                    color: #aaa;
+                    text-align: center;
+                    margin: 0;
+                    font-size: 0.95rem;
+                }
+
+                #${PORTAL_ID} .clerk-mount {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                #${PORTAL_ID} .loading-text {
+                    color: #666;
+                    font-size: 0.875rem;
+                }
+
+                #${PORTAL_ID} .error-text {
+                    color: #e74c3c;
+                    font-size: 0.875rem;
+                    text-align: center;
+                }
+            </style>
             <div class="login-container">
                 <div class="logo">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 150" fill="none">
@@ -155,17 +155,82 @@ export class FBViewLogin extends FBViewElement {
                     </svg>
                 </div>
                 <p class="tagline">Give Your Construction Project a Mind of Its Own</p>
-
-                <div class="clerk-container">
-                    ${this._clerkError
-                        ? html`<span class="error">Unable to load authentication. Please refresh the page and try again.</span>`
-                        : !this._clerkReady
-                            ? html`<span class="loading">Loading...</span>`
-                            : ''}
-                    <div id="clerk-sign-in"></div>
+                <div class="clerk-mount">
+                    <span class="loading-text">Loading...</span>
                 </div>
             </div>
         `;
+
+        document.body.appendChild(portal);
+        this._portal = portal;
+    }
+
+    private _removePortal(): void {
+        if (this._portal) {
+            this._portal.remove();
+            this._portal = null;
+        }
+    }
+
+    // ---- Clerk Mount ----
+
+    private _mountClerkSignIn(): void {
+        if (!clerkService.loaded) {
+            let attempts = 0;
+            const maxAttempts = 100;
+            this._clerkPollInterval = setInterval(() => {
+                attempts++;
+                if (clerkService.loaded) {
+                    clearInterval(this._clerkPollInterval!);
+                    this._clerkPollInterval = null;
+                    this._mountClerkSignIn();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(this._clerkPollInterval!);
+                    this._clerkPollInterval = null;
+                    this._clerkError = true;
+                    this._updatePortalState();
+                }
+            }, 100);
+            return;
+        }
+
+        // If Clerk says the user is signed in, the auth state will propagate
+        // through the store and the app shell will unmount this view.
+        if (clerkService.isSignedIn) {
+            return;
+        }
+
+        const mountPoint = this._portal?.querySelector('.clerk-mount') as HTMLDivElement | null;
+        if (!mountPoint) return;
+
+        // Clear loading text
+        mountPoint.innerHTML = '';
+
+        this._signInContainer = mountPoint;
+        clerkService.mountSignIn(mountPoint);
+    }
+
+    private _unmountClerkSignIn(): void {
+        if (this._signInContainer) {
+            clerkService.unmountSignIn(this._signInContainer);
+            this._signInContainer = null;
+        }
+    }
+
+    private _updatePortalState(): void {
+        if (!this._portal) return;
+        const mountPoint = this._portal.querySelector('.clerk-mount');
+        if (!mountPoint) return;
+
+        if (this._clerkError) {
+            mountPoint.innerHTML = '<span class="error-text">Unable to load authentication. Please refresh the page and try again.</span>';
+        }
+    }
+
+    override render(): TemplateResult {
+        // All visible content is in the portal (document.body).
+        // This host element is invisible.
+        return html``;
     }
 }
 
