@@ -610,14 +610,16 @@ export class FBPanelLeft extends FBElement {
             <nav class="section projects-list" aria-label="Projects">
                 <div class="section-header">
                     <span>📁 Projects</span>
-                    <button
-                        class="add-btn"
-                        @click=${(): void => { this._handleAdminNav('/projects'); }}
-                        aria-label="View all projects"
-                        title="All Projects"
-                    >
-                        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                    </button>
+                    ${this._userRole === UserRole.Admin || this._userRole === UserRole.Builder ? html`
+                        <button
+                            class="add-btn"
+                            @click=${(): void => { this._handleAdminNav('/projects/new'); }}
+                            aria-label="Create new project"
+                            title="New Project"
+                        >
+                            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                        </button>
+                    ` : nothing}
                 </div>
                 <div class="section-content" role="list">
                     ${this._projects.map((project) => html`

@@ -11,7 +11,10 @@ import { html, css, TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
+import { api } from '../../services/api';
 import type { CreateProjectRequest } from '../../services/api';
+import { store } from '../../store/store';
+import type { ProjectSummary } from '../../store/types';
 import {
     onboardingValues,
     resetOnboarding,
@@ -159,9 +162,34 @@ export class FBViewOnboarding extends FBViewElement {
         this._navigateTo('/projects');
     }
 
-    private _handleProjectCreated(e: CustomEvent<{ projectId: string }>): void {
+    private async _handleProjectCreated(e: CustomEvent<{ projectId: string }>): Promise<void> {
+        const { projectId } = e.detail;
         this.emit('project-created', e.detail);
-        this._navigateTo(`/projects/${e.detail.projectId}`);
+
+        try {
+            // Fetch the newly created project and add it to the store's project list
+            const detail = await api.projects.get(projectId);
+            const summary: ProjectSummary = {
+                id: detail.id,
+                name: detail.name,
+                address: detail.address,
+                status: detail.status,
+                completionPercentage: detail.completion_percentage,
+                createdAt: detail.created_at,
+                updatedAt: detail.updated_at,
+            };
+            const current = store.projects$.value;
+            store.actions.setProjects([...current, summary]);
+
+            // Select the new project (triggers thread loading + General thread auto-select)
+            store.actions.setActiveProject(projectId);
+
+            // Navigate to chat view
+            this._navigateTo('/');
+        } catch {
+            // Fallback: navigate to project detail page if store update fails
+            this._navigateTo(`/projects/${projectId}`);
+        }
     }
 
     override render(): TemplateResult {
