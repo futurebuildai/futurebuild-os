@@ -13,7 +13,6 @@ import { FBViewElement } from '../base/FBViewElement';
 import { store } from '../../store/store';
 import { api } from '../../services/api';
 import type { ChatMessage } from '../../store/types';
-import type { ConnectionStatus } from '../../services/realtime';
 
 import '../chat/fb-message-list';
 import '../chat/fb-input-bar';
@@ -49,35 +48,31 @@ export class FBViewChat extends FBViewElement {
                 flex-shrink: 0;
             }
 
-            .header-title {
-                font-size: var(--fb-text-sm);
-                font-weight: 500;
-                color: var(--fb-text-primary);
+            .header-spacer {
+                flex: 1;
             }
 
-            .connection-dot {
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
+            .panel-toggle {
+                padding: var(--fb-spacing-xs);
+                border: none;
+                background: transparent;
+                color: var(--fb-text-muted);
+                cursor: pointer;
+                border-radius: var(--fb-radius-sm, 4px);
                 flex-shrink: 0;
             }
 
-            .connection-dot.connected {
-                background: var(--fb-success, #22c55e);
+            .panel-toggle:hover {
+                background: var(--fb-bg-tertiary);
+                color: var(--fb-text-primary);
             }
 
-            .connection-dot.connecting {
-                background: var(--fb-warning, #f59e0b);
-                animation: pulse 1.5s ease-in-out infinite;
-            }
-
-            .connection-dot.disconnected {
-                background: var(--fb-text-muted);
-            }
-
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.4; }
+            .panel-toggle svg {
+                width: 18px;
+                height: 18px;
+                stroke: currentColor;
+                fill: none;
+                stroke-width: 2;
             }
 
             fb-message-list {
@@ -110,10 +105,9 @@ export class FBViewChat extends FBViewElement {
 
     @state() private _isLoading = false;
     @state() private _error: string | null = null;
-    @state() private _connectionStatus: ConnectionStatus = 'disconnected';
     @state() private _projectId: string | null = null;
     @state() private _threadId: string | null = null;
-    @state() private _threadTitle: string | null = null;
+    @state() private _isMobile = false;
 
     private _disposeEffects: (() => void)[] = [];
     private _loadAbortController: AbortController | null = null;
@@ -129,15 +123,13 @@ export class FBViewChat extends FBViewElement {
                 this._error = store.chatError$.value;
             }),
             effect(() => {
-                this._connectionStatus = store.connectionStatus$.value;
+                this._isMobile = store.isMobile$.value;
             }),
             effect(() => {
                 this._projectId = store.activeProjectId$.value;
             }),
             effect(() => {
                 const threadId = store.activeThreadId$.value;
-                const thread = store.activeThread$.value;
-                this._threadTitle = thread?.title ?? null;
                 if (threadId && this._projectId && threadId !== this._threadId) {
                     this._threadId = threadId;
                     void this._loadHistory(this._projectId, threadId);
@@ -253,12 +245,26 @@ export class FBViewChat extends FBViewElement {
     override render(): TemplateResult {
         return html`
             <div class="chat-header">
-                <span
-                    class="connection-dot ${this._connectionStatus}"
-                    title="Connection: ${this._connectionStatus}"
-                    aria-label="Connection status: ${this._connectionStatus}"
-                ></span>
-                <span class="header-title">${this._threadTitle ?? 'AI Assistant'}</span>
+                ${this._isMobile ? html`
+                    <button
+                        class="panel-toggle"
+                        @click=${(): void => { store.actions.toggleLeftPanel(); }}
+                        aria-label="Open navigation panel"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                    </button>
+                ` : nothing}
+                <span class="header-spacer"></span>
+                <button
+                    class="panel-toggle"
+                    @click=${(): void => { store.actions.toggleRightPanel(); }}
+                    aria-label="Toggle artifacts panel"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M9 3v18"/>
+                    </svg>
+                </button>
             </div>
 
             ${this._error ? html`

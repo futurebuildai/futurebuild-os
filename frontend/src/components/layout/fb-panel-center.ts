@@ -2,12 +2,9 @@
  * FBPanelCenter - Center Panel (Conversation / Login)
  * See FRONTEND_SCOPE.md Section 3.3
  */
-import { html, css, TemplateResult, nothing } from 'lit';
+import { html, css, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
-import { store } from '../../store/store';
-import type { ProjectSummary, Thread } from '../../store/types';
 
 // Import view components
 import '../views/fb-view-login';
@@ -31,9 +28,6 @@ import '../views/fb-view-chat';
 // Import onboarding view (Step 74 Split-Screen Wizard)
 import '../views/fb-view-onboarding';
 
-// Import notification components (Step 91)
-import '../notifications/fb-notification-bell';
-import '../notifications/fb-notification-list';
 
 @customElement('fb-panel-center')
 export class FBPanelCenter extends FBElement {
@@ -46,62 +40,6 @@ export class FBPanelCenter extends FBElement {
                 height: 100%;
                 background: var(--fb-bg-primary);
                 overflow: hidden;
-            }
-
-            .breadcrumb {
-                display: flex;
-                align-items: center;
-                gap: var(--fb-spacing-sm);
-                padding: var(--fb-spacing-md) var(--fb-spacing-lg);
-                border-bottom: 1px solid var(--fb-border-light);
-                font-size: var(--fb-text-sm);
-                color: var(--fb-text-secondary);
-                flex-shrink: 0;
-            }
-
-            .breadcrumb-item {
-                cursor: pointer;
-            }
-
-            .breadcrumb-item:hover {
-                color: var(--fb-text-primary);
-            }
-
-            .breadcrumb-separator {
-                color: var(--fb-text-muted);
-            }
-
-            .breadcrumb-current {
-                color: var(--fb-text-primary);
-                font-weight: 500;
-            }
-
-            .panel-toggle {
-                margin-left: auto;
-                padding: var(--fb-spacing-xs);
-                border: none;
-                background: transparent;
-                color: var(--fb-text-muted);
-                cursor: pointer;
-                border-radius: var(--fb-radius-sm);
-            }
-
-            .panel-toggle:hover {
-                background: var(--fb-bg-tertiary);
-                color: var(--fb-text-primary);
-            }
-
-            .panel-toggle:focus-visible {
-                outline: 2px solid var(--fb-primary);
-                outline-offset: 2px;
-            }
-
-            .panel-toggle svg {
-                width: 18px;
-                height: 18px;
-                stroke: currentColor;
-                fill: none;
-                stroke-width: 2;
             }
 
             .empty-state {
@@ -135,20 +73,11 @@ export class FBPanelCenter extends FBElement {
                 flex: 1;
             }
 
-            /* Step 91: Notification bell container */
-            .notification-container {
-                position: relative;
-                margin-left: auto;
-            }
         `,
     ];
 
     @property({ type: Boolean, attribute: 'is-authenticated' }) isAuthenticated = false;
 
-    @state() private _activeProject: ProjectSummary | null = null;
-    @state() private _activeThread: Thread | null = null;
-    @state() private _isMobile = false;
-    @state() private _notificationOpen = false;
     @state() private _isInviteAcceptRoute = false;
     @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
@@ -164,34 +93,14 @@ export class FBPanelCenter extends FBElement {
     @state() private _isPortalVerifyRoute = false;
     @state() private _isPortalDashboardRoute = false;
 
-    private _disposeEffects: (() => void)[] = [];
-
     override connectedCallback(): void {
         super.connectedCallback();
-
-        // Check for verify route
         this._checkRoute();
         window.addEventListener('popstate', this._handlePopState);
-
-        this._disposeEffects.push(
-            effect(() => {
-                this._activeProject = store.currentProject$.value;
-            }),
-            effect(() => {
-                this._activeThread = store.activeThread$.value;
-            }),
-            effect(() => {
-                this._isMobile = store.isMobile$.value;
-            })
-        );
     }
 
     private _handlePopState = (): void => {
         this._checkRoute();
-        // Step 91: Close notification dropdown on navigation
-        if (this._notificationOpen) {
-            this._handleNotificationClose();
-        }
     };
 
     private _checkRoute(): void {
@@ -222,46 +131,8 @@ export class FBPanelCenter extends FBElement {
 
     override disconnectedCallback(): void {
         window.removeEventListener('popstate', this._handlePopState);
-        document.removeEventListener('click', this._handleClickOutside);
-        this._disposeEffects.forEach((d) => { d(); });
-        this._disposeEffects = [];
         super.disconnectedCallback();
     }
-
-    private _toggleLeftPanel(): void {
-        store.actions.toggleLeftPanel();
-    }
-
-    private _toggleRightPanel(): void {
-        store.actions.toggleRightPanel();
-    }
-
-    // Step 91: Notification dropdown handlers
-    private _handleNotificationToggle(): void {
-        this._notificationOpen = !this._notificationOpen;
-        if (this._notificationOpen) {
-            // Add click-outside listener
-            requestAnimationFrame(() => {
-                document.addEventListener('click', this._handleClickOutside);
-            });
-        } else {
-            document.removeEventListener('click', this._handleClickOutside);
-        }
-    }
-
-    private _handleNotificationClose(): void {
-        this._notificationOpen = false;
-        document.removeEventListener('click', this._handleClickOutside);
-    }
-
-    private _handleClickOutside = (e: MouseEvent): void => {
-        const path = e.composedPath();
-        // Check if click was inside the notification container
-        const container = this.shadowRoot?.querySelector('.notification-container');
-        if (container && !path.includes(container)) {
-            this._handleNotificationClose();
-        }
-    };
 
     override render(): TemplateResult {
         // Portal routes (LAUNCH_PLAN.md P2) - These use portal-specific auth, not main app auth
@@ -317,39 +188,6 @@ export class FBPanelCenter extends FBElement {
         }
 
         return html`
-            <!-- Breadcrumb -->
-            <nav class="breadcrumb" aria-label="Current context">
-                ${this._isMobile ? html`
-                    <button 
-                        class="panel-toggle" 
-                        @click=${this._toggleLeftPanel.bind(this)} 
-                        aria-label="Open navigation panel"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-                    </button>
-                ` : nothing}
-                
-                ${this._activeProject ? html`
-                    <span class="breadcrumb-item">${this._activeProject.name}</span>
-                    ${this._activeThread ? html`
-                        <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                        <span class="breadcrumb-current">${this._activeThread.title}</span>
-                    ` : nothing}
-                ` : nothing}
-                
-                <button
-                    class="panel-toggle"
-                    @click=${this._toggleRightPanel.bind(this)}
-                    aria-label="Toggle artifacts panel"
-                >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M9 3v18"/>
-                    </svg>
-                </button>
-            </nav>
-
-            <!-- Step 72: Conversation via fb-view-chat -->
             <fb-view-chat></fb-view-chat>
         `;
     }
