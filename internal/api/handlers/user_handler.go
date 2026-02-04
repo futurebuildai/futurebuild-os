@@ -7,6 +7,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,12 +16,13 @@ import (
 // UserHandler handles user profile endpoints.
 // See LAUNCH_PLAN.md Section: User Profile Update Endpoint (P0).
 type UserHandler struct {
-	db *pgxpool.Pool
+	db          *pgxpool.Pool
+	userService service.UserServicer
 }
 
 // NewUserHandler creates a new user handler.
-func NewUserHandler(db *pgxpool.Pool) *UserHandler {
-	return &UserHandler{db: db}
+func NewUserHandler(db *pgxpool.Pool, userService service.UserServicer) *UserHandler {
+	return &UserHandler{db: db, userService: userService}
 }
 
 // UpdateProfileRequest is the request body for updating a user profile.
@@ -170,4 +172,46 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		OrgID:     user.OrgID.String(),
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	})
+}
+
+// ListMembers handles GET /api/v1/admin/org/members.
+// Returns all members of the authenticated user's organization.
+func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	claims, err := middleware.GetClaims(ctx)
+	if err != nil {
+		slog.Warn("user: unauthorized - no claims in context", "error", err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orgID, err := uuid.Parse(claims.OrgID)
+	if err != nil {
+		slog.Error("user: invalid org_id in claims", "error", err)
+		http.Error(w, "Invalid organization", http.StatusInternalServerError)
+		return
+	}
+
+	members, err := h.userService.ListOrgMembers(ctx, orgID)
+	if err != nil {
+		slog.Error("user: failed to list org members", "error", err, "org_id", orgID)
+		http.Error(w, "Failed to list members", http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]UserProfileResponse, 0, len(members))
+	for _, m := range members {
+		resp = append(resp, UserProfileResponse{
+			ID:        m.ID.String(),
+			Email:     m.Email,
+			Name:      m.Name,
+			Role:      string(m.Role),
+			OrgID:     m.OrgID.String(),
+			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }

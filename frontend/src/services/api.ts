@@ -492,6 +492,19 @@ export const api = {
         },
     },
     /**
+     * Team management endpoints.
+     * Lists org members for the Team page.
+     */
+    team: {
+        /**
+         * List all members of the current organization (admin only).
+         */
+        listMembers(): Promise<UserProfile[]> {
+            return get<UserProfile[]>('/admin/org/members');
+        },
+    },
+
+    /**
      * Portal endpoints.
      * See LAUNCH_PLAN.md P2: Field Portal (Mobile).
      */
@@ -784,6 +797,7 @@ export interface PhysicsConfigResponse {
 export interface UpdatePhysicsRequest {
     speed_multiplier: number;
     work_days: number[];
+    apply_to_existing?: boolean;
 }
 
 // ============================================================================

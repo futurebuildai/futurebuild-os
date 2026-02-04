@@ -197,7 +197,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	inviteHandler := handlers.NewInviteHandler(inviteService, notificationService, cfg.BaseURL)
 
 	// See LAUNCH_PLAN.md User Profile Endpoint (P0)
-	userHandler := handlers.NewUserHandler(db)
+	userService := service.NewUserService(db)
+	userHandler := handlers.NewUserHandler(db, userService)
 
 	// See LAUNCH_PLAN.md P2: Field Portal (Mobile)
 	portalService := service.NewPortalService(db, notificationService, cfg.BaseURL)
@@ -338,6 +339,13 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.Get("/me", s.UserHandler.GetProfile)
 			r.Put("/me", s.UserHandler.UpdateProfile)
+		})
+
+		// Admin endpoint for listing org members (Team page)
+		r.Route("/admin/org", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/members", s.UserHandler.ListMembers)
 		})
 
 		// See STEP_87_CONFIG_PERSISTENCE.md: Org-level physics settings

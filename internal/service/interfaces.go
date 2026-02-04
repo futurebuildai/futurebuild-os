@@ -107,6 +107,11 @@ type CompletionServicer interface {
 	GetCompletionReport(ctx context.Context, projectID, orgID uuid.UUID) (*models.CompletionReport, error)
 }
 
+// UserServicer defines the contract for user management operations.
+type UserServicer interface {
+	ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]models.User, error)
+}
+
 // GitHubServicer defines the contract for GitHub API operations.
 // Used for Automated PR Review. See docs/AUTOMATED_PR_REVIEW_PRD.md
 type GitHubServicer interface {
