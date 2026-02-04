@@ -167,7 +167,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// Phase 12: Main app auth via Clerk; AuthHandler serves /auth/me only.
 	authHandler := handlers.NewAuthHandler()
-	authMiddleware := middleware.NewAuthMiddleware(cfg)
+	authMiddleware := middleware.NewAuthMiddleware(cfg, db)
 
 	// Phase 12: Portal contacts still use magic-link auth (separate from Clerk).
 	// AuthService provides token generation, storage, and verification for portal.
@@ -341,10 +341,9 @@ func (s *Server) routes() {
 			r.Put("/me", s.UserHandler.UpdateProfile)
 		})
 
-		// Admin endpoint for listing org members (Team page)
-		r.Route("/admin/org", func(r chi.Router) {
+		// Org member listing (Team page) — any authenticated user can view members
+		r.Route("/org", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
-			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
 			r.Get("/members", s.UserHandler.ListMembers)
 		})
 

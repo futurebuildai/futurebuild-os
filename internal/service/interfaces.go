@@ -109,7 +109,8 @@ type CompletionServicer interface {
 
 // UserServicer defines the contract for user management operations.
 type UserServicer interface {
-	ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]models.User, error)
+	ListOrgMembers(ctx context.Context, claimOrgID string) ([]models.User, error)
+	ResolveUserOrg(ctx context.Context, userExternalID string) (string, error)
 }
 
 // GitHubServicer defines the contract for GitHub API operations.

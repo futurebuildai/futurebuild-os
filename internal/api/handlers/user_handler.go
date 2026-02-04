@@ -174,7 +174,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ListMembers handles GET /api/v1/admin/org/members.
+// ListMembers handles GET /api/v1/org/members.
 // Returns all members of the authenticated user's organization.
 func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -186,16 +186,24 @@ func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgID, err := uuid.Parse(claims.OrgID)
-	if err != nil {
-		slog.Error("user: invalid org_id in claims", "error", err)
-		http.Error(w, "Invalid organization", http.StatusInternalServerError)
-		return
+	orgIdentifier := claims.OrgID
+	if orgIdentifier == "" {
+		// Fallback: resolve org from user's external_id in the database.
+		// Clerk JWTs may omit org_id depending on the JWT template configuration.
+		resolved, resolveErr := h.userService.ResolveUserOrg(ctx, claims.UserID)
+		if resolveErr != nil {
+			slog.Error("user: no org_id in JWT and failed to resolve from user",
+				"error", resolveErr, "user_id", claims.UserID)
+			http.Error(w, "No organization context", http.StatusBadRequest)
+			return
+		}
+		orgIdentifier = resolved
 	}
 
-	members, err := h.userService.ListOrgMembers(ctx, orgID)
+	// Pass raw claim org_id — service resolves UUID or Clerk external_id
+	members, err := h.userService.ListOrgMembers(ctx, orgIdentifier)
 	if err != nil {
-		slog.Error("user: failed to list org members", "error", err, "org_id", orgID)
+		slog.Error("user: failed to list org members", "error", err, "claim_org_id", claims.OrgID)
 		http.Error(w, "Failed to list members", http.StatusInternalServerError)
 		return
 	}

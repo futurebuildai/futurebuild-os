@@ -285,16 +285,17 @@ export class FBViewTeam extends FBViewElement {
         this._error = '';
 
         try {
+            // Fetch members and invites in parallel; invites may 403 for non-admins
             const [members, invites] = await Promise.all([
                 api.team.listMembers(),
-                api.invites.list(),
+                api.invites.list().catch(() => [] as Invite[]),
             ]);
             this._members = members;
             this._invites = invites;
             this._viewState = 'ready';
-        } catch (err) {
+        } catch (err: unknown) {
             this._viewState = 'error';
-            this._error = err instanceof Error ? err.message : 'Failed to load team data';
+            this._error = this._extractErrorMessage(err);
         }
     }
 
@@ -326,9 +327,9 @@ export class FBViewTeam extends FBViewElement {
             await api.invites.create(this._formEmail, this._formRole);
             this._modalState = 'closed';
             void this._loadData();
-        } catch (err) {
+        } catch (err: unknown) {
             this._modalState = 'creating';
-            this._formError = err instanceof Error ? err.message : 'Failed to create invitation';
+            this._formError = this._extractErrorMessage(err);
         }
     }
 
@@ -339,6 +340,31 @@ export class FBViewTeam extends FBViewElement {
         } catch (err) {
             console.error('Failed to revoke invitation:', err instanceof Error ? err.message : err);
         }
+    }
+
+    // ========================================================================
+    // Error helpers
+    // ========================================================================
+
+    /** Extract a human-readable message from an unknown error. */
+    private _extractErrorMessage(err: unknown): string {
+        if (err instanceof Error) {
+            return err.message;
+        }
+        if (typeof err === 'string') {
+            return err;
+        }
+        // Backend returns {"error": {"code": N, "message": "..."}}
+        const obj = err as Record<string, unknown>;
+        if (obj && typeof obj === 'object') {
+            if (typeof obj['message'] === 'string') return obj['message'];
+            const inner = obj['error'];
+            if (inner && typeof inner === 'object') {
+                const detail = inner as Record<string, unknown>;
+                if (typeof detail['message'] === 'string') return detail['message'];
+            }
+        }
+        return 'Failed to load team data';
     }
 
     // ========================================================================

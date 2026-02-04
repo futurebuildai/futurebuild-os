@@ -500,7 +500,7 @@ export const api = {
          * List all members of the current organization (admin only).
          */
         listMembers(): Promise<UserProfile[]> {
-            return get<UserProfile[]>('/admin/org/members');
+            return get<UserProfile[]>('/org/members');
         },
     },
 

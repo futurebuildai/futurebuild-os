@@ -13,6 +13,7 @@ import (
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type contextKey string
@@ -22,19 +23,20 @@ const claimsContextKey contextKey = "claims"
 type AuthMiddleware struct {
 	cfg  *config.Config
 	jwks jwt.Keyfunc
+	db   *pgxpool.Pool
 }
 
 // NewAuthMiddlewareWithKeyfunc creates an AuthMiddleware with a custom JWT keyfunc.
 // Used for testing when a JWKS endpoint is not available.
 func NewAuthMiddlewareWithKeyfunc(cfg *config.Config, kf jwt.Keyfunc) *AuthMiddleware {
-	return &AuthMiddleware{cfg: cfg, jwks: kf}
+	return &AuthMiddleware{cfg: cfg, jwks: kf, db: nil}
 }
 
 // NewAuthMiddleware creates a new AuthMiddleware with JWKS-based validation.
 // Phase 12: Replaced HMAC (HS256) with Clerk JWKS (RS256).
 // See STEP_78_AUTH_PROVIDER.md Section 2 and STEP_79_MIDDLEWARE_SWAP.md.
-func NewAuthMiddleware(cfg *config.Config) *AuthMiddleware {
-	m := &AuthMiddleware{cfg: cfg}
+func NewAuthMiddleware(cfg *config.Config, db *pgxpool.Pool) *AuthMiddleware {
+	m := &AuthMiddleware{cfg: cfg, db: db}
 
 	// Initialize JWKS keyfunc from Clerk's well-known endpoint.
 	// keyfunc handles caching and background refresh.
@@ -121,12 +123,15 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Multi-Tenancy Enforcement: OrgID is required for all authenticated requests.
-		// Users without an organization should be prompted to create/join one.
+		// Enrich sparse JWT claims from the database.
+		// Clerk session tokens may omit org_id, org_role, email, and name
+		// depending on JWT template configuration.
+		if m.db != nil && claims.UserID != "" {
+			m.enrichClaimsFromDB(r.Context(), claims)
+		}
+
 		if claims.OrgID == "" {
-			// Allow requests without org_id — user may not have joined an org yet.
-			// Handlers that require org context should check this themselves.
-			slog.Debug("auth: JWT has no org_id claim", "user_id", claims.UserID)
+			slog.Debug("auth: no org_id after enrichment", "user_id", claims.UserID)
 		}
 
 		ctx := context.WithValue(r.Context(), claimsContextKey, claims)
@@ -214,6 +219,41 @@ func mapClerkRoleToInternal(clerkRole string) types.UserRole {
 		// L7: Default to Viewer (least privilege) for unknown roles
 		slog.Warn("auth: unknown Clerk role, defaulting to Viewer", "clerk_role", clerkRole)
 		return types.UserRoleViewer
+	}
+}
+
+// enrichClaimsFromDB fills in missing JWT claims by looking up the user in the database.
+// The JWT sub claim contains the Clerk user ID, which maps to users.external_id.
+// Also replaces UserID with the internal UUID so downstream handlers can use uuid.Parse.
+func (m *AuthMiddleware) enrichClaimsFromDB(ctx context.Context, claims *types.Claims) {
+	var userID, orgID, email, name, role string
+	err := m.db.QueryRow(ctx,
+		`SELECT u.id, u.org_id, u.email, u.name, u.role
+		 FROM users u
+		 WHERE u.external_id = $1`,
+		claims.UserID,
+	).Scan(&userID, &orgID, &email, &name, &role)
+	if err != nil {
+		slog.Debug("auth: could not enrich claims from DB", "external_id", claims.UserID, "error", err)
+		return
+	}
+
+	// Replace Clerk external_id with internal UUID for downstream handlers.
+	if userID != "" {
+		claims.UserID = userID
+		claims.RegisteredClaims.Subject = userID
+	}
+	if claims.OrgID == "" && orgID != "" {
+		claims.OrgID = orgID
+	}
+	if (claims.Role == "" || claims.Role == types.UserRoleViewer) && role != "" {
+		claims.Role = types.UserRole(role)
+	}
+	if claims.Email == "" && email != "" {
+		claims.Email = email
+	}
+	if claims.Name == "" && name != "" {
+		claims.Name = name
 	}
 }
 

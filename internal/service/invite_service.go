@@ -150,33 +150,28 @@ func (s *InviteService) ListInvitations(ctx context.Context, orgID uuid.UUID) ([
 	return invitations, nil
 }
 
-// RevokeInvitation deletes a pending invitation.
+// RevokeInvitation deletes an invitation regardless of acceptance state.
+// An admin can revoke any invitation in their org.
 func (s *InviteService) RevokeInvitation(ctx context.Context, inviteID, orgID uuid.UUID) error {
 	deleteQuery := `
 		DELETE FROM invitations
-		WHERE id = $1 AND org_id = $2 AND accepted_at IS NULL
+		WHERE id = $1 AND org_id = $2
 	`
 	result, err := s.db.Exec(ctx, deleteQuery, inviteID, orgID)
 	if err != nil {
 		return fmt.Errorf("failed to revoke invitation: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("invitation not found or already accepted")
+		return fmt.Errorf("invitation not found")
 	}
 	return nil
 }
 
-// AcceptInvitation validates an invitation token, creates the user, and returns the new user.
-// This method is transactional.
+// AcceptInvitation validates an invitation token and marks it as accepted.
+// With Clerk auth, user creation happens when the invitee signs up on Clerk
+// and the membership webhook fires. This method no longer creates a DB user.
 func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name string) (*models.User, error) {
 	tokenHash := hashToken(rawToken)
-
-	// Start transaction
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Find and validate invitation
 	var inv Invitation
@@ -186,7 +181,7 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name str
 		FROM invitations
 		WHERE token_hash = $1
 	`
-	err = tx.QueryRow(ctx, findQuery, tokenHash).Scan(
+	err := s.db.QueryRow(ctx, findQuery, tokenHash).Scan(
 		&inv.ID, &inv.OrgID, &inv.Email, &roleStr, &inv.ExpiresAt, &inv.AcceptedAt,
 	)
 	if err != nil {
@@ -202,40 +197,22 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name str
 		return nil, fmt.Errorf("invitation expired")
 	}
 
-	// Create user
-	userID := uuid.New()
-	createUserQuery := `
-		INSERT INTO users (id, org_id, email, name, role, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-		RETURNING created_at
-	`
-	var createdAt time.Time
-	err = tx.QueryRow(ctx, createUserQuery,
-		userID, inv.OrgID, inv.Email, name, string(inv.Role),
-	).Scan(&createdAt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
-	}
-
 	// Mark invitation as accepted
 	acceptQuery := `UPDATE invitations SET accepted_at = NOW() WHERE id = $1`
-	_, err = tx.Exec(ctx, acceptQuery, inv.ID)
+	_, err = s.db.Exec(ctx, acceptQuery, inv.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mark invitation accepted: %w", err)
 	}
 
-	// Commit transaction
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
+	// Return a synthetic user with invite details (no DB user created).
+	// The actual user row is created when the invitee signs up via Clerk.
 	return &models.User{
-		ID:        userID,
+		ID:        inv.ID, // Use invite ID as placeholder
 		OrgID:     inv.OrgID,
 		Email:     inv.Email,
 		Name:      name,
 		Role:      models.UserRole(inv.Role),
-		CreatedAt: createdAt,
+		CreatedAt: time.Now(),
 	}, nil
 }
 

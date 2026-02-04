@@ -33,6 +33,7 @@ type PhysicsConfigResponse struct {
 type UpdatePhysicsRequest struct {
 	SpeedMultiplier float64 `json:"speed_multiplier"`
 	WorkDays        []int   `json:"work_days"`
+	ApplyToExisting bool    `json:"apply_to_existing"`
 }
 
 // GetPhysics handles GET /api/v1/org/settings/physics.
@@ -129,14 +130,29 @@ func (h *ConfigHandler) UpdatePhysics(w http.ResponseWriter, r *http.Request) {
 		seen[d] = true
 	}
 
+	// Fetch old config for audit logging
+	oldCfg, err := h.configService.GetConfig(ctx, orgID)
+	if err != nil {
+		slog.Error("config: failed to get current config for audit", "error", err, "org_id", orgID)
+		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+		return
+	}
+
+	if oldCfg.SpeedMultiplier != req.SpeedMultiplier {
+		slog.Info("config: baseline change",
+			"org_id", orgID,
+			"old", oldCfg.SpeedMultiplier,
+			"new", req.SpeedMultiplier,
+			"apply_to_existing", req.ApplyToExisting,
+		)
+	}
+
 	cfg, err := h.configService.UpdateConfig(ctx, orgID, req.SpeedMultiplier, req.WorkDays)
 	if err != nil {
 		slog.Error("config: failed to update config", "error", err, "org_id", orgID)
 		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
 		return
 	}
-
-	// H-5: Service already logs — no duplicate log here.
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(PhysicsConfigResponse{
