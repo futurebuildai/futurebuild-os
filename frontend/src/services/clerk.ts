@@ -281,7 +281,41 @@ export const clerkService = {
     mountOrganizationSwitcher(element: HTMLDivElement): void {
         if (!clerk) return;
         clerk.mountOrganizationSwitcher(element, {
-            appearance: CLERK_APPEARANCE,
+            hidePersonal: true,
+            appearance: {
+                variables: CLERK_APPEARANCE.variables,
+                elements: {
+                    rootBox: {
+                        width: '100%',
+                    },
+                    organizationSwitcherTrigger: {
+                        backgroundColor: 'transparent',
+                        border: '1px solid #333333',
+                        borderRadius: '8px',
+                        padding: '4px 8px',
+                        width: '100%',
+                        justifyContent: 'space-between',
+                        color: '#ffffff',
+                    },
+                    organizationSwitcherTriggerIcon: {
+                        color: '#aaaaaa',
+                        width: '14px',
+                        height: '14px',
+                    },
+                    organizationPreviewAvatarBox: {
+                        width: '20px',
+                        height: '20px',
+                    },
+                    organizationPreviewTextContainer: {
+                        color: '#ffffff',
+                        fontSize: '13px',
+                    },
+                    organizationSwitcherPopoverCard: {
+                        backgroundColor: '#111111',
+                        border: '1px solid #333333',
+                    },
+                },
+            },
         });
     },
 

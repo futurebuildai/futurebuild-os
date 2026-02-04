@@ -269,6 +269,75 @@ export class FBPanelLeft extends FBElement {
                 padding: var(--fb-spacing-sm) var(--fb-spacing-md);
                 border-bottom: 1px solid var(--fb-border-light);
             }
+
+            /* Clerk org switcher renders inside shadow DOM but its CSS-in-JS
+               stylesheets are injected into document.head and can't penetrate
+               the shadow boundary. These rules restyle the unstyled Clerk elements. */
+            .org-switcher .cl-organizationSwitcherTrigger {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                padding: 6px 8px;
+                background: transparent;
+                border: 1px solid var(--fb-border, #333);
+                border-radius: var(--fb-radius-md, 8px);
+                color: var(--fb-text-primary, #fff);
+                cursor: pointer;
+                font-family: inherit;
+                font-size: var(--fb-text-sm, 13px);
+            }
+
+            .org-switcher .cl-organizationSwitcherTrigger:hover {
+                background: var(--fb-bg-tertiary, #1a1a1a);
+            }
+
+            .org-switcher .cl-organizationPreview {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .org-switcher .cl-organizationPreviewAvatarContainer,
+            .org-switcher .cl-avatarBox,
+            .org-switcher .cl-organizationPreviewAvatarBox {
+                width: 24px !important;
+                height: 24px !important;
+                min-width: 24px;
+                border-radius: 4px;
+                overflow: hidden;
+                flex-shrink: 0;
+            }
+
+            .org-switcher .cl-avatarImage {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            .org-switcher .cl-organizationPreviewTextContainer {
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+                color: var(--fb-text-primary, #fff);
+            }
+
+            .org-switcher .cl-organizationPreviewTextContainer > * {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .org-switcher .cl-organizationSwitcherTriggerIcon {
+                width: 14px !important;
+                height: 14px !important;
+                min-width: 14px;
+                color: var(--fb-text-muted, #666);
+                flex-shrink: 0;
+                fill: currentColor;
+            }
         `,
     ];
 

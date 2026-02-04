@@ -335,21 +335,8 @@ export class FBPanelCenter extends FBElement {
                         <span class="breadcrumb-separator" aria-hidden="true">›</span>
                         <span class="breadcrumb-current">${this._activeThread.title}</span>
                     ` : nothing}
-                ` : html`
-                    <span class="breadcrumb-current">Select a project</span>
-                `}
+                ` : nothing}
                 
-                <!-- Step 91: Notification Bell -->
-                <div class="notification-container">
-                    <fb-notification-bell
-                        @notification-toggle=${this._handleNotificationToggle.bind(this)}
-                    ></fb-notification-bell>
-                    <fb-notification-list
-                        ?open=${this._notificationOpen}
-                        @notification-close=${this._handleNotificationClose.bind(this)}
-                    ></fb-notification-list>
-                </div>
-
                 <button
                     class="panel-toggle"
                     @click=${this._toggleRightPanel.bind(this)}
