@@ -10,7 +10,6 @@ import { FBElement } from '../base/FBElement';
 import '../views/fb-view-login';
 // fb-view-verify removed — Clerk handles email verification internally (Phase 12)
 import '../views/fb-view-invite-accept';
-import '../views/fb-view-admin-invites';
 import '../views/fb-view-settings';
 import '../views/fb-view-projects';
 import '../views/fb-view-team';
@@ -79,7 +78,6 @@ export class FBPanelCenter extends FBElement {
     @property({ type: Boolean, attribute: 'is-authenticated' }) isAuthenticated = false;
 
     @state() private _isInviteAcceptRoute = false;
-    @state() private _isAdminInvitesRoute = false;
     @state() private _isSettingsRoute = false;
     @state() private _isProjectsRoute = false;
     @state() private _isOnboardingRoute = false;
@@ -106,7 +104,6 @@ export class FBPanelCenter extends FBElement {
     private _checkRoute(): void {
         const path = window.location.pathname;
         this._isInviteAcceptRoute = path === '/invite/accept';
-        this._isAdminInvitesRoute = path === '/admin/invites';
         this._isSettingsRoute = path === '/settings';
         this._isProjectsRoute = path === '/projects';
         this._isOnboardingRoute = path === '/projects/new';
@@ -160,11 +157,6 @@ export class FBPanelCenter extends FBElement {
         // Show login if not authenticated
         if (!this.isAuthenticated) {
             return html`<fb-view-login></fb-view-login>`;
-        }
-
-        // Show admin invites view for authenticated admin users
-        if (this._isAdminInvitesRoute) {
-            return html`<fb-view-admin-invites></fb-view-admin-invites>`;
         }
 
         // Show settings view for authenticated users

@@ -13,6 +13,7 @@ import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store, initializeStore } from '../../store/store';
 import { clerkService } from '../../services/clerk';
+import { isPlatformAdmin } from '../../services/platform-admin';
 
 // Import panel components
 import './fb-panel-left';
@@ -36,6 +37,9 @@ import './fb-mobile-nav';
 
 // Import shadow layout (FutureShade)
 import '../shadow/shadow-layout';
+
+// Import admin shell (Platform Admin)
+import '../admin/fb-admin-shell';
 
 /**
  * Application Shell - 3-Panel Layout Container
@@ -219,6 +223,8 @@ export class FBAppShell extends FBElement {
     @state() private _rightPanelWidth = 320;
     @state() private _hasPopoutArtifact = false;
     @state() private _shadowModeEnabled = false;
+    @state() private _isAdminRoute = false;
+    @state() private _isPlatformAdmin = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -352,6 +358,18 @@ export class FBAppShell extends FBElement {
                 this._shadowModeEnabled = store.shadowModeEnabled$.value;
             })
         );
+
+        // Derive platform admin status from user email
+        this._disposeEffects.push(
+            effect(() => {
+                const email = store.user$.value?.email ?? '';
+                this._isPlatformAdmin = isPlatformAdmin(email);
+            })
+        );
+
+        // Track admin route
+        this._checkAdminRoute();
+        window.addEventListener('popstate', this._handleAdminPopState);
     }
 
     /**
@@ -383,12 +401,22 @@ export class FBAppShell extends FBElement {
         await clerkService.syncAuthState();
     }
 
+    private _handleAdminPopState = (): void => {
+        this._checkAdminRoute();
+    };
+
+    private _checkAdminRoute(): void {
+        this._isAdminRoute = window.location.pathname.startsWith('/admin');
+    }
+
     override disconnectedCallback(): void {
         // Remove drag listeners (Step 56)
         this.removeEventListener('dragenter', this._handleDragEnter);
         this.removeEventListener('dragover', this._handleDragOver);
         this.removeEventListener('dragleave', this._handleDragLeave);
         this.removeEventListener('drop', this._handleDrop);
+
+        window.removeEventListener('popstate', this._handleAdminPopState);
 
         this._disposeEffects.forEach((dispose) => { dispose(); });
         this._disposeEffects = [];
@@ -419,6 +447,22 @@ export class FBAppShell extends FBElement {
         }
 
         const resizeHandleOffset = this._rightPanelOpen && !this._isMobile ? this._rightPanelWidth : 0;
+
+        // Admin route: render platform admin shell (or redirect non-admins)
+        if (this._isAdminRoute && this._isAuthenticated) {
+            if (!this._isPlatformAdmin) {
+                // Non-admin trying to access /admin — redirect to home
+                window.history.replaceState({}, '', '/');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+                return html`<div class="shell" data-theme="dark"></div>`;
+            }
+            return html`
+                <div class="shell" data-theme="dark" style="position: relative;">
+                    <fb-admin-shell></fb-admin-shell>
+                    <fb-toast-container></fb-toast-container>
+                </div>
+            `;
+        }
 
         // Shadow mode replaces the standard layout with FutureShade
         if (this._isAuthenticated && this._shadowModeEnabled) {

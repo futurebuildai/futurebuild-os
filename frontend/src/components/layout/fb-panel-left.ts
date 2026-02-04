@@ -12,8 +12,8 @@ import type { ProjectSummary, Thread, FocusTask } from '../../store/types';
 import type { Thread as ApiThread } from '../../types/models';
 import { UserRole } from '../../types/enums';
 import { clerkService } from '../../services/clerk';
+import { isPlatformAdmin } from '../../services/platform-admin';
 import '../agent/fb-agent-activity';
-import '../shadow/shadow-toggle';
 
 @customElement('fb-panel-left')
 export class FBPanelLeft extends FBElement {
@@ -357,6 +357,7 @@ export class FBPanelLeft extends FBElement {
     @state() private _showCompleteConfirm = false;
     @state() private _isCompleting = false;
     @state() private _completeError: string | null = null;
+    @state() private _isPlatformAdmin = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -406,6 +407,7 @@ export class FBPanelLeft extends FBElement {
                 this._userName = user?.name ?? '';
                 this._userInitials = this._computeInitials(user?.name);
                 this._userRole = user?.role ?? null;
+                this._isPlatformAdmin = isPlatformAdmin(user?.email ?? '');
             }),
             effect(() => {
                 this._theme = store.theme$.value;
@@ -709,22 +711,11 @@ export class FBPanelLeft extends FBElement {
             <!-- Agent Activity -->
             <fb-agent-activity></fb-agent-activity>
 
-            <!-- Admin Navigation (Admin only) -->
+            <!-- Organization (Admin only) -->
             ${this._userRole === UserRole.Admin ? html`
-                <section class="section admin-section" aria-label="Admin">
-                    <div class="section-header">Admin</div>
+                <section class="section admin-section" aria-label="Organization">
+                    <div class="section-header">Organization</div>
                     <div class="section-content" role="list">
-                        <button
-                            class="item admin-item"
-                            role="listitem"
-                            @click=${(): void => { this._handleAdminNav('/admin/invites'); }}
-                            aria-label="Manage user invitations"
-                        >
-                            <span class="item-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
-                            </span>
-                            Invitations
-                        </button>
                         <button
                             class="item admin-item"
                             role="listitem"
@@ -740,10 +731,19 @@ export class FBPanelLeft extends FBElement {
                 </section>
             ` : nothing}
 
-            <!-- Shadow Mode Toggle (Admin only) -->
-            ${this._userRole === UserRole.Admin ? html`
-                <div class="section">
-                    <shadow-toggle></shadow-toggle>
+            <!-- Platform Admin Link (allowlisted emails only) -->
+            ${this._isPlatformAdmin ? html`
+                <div class="section" style="padding-bottom: 0;">
+                    <button
+                        class="item admin-item"
+                        @click=${(): void => { this._handleAdminNav('/admin'); }}
+                        aria-label="Platform Administration"
+                    >
+                        <span class="item-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </span>
+                        Platform Admin
+                    </button>
                 </div>
             ` : nothing}
 

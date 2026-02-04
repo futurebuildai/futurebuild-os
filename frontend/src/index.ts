@@ -44,6 +44,11 @@ import { FBErrorBoundary } from './components/base/fb-error-boundary';
 import { FBNotificationBell } from './components/notifications/fb-notification-bell';
 import { FBNotificationList } from './components/notifications/fb-notification-list';
 
+// Admin Components (Platform Admin)
+import { FBAdminShell } from './components/admin/fb-admin-shell';
+import { FBAdminSidebar } from './components/admin/fb-admin-sidebar';
+import { FBAdminDashboard } from './components/admin/fb-admin-dashboard';
+
 // Shadow Viewer Components (SHADOW_VIEWER_specs.md)
 import { ShadowToggle } from './components/shadow/shadow-toggle';
 import { ShadowLayout } from './components/shadow/shadow-layout';
@@ -76,6 +81,10 @@ const registered = registerComponents({
     // Notification components (Step 91)
     'fb-notification-bell': FBNotificationBell,
     'fb-notification-list': FBNotificationList,
+    // Admin components (Platform Admin)
+    'fb-admin-shell': FBAdminShell,
+    'fb-admin-sidebar': FBAdminSidebar,
+    'fb-admin-dashboard': FBAdminDashboard,
     // Shadow Viewer components (SHADOW_VIEWER_specs.md)
     'shadow-toggle': ShadowToggle,
     'shadow-layout': ShadowLayout,
