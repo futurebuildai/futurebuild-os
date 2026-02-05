@@ -181,6 +181,8 @@ export class FBViewInviteAccept extends FBViewElement {
     @state() private _email = '';
     @state() private _role = '';
     @state() private _name = '';
+    @state() private _password = '';
+    @state() private _passwordConfirm = '';
     @state() private _error = '';
 
     override connectedCallback(): void {
@@ -218,6 +220,14 @@ export class FBViewInviteAccept extends FBViewElement {
             this._error = 'Please enter your name';
             return;
         }
+        if (this._password.length < 8) {
+            this._error = 'Password must be at least 8 characters';
+            return;
+        }
+        if (this._password !== this._passwordConfirm) {
+            this._error = 'Passwords do not match';
+            return;
+        }
 
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
@@ -231,7 +241,7 @@ export class FBViewInviteAccept extends FBViewElement {
         this._error = '';
 
         try {
-            await api.invites.accept(token, this._name.trim());
+            await api.invites.accept(token, this._name.trim(), this._password);
             this._state = 'success';
 
             // Redirect to login after a short delay
@@ -310,6 +320,36 @@ export class FBViewInviteAccept extends FBViewElement {
                             .value=${this._name}
                             ?disabled=${this._state === 'submitting'}
                             @input=${this._handleNameInput.bind(this)}
+                            @keyup=${this._handleKeyUp.bind(this)}
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input
+                            id="password"
+                            type="password"
+                            placeholder="Minimum 8 characters"
+                            .value=${this._password}
+                            ?disabled=${this._state === 'submitting'}
+                            @input=${(e: Event) => {
+                                this._password = (e.target as HTMLInputElement).value;
+                            }}
+                            @keyup=${this._handleKeyUp.bind(this)}
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password-confirm">Confirm Password</label>
+                        <input
+                            id="password-confirm"
+                            type="password"
+                            placeholder="Re-enter your password"
+                            .value=${this._passwordConfirm}
+                            ?disabled=${this._state === 'submitting'}
+                            @input=${(e: Event) => {
+                                this._passwordConfirm = (e.target as HTMLInputElement).value;
+                            }}
                             @keyup=${this._handleKeyUp.bind(this)}
                         />
                     </div>

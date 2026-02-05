@@ -458,11 +458,12 @@ export const api = {
          * Accept an invitation and create an account (public).
          * @param token - Invite token from email
          * @param name - User's display name
+         * @param password - Account password (min 8 chars)
          */
-        accept(token: string, name: string): Promise<InviteAcceptResponse> {
+        accept(token: string, name: string, password: string): Promise<InviteAcceptResponse> {
             return post<InviteAcceptResponse>(
                 '/invites/accept',
-                { token, name },
+                { token, name, password },
                 { skipAuth: true }
             );
         },

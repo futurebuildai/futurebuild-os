@@ -11,7 +11,7 @@ import { FBViewElement } from '../base/FBViewElement';
 import { api, UserProfile, Invite } from '../../services/api';
 
 type ViewState = 'loading' | 'ready' | 'error';
-type ModalState = 'closed' | 'creating' | 'submitting';
+type ModalState = 'closed' | 'creating' | 'confirming' | 'submitting';
 
 @customElement('fb-view-team')
 export class FBViewTeam extends FBViewElement {
@@ -275,6 +275,10 @@ export class FBViewTeam extends FBViewElement {
     @state() private _formRole = 'Builder';
     @state() private _formError = '';
 
+    // Revoke confirmation state
+    @state() private _confirmRevokeId = '';
+    @state() private _confirmRevokeEmail = '';
+
     override connectedCallback(): void {
         super.connectedCallback();
         void this._loadData();
@@ -314,12 +318,16 @@ export class FBViewTeam extends FBViewElement {
         this._modalState = 'closed';
     }
 
-    private async _handleCreate(): Promise<void> {
+    private _handleCreateStep1(): void {
         if (!this._formEmail || !this._formEmail.includes('@')) {
             this._formError = 'Please enter a valid email address';
             return;
         }
+        this._formError = '';
+        this._modalState = 'confirming';
+    }
 
+    private async _handleCreateConfirm(): Promise<void> {
         this._modalState = 'submitting';
         this._formError = '';
 
@@ -328,12 +336,26 @@ export class FBViewTeam extends FBViewElement {
             this._modalState = 'closed';
             void this._loadData();
         } catch (err: unknown) {
-            this._modalState = 'creating';
+            this._modalState = 'confirming';
             this._formError = this._extractErrorMessage(err);
         }
     }
 
-    private async _handleRevoke(id: string): Promise<void> {
+    private _openRevokeConfirm(id: string, email: string): void {
+        this._confirmRevokeId = id;
+        this._confirmRevokeEmail = email;
+    }
+
+    private _closeRevokeConfirm(): void {
+        this._confirmRevokeId = '';
+        this._confirmRevokeEmail = '';
+    }
+
+    private async _handleRevokeConfirm(): Promise<void> {
+        const id = this._confirmRevokeId;
+        this._confirmRevokeId = '';
+        this._confirmRevokeEmail = '';
+
         try {
             await api.invites.revoke(id);
             void this._loadData();
@@ -409,6 +431,7 @@ export class FBViewTeam extends FBViewElement {
 
             ${this._renderContent()}
             ${this._modalState !== 'closed' ? this._renderModal() : nothing}
+            ${this._confirmRevokeId ? this._renderRevokeConfirm() : nothing}
         `;
     }
 
@@ -522,7 +545,7 @@ export class FBViewTeam extends FBViewElement {
                                                 <td>
                                                     <button
                                                         class="btn-danger"
-                                                        @click=${() => void this._handleRevoke(invite.id)}
+                                                        @click=${() => this._openRevokeConfirm(invite.id, invite.email)}
                                                     >
                                                         Revoke
                                                     </button>
@@ -543,8 +566,13 @@ export class FBViewTeam extends FBViewElement {
     // ========================================================================
 
     private _renderModal(): TemplateResult {
-        const isSubmitting = this._modalState === 'submitting';
+        if (this._modalState === 'confirming' || this._modalState === 'submitting') {
+            return this._renderConfirmStep();
+        }
+        return this._renderFormStep();
+    }
 
+    private _renderFormStep(): TemplateResult {
         return html`
             <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
                 <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
@@ -559,7 +587,6 @@ export class FBViewTeam extends FBViewElement {
                             type="email"
                             placeholder="user@example.com"
                             .value=${this._formEmail}
-                            ?disabled=${isSubmitting}
                             @input=${(e: Event) => {
                                 this._formEmail = (e.target as HTMLInputElement).value;
                             }}
@@ -571,7 +598,6 @@ export class FBViewTeam extends FBViewElement {
                         <select
                             id="invite-role"
                             .value=${this._formRole}
-                            ?disabled=${isSubmitting}
                             @change=${(e: Event) => {
                                 this._formRole = (e.target as HTMLSelectElement).value;
                             }}
@@ -587,17 +613,88 @@ export class FBViewTeam extends FBViewElement {
                     <div class="modal-actions">
                         <button
                             class="btn-secondary"
-                            ?disabled=${isSubmitting}
                             @click=${this._closeModal.bind(this)}
                         >
                             Cancel
                         </button>
                         <button
                             class="btn-primary"
-                            ?disabled=${isSubmitting}
-                            @click=${this._handleCreate.bind(this)}
+                            @click=${this._handleCreateStep1.bind(this)}
                         >
-                            ${isSubmitting ? 'Sending...' : 'Send Invitation'}
+                            Send Invitation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private _renderConfirmStep(): TemplateResult {
+        const isSubmitting = this._modalState === 'submitting';
+
+        return html`
+            <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                    <div class="modal-title">Confirm Invitation</div>
+
+                    ${this._formError ? html`<p class="form-error">${this._formError}</p>` : nothing}
+
+                    <p style="color: var(--fb-text-secondary); margin-bottom: var(--fb-spacing-lg); line-height: 1.5;">
+                        Send an invitation to the following user?
+                    </p>
+
+                    <div style="background: var(--fb-bg-tertiary); border-radius: var(--fb-radius-md); padding: var(--fb-spacing-md); margin-bottom: var(--fb-spacing-lg);">
+                        <div style="font-size: var(--fb-text-sm); color: var(--fb-text-muted); margin-bottom: var(--fb-spacing-xs);">Email</div>
+                        <div style="color: var(--fb-text-primary); font-weight: 500;">${this._formEmail}</div>
+                        <div style="font-size: var(--fb-text-sm); color: var(--fb-text-muted); margin-top: var(--fb-spacing-sm); margin-bottom: var(--fb-spacing-xs);">Role</div>
+                        <div><span class="role-badge">${this._formRole}</span></div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button
+                            class="btn-secondary"
+                            ?disabled=${isSubmitting}
+                            @click=${() => { this._modalState = 'creating'; }}
+                        >
+                            Back
+                        </button>
+                        <button
+                            class="btn-primary"
+                            ?disabled=${isSubmitting}
+                            @click=${this._handleCreateConfirm.bind(this)}
+                        >
+                            ${isSubmitting ? 'Sending...' : 'Confirm & Send'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    private _renderRevokeConfirm(): TemplateResult {
+        return html`
+            <div class="modal-backdrop" @click=${this._closeRevokeConfirm.bind(this)}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                    <div class="modal-title">Revoke Invitation</div>
+
+                    <p style="color: var(--fb-text-secondary); margin-bottom: var(--fb-spacing-lg); line-height: 1.5;">
+                        Are you sure you want to revoke the invitation for
+                        <strong style="color: var(--fb-text-primary);">${this._confirmRevokeEmail}</strong>?
+                        They will no longer be able to accept it.
+                    </p>
+
+                    <div class="modal-actions">
+                        <button
+                            class="btn-secondary"
+                            @click=${this._closeRevokeConfirm.bind(this)}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="btn-danger"
+                            @click=${this._handleRevokeConfirm.bind(this)}
+                        >
+                            Revoke
                         </button>
                     </div>
                 </div>

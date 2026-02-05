@@ -193,7 +193,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	shadowHandler := handlers.NewShadowHandler(shadowService)
 
 	// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
-	inviteService := service.NewInviteService(db)
+	// ClerkClient is nil when CLERK_SECRET_KEY is not set (Clerk user creation disabled).
+	clerkClient := service.NewClerkClient(cfg.ClerkSecretKey)
+	inviteService := service.NewInviteService(db, clerkClient)
 	inviteHandler := handlers.NewInviteHandler(inviteService, notificationService, cfg.BaseURL)
 
 	// See LAUNCH_PLAN.md User Profile Endpoint (P0)

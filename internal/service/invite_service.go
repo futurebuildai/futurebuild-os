@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colton/futurebuild/internal/models"
@@ -17,12 +19,14 @@ import (
 // InviteService handles user invitation operations for invite-only onboarding.
 // See LAUNCH_STRATEGY.md Task B2: User Invite Flow.
 type InviteService struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	clerk *ClerkClient
 }
 
 // NewInviteService creates a new invite service.
-func NewInviteService(db *pgxpool.Pool) *InviteService {
-	return &InviteService{db: db}
+// clerk may be nil if Clerk Backend API is not configured.
+func NewInviteService(db *pgxpool.Pool, clerk *ClerkClient) *InviteService {
+	return &InviteService{db: db, clerk: clerk}
 }
 
 // Invitation represents a pending user invitation.
@@ -167,10 +171,10 @@ func (s *InviteService) RevokeInvitation(ctx context.Context, inviteID, orgID uu
 	return nil
 }
 
-// AcceptInvitation validates an invitation token and marks it as accepted.
-// With Clerk auth, user creation happens when the invitee signs up on Clerk
-// and the membership webhook fires. This method no longer creates a DB user.
-func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name string) (*models.User, error) {
+// AcceptInvitation validates an invitation token, creates a Clerk user account,
+// adds the user to the Clerk organization, upserts the local DB user, and marks
+// the invite as accepted (last, so failures leave the invite retryable).
+func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name, password string) (*models.User, error) {
 	tokenHash := hashToken(rawToken)
 
 	// Find and validate invitation
@@ -197,23 +201,86 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name str
 		return nil, fmt.Errorf("invitation expired")
 	}
 
-	// Mark invitation as accepted
+	// Look up the Clerk org ID (external_id) for this organization
+	var clerkOrgID *string
+	orgQuery := `SELECT external_id FROM organizations WHERE id = $1`
+	err = s.db.QueryRow(ctx, orgQuery, inv.OrgID).Scan(&clerkOrgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up organization: %w", err)
+	}
+
+	// Split name into first/last for Clerk
+	firstName, lastName := splitName(name)
+
+	var clerkUserID string
+
+	// Create Clerk user and add to org (if Clerk client is configured)
+	if s.clerk != nil {
+		clerkUser, err := s.clerk.CreateUser(ctx, inv.Email, password, firstName, lastName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create account: %w", err)
+		}
+		clerkUserID = clerkUser.ID
+		slog.Info("invite: Clerk user created", "clerk_user_id", clerkUserID, "email", inv.Email)
+
+		// Add to Clerk organization if the org has a Clerk external_id
+		if clerkOrgID != nil && *clerkOrgID != "" {
+			clerkRole := MapInternalRoleToClerk(string(inv.Role))
+			if err := s.clerk.AddOrgMembership(ctx, *clerkOrgID, clerkUserID, clerkRole); err != nil {
+				slog.Error("invite: failed to add Clerk org membership (user created, membership failed)",
+					"clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID, "error", err)
+				return nil, fmt.Errorf("failed to add to organization: %w", err)
+			}
+			slog.Info("invite: Clerk org membership added", "clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID)
+		}
+	}
+
+	// Upsert local DB user (handles race with Clerk webhook)
+	userID := uuid.New()
+	upsertQuery := `
+		INSERT INTO users (id, org_id, email, name, role, external_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		ON CONFLICT (external_id) DO UPDATE SET
+			name = EXCLUDED.name,
+			role = EXCLUDED.role
+		RETURNING id
+	`
+	var externalID *string
+	if clerkUserID != "" {
+		externalID = &clerkUserID
+	}
+	err = s.db.QueryRow(ctx, upsertQuery,
+		userID, inv.OrgID, inv.Email, name, string(inv.Role), externalID,
+	).Scan(&userID)
+	if err != nil {
+		slog.Error("invite: failed to upsert local user", "error", err, "email", inv.Email)
+		return nil, fmt.Errorf("failed to create local user: %w", err)
+	}
+
+	// Mark invitation as accepted LAST (so failures above leave invite retryable)
 	acceptQuery := `UPDATE invitations SET accepted_at = NOW() WHERE id = $1`
 	_, err = s.db.Exec(ctx, acceptQuery, inv.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mark invitation accepted: %w", err)
 	}
 
-	// Return a synthetic user with invite details (no DB user created).
-	// The actual user row is created when the invitee signs up via Clerk.
 	return &models.User{
-		ID:        inv.ID, // Use invite ID as placeholder
+		ID:        userID,
 		OrgID:     inv.OrgID,
 		Email:     inv.Email,
 		Name:      name,
 		Role:      models.UserRole(inv.Role),
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+// splitName splits a full name into first and last name.
+func splitName(name string) (string, string) {
+	parts := strings.SplitN(strings.TrimSpace(name), " ", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
 }
 
 // GetInvitationByToken retrieves invitation details by token (for profile setup).

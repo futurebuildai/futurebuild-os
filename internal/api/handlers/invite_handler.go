@@ -225,8 +225,9 @@ func (h *InviteHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
 
 // AcceptInviteRequest is the request body for accepting an invitation.
 type AcceptInviteRequest struct {
-	Token string `json:"token"`
-	Name  string `json:"name"`
+	Token    string `json:"token"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
 }
 
 // AcceptInvite handles POST /api/v1/invites/accept.
@@ -250,8 +251,12 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Name is required", http.StatusBadRequest)
 		return
 	}
+	if len(req.Password) < 8 {
+		http.Error(w, "Password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
 
-	user, err := h.inviteService.AcceptInvitation(ctx, req.Token, req.Name)
+	user, err := h.inviteService.AcceptInvitation(ctx, req.Token, req.Name, req.Password)
 	if err != nil {
 		slog.Warn("invite: failed to accept invitation", "error", err)
 		http.Error(w, "Invalid or expired invitation", http.StatusBadRequest)

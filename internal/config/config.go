@@ -77,6 +77,9 @@ type Config struct {
 	// Optional: webhook handler is fail-closed when empty (rejects all requests).
 	// See PHASE_12_PRD.md Step 80: Organization Manager.
 	ClerkWebhookSecret string
+	// ClerkSecretKey is the Clerk Backend API secret key (sk_xxx).
+	// Used to create users and manage org memberships during invite acceptance.
+	ClerkSecretKey string
 
 	// GitHub configuration for Automated PR Review.
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -166,6 +169,7 @@ func LoadConfig() (*Config, error) {
 		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
 		ClerkAudience:              os.Getenv("CLERK_AUDIENCE"),
 		ClerkWebhookSecret:         os.Getenv("CLERK_WEBHOOK_SECRET"),
+		ClerkSecretKey:             os.Getenv("CLERK_SECRET_KEY"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
 		Worker: WorkerConfig{
