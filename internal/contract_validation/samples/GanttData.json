@@ -15,6 +15,21 @@
       "early_finish": "2026-01-20",
       "duration_days": 10,
       "is_critical": true
+    },
+    {
+      "wbs_code": "1.2",
+      "name": "Framing",
+      "status": "Pending",
+      "early_start": "2026-01-21",
+      "early_finish": "2026-02-05",
+      "duration_days": 15,
+      "is_critical": true
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "1.1",
+      "to": "1.2"
     }
   ]
 }

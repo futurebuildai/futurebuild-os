@@ -271,12 +271,14 @@ func (s *PortalService) UpdateTaskStatus(ctx context.Context, taskID, projectID 
 }
 
 // GetContactTasks returns all tasks assigned to a contact across all projects.
+// Tasks are scoped by the contact's WBS phase assignments (e.g. phase "5.3" matches tasks "5.3.1", "5.3.2").
 func (s *PortalService) GetContactTasks(ctx context.Context, contactID uuid.UUID) ([]models.ProjectTask, error) {
 	query := `
 		SELECT pt.id, pt.project_id, pt.wbs_code, pt.name, pt.status, pt.planned_start, pt.planned_end
 		FROM project_tasks pt
-		JOIN phase_assignments pa ON pt.project_id = pa.project_id
+		JOIN project_assignments pa ON pt.project_id = pa.project_id
 		WHERE pa.contact_id = $1
+		  AND pt.wbs_code LIKE pa.wbs_phase_id || '.%'
 		ORDER BY pt.planned_start ASC NULLS LAST
 	`
 

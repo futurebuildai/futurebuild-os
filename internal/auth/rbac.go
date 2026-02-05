@@ -93,17 +93,23 @@ var rolePermissions = map[types.UserRole][]Scope{
 		ScopeChatRead,
 	},
 
-	// Portal roles: read-only by default
+	// Portal roles: read + portal-specific write scopes
 	types.UserRoleClient: {
 		ScopeProjectRead,
 		ScopeTaskRead,
 		ScopeBudgetRead,
+		ScopeDocumentWrite, // Portal: upload documents
+		ScopeChatRead,      // Portal: read portal thread messages
+		ScopeChatWrite,     // Portal: send portal thread messages
 	},
 
 	types.UserRoleSubcontractor: {
 		ScopeProjectRead,
 		ScopeTaskRead,
-		ScopeTaskWrite, // Subcontractors can update task progress
+		ScopeTaskWrite,     // Subcontractors can update task progress
+		ScopeDocumentWrite, // Portal: upload documents and invoices
+		ScopeChatRead,      // Portal: read portal thread messages
+		ScopeChatWrite,     // Portal: send portal thread messages
 	},
 }
 

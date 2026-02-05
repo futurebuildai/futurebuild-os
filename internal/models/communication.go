@@ -43,11 +43,13 @@ type Notification struct {
 
 // ChatMessage represents a single message in an agent session.
 // See DATA_SPINE_SPEC.md Section 5.3
+// Portal messages use ContactID (UserID is nil); internal messages use UserID (ContactID is nil).
 type ChatMessage struct {
 	ID        uuid.UUID        `json:"id" db:"id"`
 	ProjectID uuid.UUID        `json:"project_id" db:"project_id" validate:"required"`
 	ThreadID  uuid.UUID        `json:"thread_id" db:"thread_id" validate:"required"`
-	UserID    uuid.UUID        `json:"user_id" db:"user_id" validate:"required"`
+	UserID    *uuid.UUID       `json:"user_id,omitempty" db:"user_id"`
+	ContactID *uuid.UUID       `json:"contact_id,omitempty" db:"contact_id"`
 	Role      types.ChatRole   `json:"role" db:"role" validate:"required"`
 	Content   string           `json:"content" db:"content" validate:"required"`
 	ToolCalls []types.ToolCall `json:"tool_calls,omitempty" db:"tool_calls"` // CTO-002: Typed struct
