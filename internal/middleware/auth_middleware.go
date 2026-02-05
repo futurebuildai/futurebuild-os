@@ -213,6 +213,8 @@ func mapClerkRoleToInternal(clerkRole string) types.UserRole {
 		return types.UserRoleAdmin
 	case "member", "basic_member":
 		return types.UserRoleBuilder
+	case "pm":
+		return types.UserRolePM
 	case "viewer", "guest":
 		return types.UserRoleViewer
 	default:
@@ -259,7 +261,9 @@ func (m *AuthMiddleware) enrichClaimsFromDB(ctx context.Context, claims *types.C
 	if claims.OrgID == "" && orgID != "" {
 		claims.OrgID = orgID
 	}
-	if (claims.Role == "" || claims.Role == types.UserRoleViewer) && role != "" {
+	// DB role is source of truth — always override JWT-derived role when DB has a value.
+	// This prevents Clerk's generic org:member → Builder from overriding a DB-stored PM role.
+	if role != "" {
 		claims.Role = types.UserRole(role)
 	}
 	if claims.Email == "" && email != "" {

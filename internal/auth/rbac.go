@@ -71,6 +71,20 @@ var rolePermissions = map[types.UserRole][]Scope{
 		ScopeSettingsWrite, // Step 87: Builders can configure their org's physics settings
 	},
 
+	// PM: like Builder but without project:create and settings:write
+	types.UserRolePM: {
+		ScopeProjectRead,
+		ScopeProjectComplete,
+		ScopeTaskRead,
+		ScopeTaskWrite,
+		ScopeBudgetRead,
+		ScopeFinanceEdit,
+		ScopeDocumentRead,
+		ScopeDocumentWrite,
+		ScopeChatRead,
+		ScopeChatWrite,
+	},
+
 	types.UserRoleViewer: {
 		ScopeProjectRead,
 		ScopeTaskRead,

@@ -19,6 +19,7 @@ export enum TaskStatus {
 export enum UserRole {
     Admin = "Admin",
     Builder = "Builder",
+    PM = "PM",
     Viewer = "Viewer",
     Client = "Client",
     Subcontractor = "Subcontractor",

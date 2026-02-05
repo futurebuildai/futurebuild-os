@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/service"
@@ -261,7 +262,17 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	user, err := h.inviteService.AcceptInvitation(ctx, req.Token, req.Name, req.Password)
 	if err != nil {
 		slog.Error("invite: AcceptInvitation FAILED", "error", err)
-		http.Error(w, "Invalid or expired invitation", http.StatusBadRequest)
+		// Surface user-actionable errors (password policy, duplicate account)
+		// rather than swallowing them behind a generic message.
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "password"):
+			http.Error(w, "Password rejected: please choose a stronger password", http.StatusBadRequest)
+		case strings.Contains(msg, "already"):
+			http.Error(w, msg, http.StatusBadRequest)
+		default:
+			http.Error(w, "Invalid or expired invitation", http.StatusBadRequest)
+		}
 		return
 	}
 

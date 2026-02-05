@@ -604,6 +604,7 @@ export class FBViewTeam extends FBViewElement {
                         >
                             <option value="Admin">Admin</option>
                             <option value="Builder">Builder</option>
+                            <option value="PM">PM</option>
                             <option value="Viewer">Viewer</option>
                             <option value="Client">Client</option>
                             <option value="Subcontractor">Subcontractor</option>

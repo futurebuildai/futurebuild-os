@@ -25,16 +25,16 @@ func TestCan_AdminHasAllScopes(t *testing.T) {
 
 func TestCan_BuilderPermissions(t *testing.T) {
 	allowed := []Scope{
-		ScopeProjectRead, ScopeProjectCreate,
+		ScopeProjectRead, ScopeProjectCreate, ScopeProjectComplete,
 		ScopeTaskRead, ScopeTaskWrite,
-		ScopeBudgetRead,
+		ScopeBudgetRead, ScopeFinanceEdit,
 		ScopeDocumentRead, ScopeDocumentWrite,
 		ScopeChatRead, ScopeChatWrite,
+		ScopeSettingsWrite,
 	}
 	denied := []Scope{
 		ScopeProjectDelete,
 		ScopeBudgetApprove,
-		ScopeSettingsWrite,
 		ScopeMembersManage,
 	}
 
@@ -46,6 +46,34 @@ func TestCan_BuilderPermissions(t *testing.T) {
 	for _, scope := range denied {
 		if Can(types.UserRoleBuilder, scope) {
 			t.Errorf("Builder should NOT have scope %s but was granted", scope)
+		}
+	}
+}
+
+func TestCan_PMPermissions(t *testing.T) {
+	allowed := []Scope{
+		ScopeProjectRead, ScopeProjectComplete,
+		ScopeTaskRead, ScopeTaskWrite,
+		ScopeBudgetRead, ScopeFinanceEdit,
+		ScopeDocumentRead, ScopeDocumentWrite,
+		ScopeChatRead, ScopeChatWrite,
+	}
+	denied := []Scope{
+		ScopeProjectCreate,
+		ScopeProjectDelete,
+		ScopeBudgetApprove,
+		ScopeSettingsWrite,
+		ScopeMembersManage,
+	}
+
+	for _, scope := range allowed {
+		if !Can(types.UserRolePM, scope) {
+			t.Errorf("PM should have scope %s but was denied", scope)
+		}
+	}
+	for _, scope := range denied {
+		if Can(types.UserRolePM, scope) {
+			t.Errorf("PM should NOT have scope %s but was granted", scope)
 		}
 	}
 }
@@ -139,8 +167,13 @@ func TestAllScopes_ReturnsCorrectScopes(t *testing.T) {
 	}
 
 	builderScopes := AllScopes(types.UserRoleBuilder)
-	if len(builderScopes) != 10 {
-		t.Errorf("Builder should have 10 scopes, got %d", len(builderScopes))
+	if len(builderScopes) != 12 {
+		t.Errorf("Builder should have 12 scopes, got %d", len(builderScopes))
+	}
+
+	pmScopes := AllScopes(types.UserRolePM)
+	if len(pmScopes) != 10 {
+		t.Errorf("PM should have 10 scopes, got %d", len(pmScopes))
 	}
 
 	viewerScopes := AllScopes(types.UserRoleViewer)
