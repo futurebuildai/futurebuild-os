@@ -256,14 +256,17 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("invite: accept request received", "name", req.Name, "password_len", len(req.Password))
+
 	user, err := h.inviteService.AcceptInvitation(ctx, req.Token, req.Name, req.Password)
 	if err != nil {
-		slog.Warn("invite: failed to accept invitation", "error", err)
+		slog.Error("invite: AcceptInvitation FAILED", "error", err)
 		http.Error(w, "Invalid or expired invitation", http.StatusBadRequest)
 		return
 	}
 
-	slog.Info("invite: invitation accepted", "user_id", user.ID, "email", user.Email)
+	slog.Info("invite: invitation accepted OK",
+		"user_id", user.ID, "email", user.Email, "org_id", user.OrgID, "role", user.Role)
 
 	// Return user info (frontend can then initiate a login flow)
 	w.Header().Set("Content-Type", "application/json")

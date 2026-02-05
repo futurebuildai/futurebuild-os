@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -21,8 +22,14 @@ type ClerkClient struct {
 // Returns nil if secretKey is empty (Clerk integration disabled).
 func NewClerkClient(secretKey string) *ClerkClient {
 	if secretKey == "" {
+		slog.Warn("clerk_client: CLERK_SECRET_KEY is empty — ClerkClient will be nil")
 		return nil
 	}
+	prefix := secretKey
+	if len(prefix) > 8 {
+		prefix = prefix[:8]
+	}
+	slog.Info("clerk_client: initialized", "key_prefix", prefix+"...")
 	return &ClerkClient{
 		secretKey: secretKey,
 		httpClient: &http.Client{
@@ -47,6 +54,8 @@ func (c *ClerkClient) CreateUser(ctx context.Context, email, password, firstName
 		"skip_password_checks": false,
 	}
 
+	slog.Info("clerk_client: CreateUser request", "email", email, "first_name", firstName, "last_name", lastName)
+
 	respBody, err := c.doRequest(ctx, http.MethodPost, "https://api.clerk.com/v1/users", body)
 	if err != nil {
 		return nil, fmt.Errorf("clerk: create user: %w", err)
@@ -54,9 +63,11 @@ func (c *ClerkClient) CreateUser(ctx context.Context, email, password, firstName
 
 	var user ClerkUser
 	if err := json.Unmarshal(respBody, &user); err != nil {
+		slog.Error("clerk_client: failed to decode CreateUser response", "error", err, "body_preview", stringPreview(string(respBody), 500))
 		return nil, fmt.Errorf("clerk: decode create user response: %w", err)
 	}
 
+	slog.Info("clerk_client: CreateUser response OK", "clerk_user_id", user.ID, "primary_email_id", user.PrimaryEmailID)
 	return &user, nil
 }
 
@@ -69,11 +80,14 @@ func (c *ClerkClient) AddOrgMembership(ctx context.Context, clerkOrgID, userID, 
 	}
 
 	url := fmt.Sprintf("https://api.clerk.com/v1/organizations/%s/memberships", clerkOrgID)
+	slog.Info("clerk_client: AddOrgMembership request", "url", url, "user_id", userID, "role", role)
+
 	_, err := c.doRequest(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return fmt.Errorf("clerk: add org membership: %w", err)
 	}
 
+	slog.Info("clerk_client: AddOrgMembership OK", "clerk_org_id", clerkOrgID, "user_id", userID)
 	return nil
 }
 
@@ -116,9 +130,19 @@ func (c *ClerkClient) doRequest(ctx context.Context, method, url string, body in
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
+	slog.Info("clerk_client: HTTP response", "method", method, "url", url, "status", resp.StatusCode,
+		"body_len", len(respBody), "body_preview", stringPreview(string(respBody), 300))
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	return respBody, nil
+}
+
+func stringPreview(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

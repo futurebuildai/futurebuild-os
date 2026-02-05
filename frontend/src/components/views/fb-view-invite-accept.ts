@@ -241,7 +241,9 @@ export class FBViewInviteAccept extends FBViewElement {
         this._error = '';
 
         try {
-            await api.invites.accept(token, this._name.trim(), this._password);
+            console.log('[invite-accept] submitting', { name: this._name.trim(), passwordLen: this._password.length });
+            const result = await api.invites.accept(token, this._name.trim(), this._password);
+            console.log('[invite-accept] success', result);
             this._state = 'success';
 
             // Redirect to login after a short delay
@@ -249,6 +251,7 @@ export class FBViewInviteAccept extends FBViewElement {
                 window.location.href = '/';
             }, 2000);
         } catch (err) {
+            console.error('[invite-accept] FAILED', err);
             this._state = 'ready';
             this._error = err instanceof Error ? err.message : 'Failed to accept invitation';
         }

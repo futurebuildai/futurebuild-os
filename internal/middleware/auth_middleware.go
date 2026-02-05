@@ -226,6 +226,13 @@ func mapClerkRoleToInternal(clerkRole string) types.UserRole {
 // The JWT sub claim contains the Clerk user ID, which maps to users.external_id.
 // Also replaces UserID with the internal UUID so downstream handlers can use uuid.Parse.
 func (m *AuthMiddleware) enrichClaimsFromDB(ctx context.Context, claims *types.Claims) {
+	slog.Info("auth: enrichClaimsFromDB called",
+		"clerk_sub", claims.UserID,
+		"jwt_org_id", claims.OrgID,
+		"jwt_role", claims.Role,
+		"jwt_email", claims.Email,
+		"jwt_name", claims.Name)
+
 	var userID, orgID, email, name, role string
 	err := m.db.QueryRow(ctx,
 		`SELECT u.id, u.org_id, u.email, u.name, u.role
@@ -234,9 +241,15 @@ func (m *AuthMiddleware) enrichClaimsFromDB(ctx context.Context, claims *types.C
 		claims.UserID,
 	).Scan(&userID, &orgID, &email, &name, &role)
 	if err != nil {
-		slog.Debug("auth: could not enrich claims from DB", "external_id", claims.UserID, "error", err)
+		slog.Warn("auth: enrichClaimsFromDB — user NOT FOUND in DB",
+			"external_id", claims.UserID, "error", err)
 		return
 	}
+
+	slog.Info("auth: enrichClaimsFromDB — user found",
+		"external_id", claims.UserID,
+		"db_user_id", userID, "db_org_id", orgID,
+		"db_email", email, "db_name", name, "db_role", role)
 
 	// Replace Clerk external_id with internal UUID for downstream handlers.
 	if userID != "" {
@@ -255,6 +268,10 @@ func (m *AuthMiddleware) enrichClaimsFromDB(ctx context.Context, claims *types.C
 	if claims.Name == "" && name != "" {
 		claims.Name = name
 	}
+
+	slog.Info("auth: enrichClaimsFromDB — final claims",
+		"user_id", claims.UserID, "org_id", claims.OrgID,
+		"role", claims.Role, "email", claims.Email, "name", claims.Name)
 }
 
 // getStringClaim safely extracts a string claim from JWT MapClaims.

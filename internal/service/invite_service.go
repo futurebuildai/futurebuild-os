@@ -177,6 +177,8 @@ func (s *InviteService) RevokeInvitation(ctx context.Context, inviteID, orgID uu
 func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name, password string) (*models.User, error) {
 	tokenHash := hashToken(rawToken)
 
+	slog.Info("invite: [1/6] looking up invitation by token hash")
+
 	// Find and validate invitation
 	var inv Invitation
 	var roleStr string
@@ -189,25 +191,39 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name, pa
 		&inv.ID, &inv.OrgID, &inv.Email, &roleStr, &inv.ExpiresAt, &inv.AcceptedAt,
 	)
 	if err != nil {
+		slog.Error("invite: [1/6] token lookup FAILED", "error", err)
 		return nil, fmt.Errorf("invalid invitation token")
 	}
 	inv.Role = types.UserRole(roleStr)
+
+	slog.Info("invite: [1/6] invitation found",
+		"invite_id", inv.ID, "email", inv.Email, "org_id", inv.OrgID,
+		"role", roleStr, "expires_at", inv.ExpiresAt, "already_accepted", inv.AcceptedAt != nil)
 
 	// Validate invitation status
 	if inv.AcceptedAt != nil {
 		return nil, fmt.Errorf("invitation already used")
 	}
 	if time.Now().After(inv.ExpiresAt) {
+		slog.Warn("invite: invitation expired", "expires_at", inv.ExpiresAt, "now", time.Now())
 		return nil, fmt.Errorf("invitation expired")
 	}
 
 	// Look up the Clerk org ID (external_id) for this organization
+	slog.Info("invite: [2/6] looking up org external_id", "org_id", inv.OrgID)
 	var clerkOrgID *string
 	orgQuery := `SELECT external_id FROM organizations WHERE id = $1`
 	err = s.db.QueryRow(ctx, orgQuery, inv.OrgID).Scan(&clerkOrgID)
 	if err != nil {
+		slog.Error("invite: [2/6] org lookup FAILED", "org_id", inv.OrgID, "error", err)
 		return nil, fmt.Errorf("failed to look up organization: %w", err)
 	}
+
+	clerkOrgStr := "<nil>"
+	if clerkOrgID != nil {
+		clerkOrgStr = *clerkOrgID
+	}
+	slog.Info("invite: [2/6] org external_id resolved", "org_id", inv.OrgID, "clerk_org_id", clerkOrgStr)
 
 	// Split name into first/last for Clerk
 	firstName, lastName := splitName(name)
@@ -216,23 +232,35 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name, pa
 
 	// Create Clerk user and add to org (if Clerk client is configured)
 	if s.clerk != nil {
+		slog.Info("invite: [3/6] creating Clerk user", "email", inv.Email, "first_name", firstName, "last_name", lastName)
+
 		clerkUser, err := s.clerk.CreateUser(ctx, inv.Email, password, firstName, lastName)
 		if err != nil {
+			slog.Error("invite: [3/6] Clerk CreateUser FAILED", "email", inv.Email, "error", err)
 			return nil, fmt.Errorf("failed to create account: %w", err)
 		}
 		clerkUserID = clerkUser.ID
-		slog.Info("invite: Clerk user created", "clerk_user_id", clerkUserID, "email", inv.Email)
+		slog.Info("invite: [3/6] Clerk user created OK", "clerk_user_id", clerkUserID, "email", inv.Email)
 
 		// Add to Clerk organization if the org has a Clerk external_id
 		if clerkOrgID != nil && *clerkOrgID != "" {
 			clerkRole := MapInternalRoleToClerk(string(inv.Role))
+			slog.Info("invite: [4/6] adding Clerk org membership",
+				"clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID, "clerk_role", clerkRole)
+
 			if err := s.clerk.AddOrgMembership(ctx, *clerkOrgID, clerkUserID, clerkRole); err != nil {
-				slog.Error("invite: failed to add Clerk org membership (user created, membership failed)",
+				slog.Error("invite: [4/6] Clerk AddOrgMembership FAILED",
 					"clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID, "error", err)
 				return nil, fmt.Errorf("failed to add to organization: %w", err)
 			}
-			slog.Info("invite: Clerk org membership added", "clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID)
+			slog.Info("invite: [4/6] Clerk org membership added OK",
+				"clerk_user_id", clerkUserID, "clerk_org_id", *clerkOrgID)
+		} else {
+			slog.Warn("invite: [4/6] SKIPPED org membership — org has no Clerk external_id",
+				"org_id", inv.OrgID, "clerk_org_id", clerkOrgStr)
 		}
+	} else {
+		slog.Warn("invite: [3-4/6] SKIPPED Clerk user creation — ClerkClient is nil (CLERK_SECRET_KEY not set)")
 	}
 
 	// Upsert local DB user (handles race with Clerk webhook)
@@ -249,20 +277,33 @@ func (s *InviteService) AcceptInvitation(ctx context.Context, rawToken, name, pa
 	if clerkUserID != "" {
 		externalID = &clerkUserID
 	}
+
+	slog.Info("invite: [5/6] upserting local DB user",
+		"email", inv.Email, "org_id", inv.OrgID, "role", inv.Role,
+		"clerk_user_id", clerkUserID, "external_id_nil", externalID == nil)
+
 	err = s.db.QueryRow(ctx, upsertQuery,
 		userID, inv.OrgID, inv.Email, name, string(inv.Role), externalID,
 	).Scan(&userID)
 	if err != nil {
-		slog.Error("invite: failed to upsert local user", "error", err, "email", inv.Email)
+		slog.Error("invite: [5/6] DB upsert FAILED", "error", err, "email", inv.Email)
 		return nil, fmt.Errorf("failed to create local user: %w", err)
 	}
 
+	slog.Info("invite: [5/6] local DB user upserted OK",
+		"user_id", userID, "email", inv.Email, "clerk_user_id", clerkUserID)
+
 	// Mark invitation as accepted LAST (so failures above leave invite retryable)
+	slog.Info("invite: [6/6] marking invitation accepted", "invite_id", inv.ID)
 	acceptQuery := `UPDATE invitations SET accepted_at = NOW() WHERE id = $1`
 	_, err = s.db.Exec(ctx, acceptQuery, inv.ID)
 	if err != nil {
+		slog.Error("invite: [6/6] mark accepted FAILED", "invite_id", inv.ID, "error", err)
 		return nil, fmt.Errorf("failed to mark invitation accepted: %w", err)
 	}
+
+	slog.Info("invite: accept flow COMPLETED",
+		"user_id", userID, "email", inv.Email, "clerk_user_id", clerkUserID)
 
 	return &models.User{
 		ID:        userID,
