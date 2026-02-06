@@ -1,26 +1,30 @@
 /**
- * FBOnboardingChat - Left Panel Chat Interface for Project Onboarding
- * See STEP_74_SPLIT_SCREEN_WIZARD.md Task 2, STEP_76_REALTIME_FORM_FILLING.md,
+ * FBOnboardingChat - Full-Width Chat Interface for Project Onboarding
+ * See STEP_74_SPLIT_SCREEN_WIZARD.md, STEP_76_REALTIME_FORM_FILLING.md,
  * STEP_77_MAGIC_UPLOAD_TRIGGER.md
  *
- * Conversational interface that:
- * - Displays initial greeting from "The Interrogator" agent
- * - Renders messages inline (separate from global chat store)
- * - Includes drag-and-drop zone for blueprints/documents
- * - Calls Interrogator Agent API for field extraction
- * - Step 77: Uploads files via multipart to /agent/onboard
+ * Document-first, chat-only onboarding experience:
+ * - Displays welcome message with document upload prompt
+ * - Renders extraction cards with building specs and long-lead items
+ * - Shows procurement warnings for items with long lead times
+ * - Includes Create Project button when ready
+ * - Uploads files via multipart to /agent/onboard
  */
 import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { FBElement } from '../../base/FBElement';
-import { api, type OnboardProcessResponse } from '../../../services/api';
+import { api, type OnboardProcessResponse, type CreateProjectRequest } from '../../../services/api';
 import {
     onboardingMessages,
     onboardingValues,
     isProcessing,
+    isReadyToCreate,
+    extractedProcurement,
     addMessage,
     applyAIExtraction,
+    setExtractedProcurement,
+    markDocumentUploaded,
     type OnboardingMessage
 } from '../../../store/onboarding-store';
 import type { FBOnboardingDropzone } from './fb-onboarding-dropzone';
@@ -121,19 +125,157 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
             fb-input-bar {
                 flex-shrink: 0;
             }
+
+            /* Extraction card styling */
+            .extraction-card {
+                background: var(--fb-bg-card, white);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-md, 8px);
+                padding: var(--fb-spacing-md, 16px);
+                margin: var(--fb-spacing-sm, 8px) 0;
+                max-width: 90%;
+            }
+
+            .extraction-header {
+                font-weight: 600;
+                font-size: var(--fb-text-sm, 14px);
+                color: var(--fb-text-primary);
+                margin-bottom: var(--fb-spacing-sm, 8px);
+                display: flex;
+                align-items: center;
+                gap: var(--fb-spacing-xs, 4px);
+            }
+
+            .extraction-header svg {
+                width: 16px;
+                height: 16px;
+                color: #667eea;
+            }
+
+            .extraction-fields {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: var(--fb-spacing-xs, 4px);
+                font-size: var(--fb-text-sm, 14px);
+            }
+
+            .extraction-field {
+                display: flex;
+                flex-direction: column;
+                padding: var(--fb-spacing-xs, 4px) 0;
+            }
+
+            .extraction-field-label {
+                color: var(--fb-text-muted);
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .extraction-field-value {
+                color: var(--fb-text-primary);
+                font-weight: 500;
+            }
+
+            /* Procurement warning styling */
+            .procurement-warning {
+                background: rgba(251, 191, 36, 0.1);
+                border: 1px solid #fbbf24;
+                border-radius: var(--fb-radius-sm, 4px);
+                padding: var(--fb-spacing-sm, 8px);
+                margin-top: var(--fb-spacing-sm, 8px);
+            }
+
+            .procurement-warning-header {
+                font-weight: 600;
+                font-size: var(--fb-text-sm, 14px);
+                color: #78350f;
+                margin-bottom: var(--fb-spacing-xs, 4px);
+                display: flex;
+                align-items: center;
+                gap: var(--fb-spacing-xs, 4px);
+            }
+
+            .procurement-warning-header svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            .lead-item {
+                font-size: var(--fb-text-sm, 14px);
+                color: #78350f;
+                padding: 2px 0;
+            }
+
+            .lead-item-weeks {
+                font-weight: 600;
+            }
+
+            /* Create button styling */
+            .create-section {
+                padding: var(--fb-spacing-md, 16px);
+                border-top: 1px solid var(--fb-border);
+                background: var(--fb-bg-secondary);
+            }
+
+            .create-summary {
+                font-size: var(--fb-text-sm, 14px);
+                color: var(--fb-text-muted);
+                margin-bottom: var(--fb-spacing-sm, 8px);
+            }
+
+            .btn-create {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--fb-spacing-xs, 4px);
+                width: 100%;
+                padding: var(--fb-spacing-md, 16px);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                font-size: var(--fb-text-md, 16px);
+                font-weight: 600;
+                border: none;
+                border-radius: var(--fb-radius-md, 8px);
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .btn-create:hover:not(:disabled) {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            }
+
+            .btn-create:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            .btn-create svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .error-message {
+                color: #dc2626;
+                font-size: var(--fb-text-sm, 14px);
+                margin-top: var(--fb-spacing-xs, 4px);
+            }
         `
     ];
 
     @state() private _showGreeting = true;
     @state() private _sessionId = crypto.randomUUID();
+    @state() private _isSubmitting = false;
+    @state() private _errorMessage = '';
 
     override connectedCallback(): void {
         super.connectedCallback();
         if (onboardingMessages.value.length === 0) {
             addMessage({
                 id: `sys-${String(Date.now())}`,
-                role: 'system',
-                content: "Hi! I'm here to help set up your new project. You can describe it to me, or drag a blueprint/document here to get started.",
+                role: 'assistant',
+                content: "Welcome! Drop your building plans or permit set here, and I'll extract everything I can to get your schedule started. You can also describe your project if you don't have documents handy.",
                 timestamp: new Date()
             });
         }
@@ -270,6 +412,14 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 );
             }
 
+            // Store long-lead items
+            if (response.long_lead_items && response.long_lead_items.length > 0) {
+                setExtractedProcurement(response.long_lead_items);
+            }
+
+            // Mark document as uploaded
+            markDocumentUploaded();
+
             // Add assistant response
             addMessage({
                 id: `msg-${String(Date.now())}-assistant`,
@@ -290,6 +440,100 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         }
     }
 
+    private async _handleSubmit(): Promise<void> {
+        if (this._isSubmitting || isProcessing.value || !isReadyToCreate.value) return;
+
+        this._isSubmitting = true;
+        this._errorMessage = '';
+
+        const values = onboardingValues.value;
+
+        try {
+            const startDate = values.start_date ?? new Date().toISOString().split('T')[0] ?? '';
+            const projectData: CreateProjectRequest = {
+                name: values.name ?? '',
+                address: values.address ?? '',
+                square_footage: values.square_footage ?? 0,
+                bedrooms: values.bedrooms ?? 0,
+                bathrooms: values.bathrooms ?? 0,
+                start_date: startDate,
+            };
+
+            if (values.lot_size !== undefined) projectData.lot_size = values.lot_size;
+            if (values.foundation_type !== undefined) projectData.foundation_type = values.foundation_type;
+            if (values.stories !== undefined) projectData.stories = values.stories;
+            if (values.topography !== undefined) projectData.topography = values.topography;
+            if (values.soil_conditions !== undefined) projectData.soil_conditions = values.soil_conditions;
+
+            const response = await api.projects.create(projectData);
+            this.emit('project-created', { projectId: response.id });
+        } catch (err) {
+            console.error('[FBOnboardingChat] Project creation failed:', err);
+            this._errorMessage = 'Failed to create project. Please try again.';
+        } finally {
+            this._isSubmitting = false;
+        }
+    }
+
+    private _renderProcurementWarnings(): TemplateResult | typeof nothing {
+        const items = extractedProcurement.value;
+        if (items.length === 0) return nothing;
+
+        return html`
+            <div class="procurement-warning">
+                <div class="procurement-warning-header">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Long-lead items detected
+                </div>
+                ${items.map(item => html`
+                    <div class="lead-item">
+                        ${item.name}${item.brand ? ` (${item.brand})` : ''} -
+                        <span class="lead-item-weeks">~${String(item.estimated_lead_weeks)} weeks</span>
+                    </div>
+                `)}
+            </div>
+        `;
+    }
+
+    private _renderCreateSection(): TemplateResult | typeof nothing {
+        if (!isReadyToCreate.value) return nothing;
+
+        const values = onboardingValues.value;
+        const procurement = extractedProcurement.value;
+        const maxLeadWeeks = procurement.length > 0
+            ? Math.max(...procurement.map(p => p.estimated_lead_weeks))
+            : 0;
+
+        return html`
+            <div class="create-section">
+                <div class="create-summary">
+                    ${values.square_footage ? `${String(values.square_footage)} sq ft` : ''}
+                    ${values.foundation_type ? ` | ${values.foundation_type} foundation` : ''}
+                    ${maxLeadWeeks > 0 ? ` | ${String(maxLeadWeeks)}-week longest lead time` : ''}
+                </div>
+                <button
+                    class="btn-create"
+                    @click=${(): void => { void this._handleSubmit(); }}
+                    ?disabled=${this._isSubmitting || isProcessing.value}
+                >
+                    ${this._isSubmitting ? html`
+                        Creating...
+                    ` : html`
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                        Create Project
+                    `}
+                </button>
+                ${this._errorMessage ? html`
+                    <div class="error-message">${this._errorMessage}</div>
+                ` : nothing}
+            </div>
+        `;
+    }
+
     private _renderMessage(msg: OnboardingMessage): TemplateResult {
         return html`<div class="message ${msg.role}">${msg.content}</div>`;
     }
@@ -299,6 +543,7 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
         return html`
             <div class="message-list">
                 ${messages.map(msg => this._renderMessage(msg))}
+                ${this._renderProcurementWarnings()}
                 ${isProcessing.value ? html`
                     <div class="processing-indicator">Thinking...</div>
                 ` : nothing}
@@ -307,13 +552,15 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
     }
 
     override render(): TemplateResult {
+        const ready = isReadyToCreate.value;
+
         return html`
             <div class="chat-container">
                 ${this._showGreeting ? html`
                     <div class="greeting">
                         <div class="greeting-icon">Welcome to FutureBuild</div>
-                        <strong>I'm The Interrogator, your AI project assistant.</strong>
-                        <p>I'll help you set up your construction project by asking a few questions or analyzing your documents.</p>
+                        <strong>I'm here to help set up your new project.</strong>
+                        <p>Drop your building plans or permit set below, and I'll extract everything I need to generate your initial schedule. You can also describe your project if you don't have documents handy.</p>
                     </div>
                 ` : this._renderMessages()}
 
@@ -325,10 +572,12 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 </div>
             </div>
 
-            <fb-input-bar
-                @send=${(e: CustomEvent<{ content: string }>): void => { void this._handleSend(e); }}
-                ?disabled=${isProcessing.value}
-            ></fb-input-bar>
+            ${ready ? this._renderCreateSection() : html`
+                <fb-input-bar
+                    @send=${(e: CustomEvent<{ content: string }>): void => { void this._handleSend(e); }}
+                    ?disabled=${isProcessing.value}
+                ></fb-input-bar>
+            `}
         `;
     }
 }

@@ -99,6 +99,20 @@ export interface OnboardProcessRequest {
 }
 
 /**
+ * Long-lead item that affects schedule generation.
+ * Items with significant lead times need early procurement.
+ */
+export interface LongLeadItem {
+    name: string;
+    brand?: string;
+    model?: string;
+    category: 'windows' | 'doors' | 'hvac' | 'appliances' | 'millwork' | 'finishes';
+    estimated_lead_weeks: number;
+    wbs_code?: string;
+    notes?: string;
+}
+
+/**
  * Response from the Interrogator Agent.
  * Must match Go models.OnboardResponse exactly (Rosetta Stone).
  */
@@ -107,6 +121,7 @@ export interface OnboardProcessResponse {
     reply: string;
     extracted_values?: Record<string, unknown>;
     confidence_scores?: Record<string, number>;
+    long_lead_items?: LongLeadItem[];
     clarifying_question?: string;
     ready_to_create: boolean;
     next_priority_field?: string;

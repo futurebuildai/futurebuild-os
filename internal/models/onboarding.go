@@ -19,12 +19,25 @@ type OnboardRequest struct {
 	DocumentFileName    string `json:"-"`
 }
 
+// LongLeadItem represents a material or equipment with significant lead time.
+// These items affect schedule generation and need early procurement.
+type LongLeadItem struct {
+	Name               string `json:"name"`
+	Brand              string `json:"brand,omitempty"`
+	Model              string `json:"model,omitempty"`
+	Category           string `json:"category"` // windows, doors, hvac, appliances, millwork, finishes
+	EstimatedLeadWeeks int    `json:"estimated_lead_weeks"`
+	WBSCode            string `json:"wbs_code,omitempty"` // Affected WBS code (e.g., "8.1" for windows)
+	Notes              string `json:"notes,omitempty"`
+}
+
 // OnboardResponse is returned to the frontend with extracted values.
 type OnboardResponse struct {
 	SessionID          string             `json:"session_id"`
 	Reply              string             `json:"reply"`
 	ExtractedValues    map[string]any     `json:"extracted_values"`
 	ConfidenceScores   map[string]float64 `json:"confidence_scores"`
+	LongLeadItems      []LongLeadItem     `json:"long_lead_items,omitempty"`
 	ClarifyingQuestion string             `json:"clarifying_question,omitempty"`
 	ReadyToCreate      bool               `json:"ready_to_create"`
 	NextPriorityField  string             `json:"next_priority_field,omitempty"`
@@ -43,10 +56,11 @@ type OnboardingSession struct {
 
 // ExtractionResult logs what was extracted from a document.
 type ExtractionResult struct {
-	DocumentURL string             `json:"document_url"`
-	ExtractedAt time.Time          `json:"extracted_at"`
-	Values      map[string]any     `json:"values"`
-	Confidence  map[string]float64 `json:"confidence"`
+	DocumentURL   string             `json:"document_url"`
+	ExtractedAt   time.Time          `json:"extracted_at"`
+	Values        map[string]any     `json:"values"`
+	Confidence    map[string]float64 `json:"confidence"`
+	LongLeadItems []LongLeadItem     `json:"long_lead_items,omitempty"`
 }
 
 // PhysicsFieldPriority defines extraction priority.
@@ -62,6 +76,7 @@ func GetPriorityFields() []PhysicsFieldPriority {
 	return []PhysicsFieldPriority{
 		{"name", 0, "What would you like to call this project?"},
 		{"address", 0, "Where is the project located?"},
+		{"start_date", 0, "When did your permit get issued, or when do you plan to break ground?"},
 		{"square_footage", 0, "What's the approximate square footage?"},
 		{"foundation_type", 0, "What type of foundation? Slab, crawlspace, or basement?"},
 		{"stories", 1, "Is this a single-story or multi-story home?"},
@@ -69,6 +84,41 @@ func GetPriorityFields() []PhysicsFieldPriority {
 		{"soil_conditions", 1, "Any special soil conditions? Normal, rocky, clay, or sandy?"},
 		{"bedrooms", 2, "How many bedrooms?"},
 		{"bathrooms", 2, "How many bathrooms?"},
-		{"supply_chain_volatility", 2, "Any supply chain concerns for this project?"},
+		{"holidays", 2, "Any holidays or planned breaks I should account for?"},
+	}
+}
+
+// KnownBrandLeadTimes returns estimated lead times in weeks for known brands.
+// Used to calculate procurement constraints for schedule generation.
+func KnownBrandLeadTimes() map[string]int {
+	return map[string]int{
+		// Windows
+		"marvin":          12,
+		"marvin ultimate": 14,
+		"andersen":        10,
+		"andersen e":      12,
+		"pella":           10,
+		"pella reserve":   12,
+		"milgard":         5,
+
+		// Appliances
+		"sub-zero":   10,
+		"subzero":    10,
+		"wolf":       10,
+		"viking":     8,
+		"la cornue":  20,
+		"thermador":  8,
+		"miele":      8,
+		"gaggenau":   10,
+
+		// HVAC
+		"geothermal": 8,
+		"carrier":    4,
+		"trane":      4,
+		"lennox":     4,
+
+		// Doors
+		"simpson":    6,
+		"therma-tru": 6,
 	}
 }

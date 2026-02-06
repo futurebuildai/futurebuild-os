@@ -79,7 +79,10 @@ func (s *InterrogatorService) ProcessMessage(
 			resp.ConfidenceScores[k] = extraction.Confidence[k]
 		}
 
-		// Generate a summary message
+		// Include long-lead items in response
+		resp.LongLeadItems = extraction.LongLeadItems
+
+		// Generate a summary message with procurement warnings
 		resp.Reply = s.generateExtractionSummary(extraction)
 	}
 
@@ -170,7 +173,14 @@ func (s *InterrogatorService) extractFromDocument(
 		Stories        int                `json:"stories"`
 		Bedrooms       int                `json:"bedrooms"`
 		Bathrooms      int                `json:"bathrooms"`
-		Confidence     map[string]float64 `json:"confidence"`
+		LongLeadItems  []struct {
+			Name     string `json:"name"`
+			Brand    string `json:"brand"`
+			Model    string `json:"model"`
+			Category string `json:"category"`
+			Notes    string `json:"notes"`
+		} `json:"long_lead_items"`
+		Confidence map[string]float64 `json:"confidence"`
 	}
 
 	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
@@ -200,11 +210,15 @@ func (s *InterrogatorService) extractFromDocument(
 		values["bathrooms"] = extraction.Bathrooms
 	}
 
+	// Convert extracted long-lead items with lead time estimates
+	longLeadItems := s.enrichLongLeadItems(extraction.LongLeadItems)
+
 	return &models.ExtractionResult{
-		DocumentURL: documentURL,
-		ExtractedAt: time.Now(), // L7: Add timestamp
-		Values:      values,
-		Confidence:  extraction.Confidence,
+		DocumentURL:   documentURL,
+		ExtractedAt:   time.Now(),
+		Values:        values,
+		Confidence:    extraction.Confidence,
+		LongLeadItems: longLeadItems,
 	}, nil
 }
 
@@ -247,7 +261,14 @@ func (s *InterrogatorService) extractFromBytes(
 		Stories        int                `json:"stories"`
 		Bedrooms       int                `json:"bedrooms"`
 		Bathrooms      int                `json:"bathrooms"`
-		Confidence     map[string]float64 `json:"confidence"`
+		LongLeadItems  []struct {
+			Name     string `json:"name"`
+			Brand    string `json:"brand"`
+			Model    string `json:"model"`
+			Category string `json:"category"`
+			Notes    string `json:"notes"`
+		} `json:"long_lead_items"`
+		Confidence map[string]float64 `json:"confidence"`
 	}
 
 	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
@@ -277,11 +298,15 @@ func (s *InterrogatorService) extractFromBytes(
 		values["bathrooms"] = extraction.Bathrooms
 	}
 
+	// Convert extracted long-lead items with lead time estimates
+	longLeadItems := s.enrichLongLeadItems(extraction.LongLeadItems)
+
 	return &models.ExtractionResult{
-		DocumentURL: fmt.Sprintf("inline:%s", fileName),
-		ExtractedAt: time.Now(),
-		Values:      values,
-		Confidence:  extraction.Confidence,
+		DocumentURL:   fmt.Sprintf("inline:%s", fileName),
+		ExtractedAt:   time.Now(),
+		Values:        values,
+		Confidence:    extraction.Confidence,
+		LongLeadItems: longLeadItems,
 	}, nil
 }
 
@@ -335,8 +360,47 @@ func (s *InterrogatorService) checkReadyToCreate(state map[string]interface{}) b
 
 // generateExtractionSummary creates a natural language summary of what was extracted.
 func (s *InterrogatorService) generateExtractionSummary(extraction *models.ExtractionResult) string {
-	count := len(extraction.Values)
-	return fmt.Sprintf("I found %d details from your blueprint. Review them in the form and let me know if anything needs to be corrected.", count)
+	var sb strings.Builder
+
+	// Build summary of extracted fields
+	sb.WriteString("I found these details from your plans:\n\n")
+
+	if name, ok := extraction.Values["name"].(string); ok && name != "" {
+		sb.WriteString(fmt.Sprintf("**Project**: %s\n", name))
+	}
+	if addr, ok := extraction.Values["address"].(string); ok && addr != "" {
+		sb.WriteString(fmt.Sprintf("**Address**: %s\n", addr))
+	}
+	if sqft, ok := extraction.Values["square_footage"].(float64); ok && sqft > 0 {
+		sb.WriteString(fmt.Sprintf("**Size**: %.0f sq ft\n", sqft))
+	}
+	if foundation, ok := extraction.Values["foundation_type"].(string); ok && foundation != "" {
+		sb.WriteString(fmt.Sprintf("**Foundation**: %s\n", strings.Title(foundation)))
+	}
+	if stories, ok := extraction.Values["stories"].(int); ok && stories > 0 {
+		sb.WriteString(fmt.Sprintf("**Stories**: %d\n", stories))
+	}
+	if bed, ok := extraction.Values["bedrooms"].(int); ok && bed > 0 {
+		if bath, ok := extraction.Values["bathrooms"].(int); ok && bath > 0 {
+			sb.WriteString(fmt.Sprintf("**%d bed / %d bath**\n", bed, bath))
+		}
+	}
+
+	// Add long-lead item warnings
+	if len(extraction.LongLeadItems) > 0 {
+		sb.WriteString("\n**Long-lead items detected**:\n")
+		for _, item := range extraction.LongLeadItems {
+			if item.Brand != "" {
+				sb.WriteString(fmt.Sprintf("- %s (%s) - ~%d weeks\n", item.Name, item.Brand, item.EstimatedLeadWeeks))
+			} else {
+				sb.WriteString(fmt.Sprintf("- %s - ~%d weeks\n", item.Name, item.EstimatedLeadWeeks))
+			}
+		}
+	}
+
+	sb.WriteString("\nWhen did your permit get issued, or when do you plan to break ground?")
+
+	return sb.String()
 }
 
 // mergeStates combines current state with new extractions (new values win).
@@ -469,4 +533,88 @@ func calculateAvgConfidence(scores map[string]float64) float64 {
 		sum += score
 	}
 	return sum / float64(len(scores))
+}
+
+// enrichLongLeadItems converts raw extraction items to models with lead time estimates.
+func (s *InterrogatorService) enrichLongLeadItems(items []struct {
+	Name     string `json:"name"`
+	Brand    string `json:"brand"`
+	Model    string `json:"model"`
+	Category string `json:"category"`
+	Notes    string `json:"notes"`
+}) []models.LongLeadItem {
+	if len(items) == 0 {
+		return nil
+	}
+
+	leadTimes := models.KnownBrandLeadTimes()
+	result := make([]models.LongLeadItem, 0, len(items))
+
+	for _, item := range items {
+		leadWeeks := estimateLeadTime(item.Brand, item.Category, leadTimes)
+		wbsCode := categoryToWBS(item.Category)
+
+		result = append(result, models.LongLeadItem{
+			Name:               item.Name,
+			Brand:              item.Brand,
+			Model:              item.Model,
+			Category:           item.Category,
+			EstimatedLeadWeeks: leadWeeks,
+			WBSCode:            wbsCode,
+			Notes:              item.Notes,
+		})
+	}
+
+	return result
+}
+
+// estimateLeadTime determines lead time based on brand and category.
+func estimateLeadTime(brand, category string, leadTimes map[string]int) int {
+	// Normalize brand for lookup
+	brandLower := strings.ToLower(strings.TrimSpace(brand))
+
+	// Try exact brand match first
+	if weeks, ok := leadTimes[brandLower]; ok {
+		return weeks
+	}
+
+	// Try partial brand match
+	for key, weeks := range leadTimes {
+		if strings.Contains(brandLower, key) || strings.Contains(key, brandLower) {
+			return weeks
+		}
+	}
+
+	// Fall back to category defaults
+	categoryDefaults := map[string]int{
+		"windows":    8,
+		"doors":      6,
+		"hvac":       4,
+		"appliances": 6,
+		"millwork":   8,
+		"finishes":   4,
+	}
+
+	if weeks, ok := categoryDefaults[strings.ToLower(category)]; ok {
+		return weeks
+	}
+
+	return 4 // Default fallback
+}
+
+// categoryToWBS maps long-lead item categories to their typical WBS codes.
+func categoryToWBS(category string) string {
+	mapping := map[string]string{
+		"windows":    "8.1", // Exterior Trim & Windows
+		"doors":      "8.2", // Exterior Doors
+		"hvac":       "9.1", // HVAC Rough-In
+		"appliances": "14.1", // Appliance Installation
+		"millwork":   "13.1", // Interior Trim & Doors
+		"finishes":   "12.1", // Interior Paint
+	}
+
+	if wbs, ok := mapping[strings.ToLower(category)]; ok {
+		return wbs
+	}
+	return ""
 }

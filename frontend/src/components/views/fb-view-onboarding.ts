@@ -1,11 +1,13 @@
 /**
- * FBViewOnboarding - Split-Screen Wizard for AI-Driven Project Creation
- * See STEP_74_SPLIT_SCREEN_WIZARD.md, STEP_76_REALTIME_FORM_FILLING.md
+ * FBViewOnboarding - Document-First Chat-Only Project Creation
  *
- * Pure layout component. State lives in onboarding-store; children read from it directly.
- * - Left Panel: Chat interface with "The Interrogator" agent
- * - Right Panel: Live form that auto-populates as AI extracts data
- * - Responsive: Side-by-side on desktop, stacked on tablet, tabs on mobile
+ * Full-width chat experience with horizontal progress bar:
+ * - Top: Progress steps (Upload → Extract → Details → Review)
+ * - Center: Full-width chat with document extraction and conversation
+ * - Bottom: Create button when ready
+ *
+ * Collects all inputs needed for initial deterministic schedule generation
+ * through AI document extraction and natural conversation.
  */
 import { html, css, TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -21,7 +23,7 @@ import {
 } from '../../store/onboarding-store';
 
 import '../features/onboarding/fb-onboarding-chat';
-import '../features/onboarding/fb-onboarding-form';
+import '../features/onboarding/fb-onboarding-steps';
 
 @customElement('fb-view-onboarding')
 export class FBViewOnboarding extends FBViewElement {
@@ -78,6 +80,7 @@ export class FBViewOnboarding extends FBViewElement {
 
             .wizard-body {
                 display: flex;
+                flex-direction: column;
                 flex: 1;
                 overflow: hidden;
             }
@@ -86,37 +89,7 @@ export class FBViewOnboarding extends FBViewElement {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
-                border-right: 1px solid var(--fb-border);
                 overflow: hidden;
-            }
-
-            .panel-form {
-                flex: 1;
-                overflow-y: auto;
-                padding: var(--fb-spacing-xl);
-            }
-
-            /* Responsive: Stack on tablet (768px - 1023px) */
-            @media (max-width: 1023px) {
-                .wizard-body {
-                    flex-direction: column;
-                }
-                .panel-chat {
-                    border-right: none;
-                    border-bottom: 1px solid var(--fb-border);
-                    max-height: 50%;
-                }
-                .panel-form {
-                    max-height: 50%;
-                }
-            }
-
-            /* Mobile: Tab toggle mode (< 768px) - Phase 2 */
-            @media (max-width: 767px) {
-                .wizard-body {
-                    position: relative;
-                }
-                /* Future: Implement tab toggle UI */
             }
         `
     ];
@@ -207,14 +180,12 @@ export class FBViewOnboarding extends FBViewElement {
                     </svg>
                 </button>
             </div>
+            <fb-onboarding-steps></fb-onboarding-steps>
             <div class="wizard-body">
                 <div class="panel-chat">
-                    <fb-onboarding-chat></fb-onboarding-chat>
-                </div>
-                <div class="panel-form">
-                    <fb-onboarding-form
-                        @project-created=${(e: CustomEvent<{ projectId: string }>): void => { this._handleProjectCreated(e); }}
-                    ></fb-onboarding-form>
+                    <fb-onboarding-chat
+                        @project-created=${(e: CustomEvent<{ projectId: string }>): void => { void this._handleProjectCreated(e); }}
+                    ></fb-onboarding-chat>
                 </div>
             </div>
         `;

@@ -2,12 +2,12 @@
  * Onboarding Store - Signals-Based State for Smart Onboarding Wizard
  * See STEP_76_REALTIME_FORM_FILLING.md
  *
- * Implements bidirectional state synchronization between chat and form panels.
- * State changes propagate instantly via Signals, with visual indicators for AI vs user edits.
+ * Implements document-first, chat-only onboarding with horizontal progress bar.
+ * State changes propagate instantly via Signals.
  */
 
 import { signal, computed } from '@preact/signals-core';
-import type { CreateProjectRequest } from '../services/api';
+import type { CreateProjectRequest, LongLeadItem } from '../services/api';
 
 // ============================================================================
 // Types
@@ -18,9 +18,21 @@ export interface OnboardingMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: Date;
+    /** Optional extraction results to render as a card */
+    extractionCard?: ExtractionCard;
+}
+
+export interface ExtractionCard {
+    fields: Array<{ label: string; value: string | number }>;
+    longLeadItems: LongLeadItem[];
 }
 
 export type FieldSource = 'user' | 'ai' | 'default';
+
+/**
+ * Onboarding stages for horizontal progress bar.
+ */
+export type OnboardingStage = 'upload' | 'extract' | 'details' | 'review';
 
 // ============================================================================
 // Core State Signals
@@ -58,17 +70,58 @@ export const isProcessing = signal<boolean>(false);
  */
 export const recentlyUpdatedFields = signal<Set<string>>(new Set());
 
+/**
+ * Extracted long-lead procurement items.
+ * Displayed as warnings in the chat panel.
+ */
+export const extractedProcurement = signal<LongLeadItem[]>([]);
+
+/**
+ * Whether a document has been uploaded in this session.
+ */
+export const hasDocumentUploaded = signal<boolean>(false);
+
 // ============================================================================
 // Computed Values
 // ============================================================================
 
 /**
  * Whether the form has minimum required fields to create a project.
- * Required: name, address
+ * Required: name, address, start_date, square_footage
  */
 export const isReadyToCreate = computed(() => {
     const v = onboardingValues.value;
-    return !!(v.name && v.address);
+    return !!(v.name && v.address && v.start_date && v.square_footage);
+});
+
+/**
+ * Current onboarding stage for horizontal progress bar.
+ * Computed from state: upload → extract → details → review
+ */
+export const currentStage = computed<OnboardingStage>(() => {
+    const v = onboardingValues.value;
+    const msgs = onboardingMessages.value;
+    const processing = isProcessing.value;
+    const uploaded = hasDocumentUploaded.value;
+
+    // If processing (AI analyzing), show extract stage
+    if (processing) return 'extract';
+
+    // If no user messages yet and no document uploaded, still in upload stage
+    const hasUserMessage = msgs.some(m => m.role === 'user');
+    if (!hasUserMessage && !uploaded) return 'upload';
+
+    // Check if we have all required fields for schedule generation
+    const hasName = !!v.name;
+    const hasAddress = !!v.address;
+    const hasStartDate = !!v.start_date;
+    const hasSquareFootage = !!v.square_footage;
+
+    // If all required fields are present, we're ready for review
+    if (hasName && hasAddress && hasStartDate && hasSquareFootage) return 'review';
+
+    // Otherwise we're collecting details
+    return 'details';
 });
 
 /**
@@ -174,4 +227,20 @@ export function resetOnboarding(): void {
     onboardingMessages.value = [];
     isProcessing.value = false;
     recentlyUpdatedFields.value = new Set();
+    extractedProcurement.value = [];
+    hasDocumentUploaded.value = false;
+}
+
+/**
+ * Set extracted long-lead procurement items.
+ */
+export function setExtractedProcurement(items: LongLeadItem[]): void {
+    extractedProcurement.value = items;
+}
+
+/**
+ * Mark that a document has been uploaded in this session.
+ */
+export function markDocumentUploaded(): void {
+    hasDocumentUploaded.value = true;
 }
