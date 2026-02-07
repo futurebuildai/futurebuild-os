@@ -89,7 +89,18 @@ func (s *InterrogatorService) ProcessMessage(
 	// BRANCH 2: User message → Parse natural language
 	if req.Message != "" {
 		extraction, err := s.parseUserMessage(ctx, req.Message, req.CurrentState)
-		if err == nil {
+		if err != nil {
+			slog.Warn("message_parsing_failed",
+				"error", err.Error(),
+				"message", req.Message,
+				"session_id", req.SessionID,
+			)
+		} else if extraction != nil {
+			slog.Info("message_parsing_success",
+				"extracted_fields", len(extraction.Values),
+				"values", extraction.Values,
+				"session_id", req.SessionID,
+			)
 			for k, v := range extraction.Values {
 				resp.ExtractedValues[k] = v
 				resp.ConfidenceScores[k] = extraction.Confidence[k]
@@ -323,22 +334,66 @@ func (s *InterrogatorService) parseUserMessage(
 
 	result, err := s.aiClient.GenerateContent(ctx, req)
 	if err != nil {
+		slog.Error("ai_message_parse_request_failed",
+			"error", err.Error(),
+			"message_preview", truncateString(message, 100),
+		)
 		return nil, err
 	}
+
+	slog.Debug("ai_message_parse_response",
+		"raw_response", truncateString(result.Text, 500),
+		"message_preview", truncateString(message, 100),
+	)
+
+	// Strip markdown code block wrappers if present
+	jsonText := stripMarkdownCodeBlock(result.Text)
 
 	var extraction struct {
 		Values     map[string]any     `json:"values"`
 		Confidence map[string]float64 `json:"confidence"`
 	}
 
-	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
-		return nil, err
+	if err := json.Unmarshal([]byte(jsonText), &extraction); err != nil {
+		slog.Warn("ai_message_parse_json_failed",
+			"error", err.Error(),
+			"raw_response", truncateString(result.Text, 500),
+			"cleaned_json", truncateString(jsonText, 500),
+		)
+		return nil, fmt.Errorf("failed to parse AI response as JSON: %w", err)
 	}
 
 	return &models.ExtractionResult{
 		Values:     extraction.Values,
 		Confidence: extraction.Confidence,
 	}, nil
+}
+
+// truncateString safely truncates a string to max length.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// stripMarkdownCodeBlock removes ```json ... ``` wrappers from AI responses.
+func stripMarkdownCodeBlock(s string) string {
+	s = strings.TrimSpace(s)
+
+	// Check for ```json or ``` prefix
+	if strings.HasPrefix(s, "```json") {
+		s = strings.TrimPrefix(s, "```json")
+	} else if strings.HasPrefix(s, "```") {
+		s = strings.TrimPrefix(s, "```")
+	}
+
+	// Check for ``` suffix
+	if strings.HasSuffix(s, "```") {
+		s = strings.TrimSuffix(s, "```")
+	}
+
+	return strings.TrimSpace(s)
 }
 
 // getNextQuestion determines what to ask based on missing fields.

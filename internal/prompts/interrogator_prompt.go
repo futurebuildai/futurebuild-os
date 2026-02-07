@@ -1,6 +1,9 @@
 package prompts
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // BlueprintExtractionPrompt returns the system prompt for document analysis.
 // Extracts building specs and long-lead procurement items for schedule generation.
@@ -61,36 +64,44 @@ Return an empty array for long_lead_items if none are found.`
 
 // MessageParsingPrompt returns the prompt for natural language parsing.
 func MessageParsingPrompt(message string, currentState map[string]interface{}) string {
-	return fmt.Sprintf(`You are extracting project details from a user's message.
+	// Format current state as JSON for clarity
+	stateJSON, _ := json.Marshal(currentState)
+	if stateJSON == nil {
+		stateJSON = []byte("{}")
+	}
 
-CURRENT PROJECT STATE:
-%v
+	return fmt.Sprintf(`You are extracting construction project details from a user's message.
+
+CURRENT PROJECT STATE (already collected):
+%s
 
 USER MESSAGE:
 "%s"
 
-Extract any NEW information about:
-- name (project name)
-- address (location)
-- square_footage (square footage, look for "sq ft", "square feet", numbers like "3200")
-- foundation_type ("slab", "crawlspace", "basement")
-- stories (1, 2, etc or "single story", "two story")
-- bedrooms (number)
-- bathrooms (number)
-- topography ("flat", "sloped", "hillside")
-- soil_conditions ("normal", "rocky", "clay", "sandy")
+Extract any NEW information. Look for:
+- name: Project name (e.g., "Project: Oak Ridge" → "Oak Ridge", "called Sunset Heights" → "Sunset Heights", "building Mountain View Estate" → "Mountain View Estate")
+- address: Full address with city/state/zip
+- square_footage: Number only (e.g., "3,200 sq ft" → 3200, "2800 square feet" → 2800)
+- foundation_type: Must be exactly "slab", "crawlspace", or "basement"
+- stories: Number (e.g., "two-story" → 2, "single story" → 1)
+- bedrooms: Number
+- bathrooms: Number (e.g., "2.5 bath" → 2.5)
+- start_date: ISO date format YYYY-MM-DD (e.g., "January 15, 2026" → "2026-01-15")
+- topography: Must be exactly "flat", "sloped", or "hillside"
+- soil_conditions: Must be exactly "normal", "rocky", "clay", or "sandy"
 
-RESPOND IN JSON FORMAT ONLY:
+IMPORTANT: Return ONLY valid JSON, no other text. Include only fields with new values.
+
 {
   "values": {
-    "field_name": "extracted_value"
+    "name": "extracted project name",
+    "address": "full address"
   },
   "confidence": {
-    "field_name": 0.0-1.0
+    "name": 0.95,
+    "address": 0.9
   }
-}
-
-Only include fields that have new values from this message. Do not repeat existing values.`, currentState, message)
+}`, string(stateJSON), message)
 }
 
 // ClarifyingQuestionPrompt generates context-aware follow-up questions.
