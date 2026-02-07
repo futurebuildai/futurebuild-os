@@ -15,8 +15,8 @@ import { store } from '../../store/store';
  */
 @customElement('fb-input-bar')
 export class FBInputBar extends FBElement {
-    /** Maximum height for auto-resizing textarea in pixels */
-    private static readonly MAX_TEXTAREA_HEIGHT = 120;
+    /** Maximum height for auto-resizing textarea as percentage of viewport */
+    private static readonly MAX_TEXTAREA_HEIGHT_VH = 35;
 
     /** When true, disables input and send button (e.g., during AI processing). */
     @property({ type: Boolean }) disabled = false;
@@ -49,7 +49,7 @@ export class FBInputBar extends FBElement {
             textarea {
                 width: 100%;
                 min-height: 44px;
-                max-height: 120px;
+                max-height: 35vh;
                 padding: 12px 14px;
                 border: 1px solid var(--fb-border);
                 border-radius: var(--fb-radius-lg);
@@ -61,7 +61,8 @@ export class FBInputBar extends FBElement {
                 resize: none;
                 outline: none;
                 box-sizing: border-box;
-                transition: border-color 0.2s;
+                transition: border-color 0.2s, height 0.1s ease-out;
+                overflow-y: auto;
             }
 
             textarea:focus {
@@ -151,19 +152,26 @@ export class FBInputBar extends FBElement {
 
     private _autoResize(el: HTMLTextAreaElement): void {
         el.style.height = 'auto';
-        const newHeight = Math.min(el.scrollHeight, FBInputBar.MAX_TEXTAREA_HEIGHT);
+        // Calculate max height as percentage of viewport
+        const maxHeight = window.innerHeight * (FBInputBar.MAX_TEXTAREA_HEIGHT_VH / 100);
+        const newHeight = Math.min(el.scrollHeight, maxHeight);
         el.style.height = `${String(newHeight)}px`;
     }
 
     private _send(): void {
         if (!this._value.trim() || this.disabled) return;
 
-        this.emit('send', { content: this._value });
+        const content = this._value;
         this._value = '';
 
-        // Reset height
+        // Clear textarea value directly and reset height
         const textarea = this.shadowRoot?.querySelector('textarea');
-        if (textarea) textarea.style.height = 'auto';
+        if (textarea) {
+            textarea.value = '';
+            textarea.style.height = 'auto';
+        }
+
+        this.emit('send', { content });
     }
 
     /** Step 73: Open native file picker, feed selection into store.handleFileDrop */
