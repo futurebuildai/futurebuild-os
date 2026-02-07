@@ -1,15 +1,22 @@
 # fb-input-bar
 
 ## Intent
-*   **High Level:** [Auto-filled: Pending documentation]
-*   **Business Value:** [Auto-filled: Pending documentation]
+*   **High Level:** User input component for chat messages with auto-resizing textarea
+*   **Business Value:** Enables users to compose and send messages to AI agents with a polished UX
 
 ## Responsibility
-*   State what this component handles.
+*   Renders a textarea with placeholder text and send button
+*   Auto-resizes textarea as user types, up to 35% of viewport height
+*   Handles Enter key to send (Shift+Enter for newlines)
+*   Clears input and resets height after sending
+*   Provides file upload button that triggers store.handleFileDrop()
 
 ## Key Logic
-*   Describe flows and state management.
+*   **Auto-resize:** `_autoResize()` calculates `min(scrollHeight, 35vh)` and sets textarea height
+*   **Send flow:** `_send()` captures value, clears both reactive state AND DOM element, emits 'send' event
+*   **Viewport-relative max height:** Uses `window.innerHeight * 0.35` for responsive expansion
+*   **File picker:** Hidden `<input type="file">` triggered by upload button click
 
 ## Dependencies
-*   **Upstream:** [Incoming calls]
-*   **Downstream:** [Outgoing calls]
+*   **Upstream:** Used by `fb-view-chat`, `fb-onboarding-chat`
+*   **Downstream:** Emits `send` event with `{ content: string }`, calls `store.actions.handleFileDrop()`
