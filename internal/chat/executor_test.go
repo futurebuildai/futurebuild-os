@@ -122,8 +122,8 @@ func TestExecutor_ErrorPersistence(t *testing.T) {
 		t.Errorf("expected ProjectID=%s, got %s", execCtx.ProjectID, persistedMsg.ProjectID)
 	}
 
-	if persistedMsg.UserID != execCtx.UserID {
-		t.Errorf("expected UserID=%s, got %s", execCtx.UserID, persistedMsg.UserID)
+	if persistedMsg.UserID == nil || *persistedMsg.UserID != execCtx.UserID {
+		t.Errorf("expected UserID=%s, got %v", execCtx.UserID, persistedMsg.UserID)
 	}
 
 	// Verify error message content is user-friendly

@@ -234,7 +234,7 @@ export class TribunalLogFeed extends FBElement {
                             (d) => html`
                                 <div
                                     class="item ${this._selectedId === d.id ? 'selected' : ''}"
-                                    @click=${() => this._handleSelect(d.id)}
+                                    @click=${() => { this._handleSelect(d.id); }}
                                 >
                                     <span class=${this._getStatusClass(d.status)}>${d.status}</span>
                                     <span class="context">${d.context}</span>

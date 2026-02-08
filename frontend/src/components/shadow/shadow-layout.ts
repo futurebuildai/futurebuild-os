@@ -87,7 +87,7 @@ export class ShadowLayout extends FBElement {
     }
 
     override disconnectedCallback(): void {
-        this._disposeEffects.forEach((d) => d());
+        this._disposeEffects.forEach((d) => { d(); });
         super.disconnectedCallback();
     }
 

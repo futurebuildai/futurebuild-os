@@ -42,8 +42,9 @@ type Server struct {
 	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
 	InviteHandler        *handlers.InviteHandler        // See LAUNCH_STRATEGY.md Task B2
 	UserHandler          *handlers.UserHandler          // See LAUNCH_PLAN.md User Profile Endpoint
-	PortalHandler        *handlers.PortalHandler        // See LAUNCH_PLAN.md P2: Field Portal
-	PortalAuthHandler    *handlers.PortalAuthHandler    // Phase 12: Portal magic-link auth (separate from Clerk)
+	PortalHandler          *handlers.PortalHandler          // See LAUNCH_PLAN.md P2: Field Portal
+	PortalAuthHandler      *handlers.PortalAuthHandler      // Phase 12: Portal magic-link auth (separate from Clerk)
+	PortalDashboardHandler *handlers.PortalDashboardHandler // Portal Dashboard API: authenticated contact endpoints
 	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
 	ClerkWebhookHandler  *handlers.ClerkWebhookHandler  // See PHASE_12_PRD.md Step 80
 	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
@@ -205,6 +206,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// See LAUNCH_PLAN.md P2: Field Portal (Mobile)
 	portalService := service.NewPortalService(db, notificationService, cfg.BaseURL)
 	portalHandler := handlers.NewPortalHandler(portalService)
+	portalDashboardHandler := handlers.NewPortalDashboardHandler(portalService)
 
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md: GitHub Webhook Handler
 	// Only initialize if webhook secret is configured (fail-closed handled in handler)
@@ -260,8 +262,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
 		InviteHandler:        inviteHandler,        // See LAUNCH_STRATEGY.md Task B2
 		UserHandler:          userHandler,          // See LAUNCH_PLAN.md User Profile Endpoint
-		PortalHandler:        portalHandler,        // See LAUNCH_PLAN.md P2: Field Portal
-		PortalAuthHandler:    portalAuthHandler,    // Phase 12: Portal magic-link auth
+		PortalHandler:          portalHandler,          // See LAUNCH_PLAN.md P2: Field Portal
+		PortalAuthHandler:      portalAuthHandler,      // Phase 12: Portal magic-link auth
+		PortalDashboardHandler: portalDashboardHandler, // Portal Dashboard API
 		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
 		ClerkWebhookHandler:  clerkWebhookHandler,  // See PHASE_12_PRD.md Step 80
 		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
@@ -326,6 +329,28 @@ func (s *Server) routes() {
 				r.Use(middleware.RateLimit(s.PortalRateLimiter))
 				r.Post("/login", s.PortalAuthHandler.Login)
 				r.Get("/verify", s.PortalAuthHandler.Verify)
+			})
+
+			// Authenticated portal dashboard endpoints.
+			// Protected by portal JWT middleware (HS256, subject_type=contact).
+			r.Route("/me", func(r chi.Router) {
+				r.Use(s.AuthMiddleware.RequirePortalAuth)
+
+				r.Get("/projects", s.PortalDashboardHandler.ListProjects)
+
+				r.Route("/projects/{id}", func(r chi.Router) {
+					r.Get("/tasks", s.PortalDashboardHandler.ListProjectTasks)
+					r.Get("/dependencies", s.PortalDashboardHandler.GetDependencies)
+
+					r.Get("/messages", s.PortalDashboardHandler.ListMessages)
+					r.Post("/messages", s.PortalDashboardHandler.SendMessage)
+
+					r.Get("/documents", s.PortalDashboardHandler.ListDocuments)
+					r.Post("/documents", s.PortalDashboardHandler.UploadDocument)
+
+					r.Get("/invoices", s.PortalDashboardHandler.ListInvoices)
+					r.Post("/invoices", s.PortalDashboardHandler.UploadInvoice)
+				})
 			})
 		})
 

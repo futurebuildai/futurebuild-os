@@ -1028,7 +1028,7 @@ export class FBViewSettings extends FBViewElement {
                                 <button
                                     class="day-toggle ${isActive ? 'active' : ''}"
                                     ?disabled=${!canEdit}
-                                    @click=${() => this._toggleWorkDay(dayNum)}
+                                    @click=${() => { this._toggleWorkDay(dayNum); }}
                                     title="${fullName}"
                                     aria-label="${fullName}"
                                     aria-pressed=${isActive ? 'true' : 'false'}

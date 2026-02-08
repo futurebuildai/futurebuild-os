@@ -121,7 +121,7 @@ export class FBPhotoGallery extends FBElement {
                 ${this.assets.map(asset => html`
                     <div
                         class="gallery-item"
-                        @click=${() => this._handleAssetClick(asset)}
+                        @click=${() => { this._handleAssetClick(asset); }}
                     >
                         <img
                             src="${asset.file_url}"

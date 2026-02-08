@@ -236,7 +236,7 @@ func (o *Orchestrator) ProcessRequest(ctx context.Context, userID uuid.UUID, org
 		ID:        uuid.New(),
 		ProjectID: req.ProjectID,
 		ThreadID:  req.ThreadID,
-		UserID:    userID,
+		UserID:    &userID,
 		Role:      types.ChatRoleUser,
 		Content:   req.Message,
 		CreatedAt: time.Now().UTC(),
@@ -364,11 +364,11 @@ func (s *PgxMessageStore) SaveMessage(ctx context.Context, msg models.ChatMessag
 func (s *PgxMessageStore) saveMessageWithTx(ctx context.Context, tx pgx.Tx, msg models.ChatMessage) error {
 	// 1. Insert into chat_messages
 	messageQuery := `
-		INSERT INTO chat_messages (id, project_id, thread_id, user_id, role, content, tool_calls, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO chat_messages (id, project_id, thread_id, user_id, contact_id, role, content, tool_calls, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := tx.Exec(ctx, messageQuery,
-		msg.ID, msg.ProjectID, msg.ThreadID, msg.UserID, msg.Role, msg.Content, msg.ToolCalls, msg.CreatedAt,
+		msg.ID, msg.ProjectID, msg.ThreadID, msg.UserID, msg.ContactID, msg.Role, msg.Content, msg.ToolCalls, msg.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("db insert chat_messages failed: %w", err)

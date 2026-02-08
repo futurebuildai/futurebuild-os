@@ -98,10 +98,11 @@ func TestPgxMessageStore_SaveMessage_Success(t *testing.T) {
 	mockTransactor := &MockTransactor{}
 	store := NewPgxMessageStore(mockTransactor)
 
+	userID := uuid.New()
 	msg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: uuid.New(),
-		UserID:    uuid.New(),
+		UserID:    &userID,
 		Role:      types.ChatRoleUser,
 		Content:   "Test Message",
 		CreatedAt: time.Now(),
@@ -140,10 +141,11 @@ func TestPgxMessageStore_SaveMessage_WithToolCalls(t *testing.T) {
 	mockTransactor := &MockTransactor{}
 	store := NewPgxMessageStore(mockTransactor)
 
+	toolUserID := uuid.New()
 	msg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: uuid.New(),
-		UserID:    uuid.New(),
+		UserID:    &toolUserID,
 		Role:      types.ChatRoleModel,
 		Content:   "Let me check the schedule",
 		ToolCalls: []types.ToolCall{
@@ -191,10 +193,11 @@ func TestPgxMessageStore_SaveMessage_RollbackOnToolInsertFailure(t *testing.T) {
 	mockTransactor := &MockTransactor{}
 	store := NewPgxMessageStore(mockTransactor)
 
+	rollbackUserID := uuid.New()
 	msg := models.ChatMessage{
 		ID:        uuid.New(),
 		ProjectID: uuid.New(),
-		UserID:    uuid.New(),
+		UserID:    &rollbackUserID,
 		Role:      types.ChatRoleModel,
 		Content:   "Let me process this",
 		ToolCalls: []types.ToolCall{

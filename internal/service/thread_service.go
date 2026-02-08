@@ -219,7 +219,7 @@ func (s *ThreadService) GetThreadMessages(ctx context.Context, threadID, project
 	}
 
 	query := `
-		SELECT cm.id, cm.project_id, cm.thread_id, cm.user_id, cm.role, cm.content, cm.tool_calls, cm.created_at
+		SELECT cm.id, cm.project_id, cm.thread_id, cm.user_id, cm.contact_id, cm.role, cm.content, cm.tool_calls, cm.created_at
 		FROM chat_messages cm
 		JOIN threads t ON t.id = cm.thread_id
 		JOIN projects p ON p.id = t.project_id
@@ -237,7 +237,7 @@ func (s *ThreadService) GetThreadMessages(ctx context.Context, threadID, project
 	for rows.Next() {
 		var m models.ChatMessage
 		if err := rows.Scan(
-			&m.ID, &m.ProjectID, &m.ThreadID, &m.UserID, &m.Role, &m.Content, &m.ToolCalls, &m.CreatedAt,
+			&m.ID, &m.ProjectID, &m.ThreadID, &m.UserID, &m.ContactID, &m.Role, &m.Content, &m.ToolCalls, &m.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -286,4 +287,108 @@ func getStringClaim(claims jwt.MapClaims, key string) string {
 		}
 	}
 	return ""
+}
+
+// ---- Portal JWT Middleware ----
+// Portal contacts authenticate via HS256 JWTs issued by AuthService (magic-link flow).
+// This is separate from the Clerk RS256 middleware used by internal users.
+
+// portalContextKey is the context key type for portal-specific values.
+type portalContextKey string
+
+const (
+	portalContactIDKey   portalContextKey = "portal_contact_id"
+	portalContactNameKey portalContextKey = "portal_contact_name"
+)
+
+// RequirePortalAuth validates a portal JWT (HS256, issuer "futurebuild") from the
+// Authorization header. Extracts contact_id from claims and sets it in context.
+// Only allows tokens with subject_type = "contact".
+func (m *AuthMiddleware) RequirePortalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		// Portal JWTs use HS256 with the app's JWT secret (not Clerk JWKS).
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return []byte(m.cfg.JWTSecret), nil
+		},
+			jwt.WithValidMethods([]string{"HS256"}),
+			jwt.WithIssuer("futurebuild"),
+		)
+		if err != nil {
+			slog.Debug("portal auth middleware: JWT validation failed", "error", err)
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		if !token.Valid {
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		mapClaims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		// Verify this is a contact token, not a user token
+		subjectType := getStringClaim(mapClaims, "subject_type")
+		if subjectType != string(types.SubjectTypeContact) {
+			slog.Warn("portal auth middleware: non-contact token used on portal endpoint",
+				"subject_type", subjectType)
+			response.JSONError(w, http.StatusForbidden, "Forbidden")
+			return
+		}
+
+		contactIDStr := getStringClaim(mapClaims, "user_id")
+		if contactIDStr == "" {
+			contactIDStr = getStringClaim(mapClaims, "sub")
+		}
+		if contactIDStr == "" {
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		contactID, err := uuid.Parse(contactIDStr)
+		if err != nil {
+			slog.Warn("portal auth middleware: invalid contact UUID", "value", contactIDStr)
+			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		contactName := getStringClaim(mapClaims, "name")
+
+		// Also check RBAC: portal endpoints require one of the portal roles
+		role := types.UserRole(getStringClaim(mapClaims, "role"))
+		if role != types.UserRoleClient && role != types.UserRoleSubcontractor {
+			slog.Warn("portal auth middleware: non-portal role on portal endpoint",
+				"contact_id", contactID, "role", role)
+			response.JSONError(w, http.StatusForbidden, "Forbidden")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), portalContactIDKey, contactID)
+		ctx = context.WithValue(ctx, portalContactNameKey, contactName)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetPortalContactID extracts the portal contact ID from the request context.
+func GetPortalContactID(ctx context.Context) (uuid.UUID, bool) {
+	v, ok := ctx.Value(portalContactIDKey).(uuid.UUID)
+	return v, ok
 }

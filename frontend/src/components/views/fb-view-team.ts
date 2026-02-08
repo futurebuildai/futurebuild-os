@@ -545,7 +545,7 @@ export class FBViewTeam extends FBViewElement {
                                                 <td>
                                                     <button
                                                         class="btn-danger"
-                                                        @click=${() => this._openRevokeConfirm(invite.id, invite.email)}
+                                                        @click=${() => { this._openRevokeConfirm(invite.id, invite.email); }}
                                                     >
                                                         Revoke
                                                     </button>
@@ -575,7 +575,7 @@ export class FBViewTeam extends FBViewElement {
     private _renderFormStep(): TemplateResult {
         return html`
             <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="modal" @click=${(e: Event) => { e.stopPropagation(); }}>
                     <div class="modal-title">Invite Team Member</div>
 
                     ${this._formError ? html`<p class="form-error">${this._formError}</p>` : nothing}
@@ -635,7 +635,7 @@ export class FBViewTeam extends FBViewElement {
 
         return html`
             <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="modal" @click=${(e: Event) => { e.stopPropagation(); }}>
                     <div class="modal-title">Confirm Invitation</div>
 
                     ${this._formError ? html`<p class="form-error">${this._formError}</p>` : nothing}
@@ -675,7 +675,7 @@ export class FBViewTeam extends FBViewElement {
     private _renderRevokeConfirm(): TemplateResult {
         return html`
             <div class="modal-backdrop" @click=${this._closeRevokeConfirm.bind(this)}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="modal" @click=${(e: Event) => { e.stopPropagation(); }}>
                     <div class="modal-title">Revoke Invitation</div>
 
                     <p style="color: var(--fb-text-secondary); margin-bottom: var(--fb-spacing-lg); line-height: 1.5;">

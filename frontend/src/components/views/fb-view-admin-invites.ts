@@ -436,7 +436,7 @@ export class FBViewAdminInvites extends FBViewElement {
 
         return html`
             <div class="modal-backdrop" @click=${this._closeModal.bind(this)}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="modal" @click=${(e: Event) => { e.stopPropagation(); }}>
                     <div class="modal-title">Invite Team Member</div>
 
                     ${this._formError ? html`<p class="form-error">${this._formError}</p>` : nothing}

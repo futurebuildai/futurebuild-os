@@ -151,7 +151,7 @@ func TestProcessRequest_PersistsUserAndModelMessages(t *testing.T) {
 	// Verify User message
 	assert.Equal(t, types.ChatRoleUser, mockDB.Messages[0].Role)
 	assert.Equal(t, req.Message, mockDB.Messages[0].Content)
-	assert.Equal(t, userID, mockDB.Messages[0].UserID)
+	assert.Equal(t, &userID, mockDB.Messages[0].UserID)
 	assert.Equal(t, projectID, mockDB.Messages[0].ProjectID)
 
 	// Verify Model message

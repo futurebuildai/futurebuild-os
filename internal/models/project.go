@@ -27,8 +27,8 @@ type Project struct {
 	TargetEndDate    *time.Time    `json:"target_end_date,omitempty" db:"target_end_date"`
 	GSF              float64       `json:"square_footage" db:"gsf"`
 	Status           ProjectStatus `json:"status" db:"status"`
-	Bedrooms         int     `json:"bedrooms" db:"bedrooms"`
-	Bathrooms        float64 `json:"bathrooms" db:"bathrooms"` // float64 to support half-baths (2.5, 3.5)
+	Bedrooms         int           `json:"bedrooms" db:"bedrooms"`
+	Bathrooms        int           `json:"bathrooms" db:"bathrooms"`
 	Stories          int           `json:"stories" db:"stories"`
 	LotSize          float64       `json:"lot_size" db:"lot_size"`
 	FoundationType   string        `json:"foundation_type" db:"foundation_type"`

@@ -109,8 +109,11 @@ func TestCan_ViewerReadOnly(t *testing.T) {
 }
 
 func TestCan_SubcontractorPermissions(t *testing.T) {
-	allowed := []Scope{ScopeProjectRead, ScopeTaskRead, ScopeTaskWrite}
-	denied := []Scope{ScopeProjectCreate, ScopeDocumentWrite, ScopeChatWrite, ScopeSettingsWrite}
+	allowed := []Scope{
+		ScopeProjectRead, ScopeTaskRead, ScopeTaskWrite,
+		ScopeDocumentWrite, ScopeChatRead, ScopeChatWrite,
+	}
+	denied := []Scope{ScopeProjectCreate, ScopeSettingsWrite, ScopeBudgetApprove, ScopeMembersManage}
 
 	for _, scope := range allowed {
 		if !Can(types.UserRoleSubcontractor, scope) {
@@ -125,8 +128,11 @@ func TestCan_SubcontractorPermissions(t *testing.T) {
 }
 
 func TestCan_ClientPermissions(t *testing.T) {
-	allowed := []Scope{ScopeProjectRead, ScopeTaskRead, ScopeBudgetRead}
-	denied := []Scope{ScopeProjectCreate, ScopeTaskWrite, ScopeChatWrite}
+	allowed := []Scope{
+		ScopeProjectRead, ScopeTaskRead, ScopeBudgetRead,
+		ScopeDocumentWrite, ScopeChatRead, ScopeChatWrite,
+	}
+	denied := []Scope{ScopeProjectCreate, ScopeTaskWrite, ScopeSettingsWrite, ScopeBudgetApprove, ScopeMembersManage}
 
 	for _, scope := range allowed {
 		if !Can(types.UserRoleClient, scope) {

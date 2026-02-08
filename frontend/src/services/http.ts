@@ -27,9 +27,10 @@ export interface ApiResponse<T> {
 
 /**
  * API error response from backend.
+ * Backend uses format: {"error": {"code": N, "message": "..."}}
  */
 export interface ApiErrorResponse {
-    error: string;
+    error: string | { code: number; message: string };
     code?: string;
     details?: Record<string, unknown>;
 }
@@ -188,8 +189,18 @@ export async function request<T>(
                 error: 'Unknown error',
             }))) as ApiErrorResponse;
 
+            // Extract error message from nested format: {"error": {"code": N, "message": "..."}}
+            let errorMessage: string;
+            if (typeof errorBody.error === 'string') {
+                errorMessage = errorBody.error;
+            } else if (errorBody.error && typeof errorBody.error === 'object') {
+                errorMessage = errorBody.error.message || `HTTP ${String(response.status)}`;
+            } else {
+                errorMessage = `HTTP ${String(response.status)}`;
+            }
+
             throw new ApiError(
-                errorBody.error || `HTTP ${String(response.status)}`,
+                errorMessage,
                 response.status,
                 errorBody.code,
                 errorBody.details

@@ -119,7 +119,7 @@ export class ShadowNav extends FBElement {
     }
 
     override disconnectedCallback(): void {
-        this._disposeEffects.forEach((d) => d());
+        this._disposeEffects.forEach((d) => { d(); });
         super.disconnectedCallback();
     }
 
@@ -151,7 +151,7 @@ export class ShadowNav extends FBElement {
                 (node) => html`
                     <div
                         class="tree-item ${this._selectedPath === node.path ? 'selected' : ''}"
-                        @click=${() => this._handleDocClick(node)}
+                        @click=${() => { this._handleDocClick(node); }}
                     >
                         <span class="icon">${node.type === 'dir' ? '📁' : '📄'}</span>
                         ${node.name}
@@ -169,13 +169,13 @@ export class ShadowNav extends FBElement {
             <div class="tabs">
                 <button
                     class="tab ${this._activeView === 'log' ? 'active' : ''}"
-                    @click=${() => this._handleTabClick('log')}
+                    @click=${() => { this._handleTabClick('log'); }}
                 >
                     Tribunal Log
                 </button>
                 <button
                     class="tab ${this._activeView === 'docs' ? 'active' : ''}"
-                    @click=${() => this._handleTabClick('docs')}
+                    @click=${() => { this._handleTabClick('docs'); }}
                 >
                     ShadowDocs
                 </button>

@@ -553,7 +553,7 @@ export class FBArtifactInvoice extends FBElement {
                         class="edit-input"
                         type="text"
                         .value=${item.description}
-                        @input=${(e: Event) => this._updateItem(index, 'description', (e.target as HTMLInputElement).value)}
+                        @input=${(e: Event) => { this._updateItem(index, 'description', (e.target as HTMLInputElement).value); }}
                         placeholder="Description"
                         maxlength="500"
                     />
@@ -563,7 +563,7 @@ export class FBArtifactInvoice extends FBElement {
                         class="edit-input"
                         type="number"
                         .value=${String(item.quantity)}
-                        @input=${(e: Event) => this._updateItem(index, 'quantity', (e.target as HTMLInputElement).value)}
+                        @input=${(e: Event) => { this._updateItem(index, 'quantity', (e.target as HTMLInputElement).value); }}
                         min="0.01"
                         step="0.01"
                     />
@@ -573,7 +573,7 @@ export class FBArtifactInvoice extends FBElement {
                         class="edit-input"
                         type="number"
                         .value=${String(item.unitPriceCents / 100)}
-                        @input=${(e: Event) => this._updateItem(index, 'unitPriceCents', (e.target as HTMLInputElement).value)}
+                        @input=${(e: Event) => { this._updateItem(index, 'unitPriceCents', (e.target as HTMLInputElement).value); }}
                         min="0"
                         step="0.01"
                     />
@@ -582,7 +582,7 @@ export class FBArtifactInvoice extends FBElement {
                 <td class="col-actions">
                     <button
                         class="btn--remove"
-                        @click=${() => this._removeItem(index)}
+                        @click=${() => { this._removeItem(index); }}
                         title="Remove line item"
                         ?disabled=${this._draftItems.length <= 1}
                         aria-label="Remove line item"

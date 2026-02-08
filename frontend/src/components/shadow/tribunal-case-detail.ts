@@ -189,7 +189,7 @@ export class TribunalCaseDetail extends FBElement {
             const href = match[2] ?? '';
             if (href.startsWith('docs/') || href.startsWith('specs/')) {
                 parts.push(
-                    html`<a href="#" @click=${(e: Event) => this._handleDocLink(e, href)}>${text}</a>`
+                    html`<a href="#" @click=${(e: Event) => { this._handleDocLink(e, href); }}>${text}</a>`
                 );
             } else {
                 parts.push(html`<a href="${href}" target="_blank" rel="noopener">${text}</a>`);

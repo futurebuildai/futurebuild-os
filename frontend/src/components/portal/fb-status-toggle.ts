@@ -171,7 +171,7 @@ export class FBStatusToggle extends FBElement {
                             role="radio"
                             aria-pressed="${this.value === opt.status}"
                             ?disabled=${this.disabled}
-                            @click=${() => this._handleSelect(opt.status)}
+                            @click=${() => { this._handleSelect(opt.status); }}
                         >
                             <div class="icon icon--${opt.status}">
                                 ${this._renderIcon(opt.status)}

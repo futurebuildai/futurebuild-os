@@ -432,18 +432,12 @@ func (s *InterrogatorService) generateExtractionSummary(extraction *models.Extra
 	if foundation, ok := extraction.Values["foundation_type"].(string); ok && foundation != "" {
 		sb.WriteString(fmt.Sprintf("**Foundation**: %s\n", strings.Title(foundation)))
 	}
-	// JSON numbers unmarshal as float64
-	if stories, ok := extraction.Values["stories"].(float64); ok && stories > 0 {
-		sb.WriteString(fmt.Sprintf("**Stories**: %.0f\n", stories))
+	if stories, ok := extraction.Values["stories"].(int); ok && stories > 0 {
+		sb.WriteString(fmt.Sprintf("**Stories**: %d\n", stories))
 	}
-	if bed, ok := extraction.Values["bedrooms"].(float64); ok && bed > 0 {
-		if bath, ok := extraction.Values["bathrooms"].(float64); ok && bath > 0 {
-			// Format half-baths properly (e.g., "3.5 bath" vs "3 bath")
-			if bath == float64(int(bath)) {
-				sb.WriteString(fmt.Sprintf("**%.0f bed / %.0f bath**\n", bed, bath))
-			} else {
-				sb.WriteString(fmt.Sprintf("**%.0f bed / %.1f bath**\n", bed, bath))
-			}
+	if bed, ok := extraction.Values["bedrooms"].(int); ok && bed > 0 {
+		if bath, ok := extraction.Values["bathrooms"].(int); ok && bath > 0 {
+			sb.WriteString(fmt.Sprintf("**%d bed / %d bath**\n", bed, bath))
 		}
 	}
 

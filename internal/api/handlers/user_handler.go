@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/colton/futurebuild/internal/api/response"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
@@ -182,7 +183,7 @@ func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	claims, err := middleware.GetClaims(ctx)
 	if err != nil {
 		slog.Warn("user: unauthorized - no claims in context", "error", err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.JSONError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -194,7 +195,7 @@ func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		if resolveErr != nil {
 			slog.Error("user: no org_id in JWT and failed to resolve from user",
 				"error", resolveErr, "user_id", claims.UserID)
-			http.Error(w, "No organization context", http.StatusBadRequest)
+			response.JSONError(w, http.StatusBadRequest, "No organization context")
 			return
 		}
 		orgIdentifier = resolved
@@ -204,7 +205,7 @@ func (h *UserHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	members, err := h.userService.ListOrgMembers(ctx, orgIdentifier)
 	if err != nil {
 		slog.Error("user: failed to list org members", "error", err, "claim_org_id", claims.OrgID)
-		http.Error(w, "Failed to list members", http.StatusInternalServerError)
+		response.JSONError(w, http.StatusInternalServerError, "Failed to list members")
 		return
 	}
 
