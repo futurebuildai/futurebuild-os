@@ -37,9 +37,12 @@ export class FBOnboardingSteps extends SignalWatcher(FBElement) {
                 align-items: center;
                 justify-content: center;
                 padding: var(--fb-spacing-sm) var(--fb-spacing-xl);
-                background: var(--fb-bg-secondary);
-                border-bottom: 1px solid var(--fb-border);
-                min-height: 48px;
+                background: var(--md-sys-color-surface-container-low);
+                border-bottom: 1px solid var(--md-sys-color-outline-variant);
+                min-height: 56px;
+                box-shadow: var(--md-sys-elevation-1);
+                position: relative;
+                z-index: 5;
             }
 
             .steps {
@@ -52,99 +55,90 @@ export class FBOnboardingSteps extends SignalWatcher(FBElement) {
                 display: flex;
                 align-items: center;
                 gap: var(--fb-spacing-xs);
+                position: relative;
             }
 
             .step-content {
                 display: flex;
                 align-items: center;
-                gap: var(--fb-spacing-xs);
-                padding: var(--fb-spacing-xs) var(--fb-spacing-sm);
-                border-radius: var(--fb-radius-full);
-                transition: all 0.3s ease;
+                gap: var(--fb-spacing-sm);
+                padding: 6px 12px;
+                border-radius: var(--md-sys-shape-corner-full);
+                transition: all var(--fb-transition-base);
             }
 
             .step-indicator {
-                width: 24px;
-                height: 24px;
+                width: 28px;
+                height: 28px;
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 12px;
-                font-weight: 600;
-                transition: all 0.3s ease;
+                font: var(--md-sys-typescale-label-small);
+                transition: all var(--fb-transition-base);
                 flex-shrink: 0;
             }
 
             .step-indicator svg {
-                width: 14px;
-                height: 14px;
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
             }
 
             .step-label {
-                font-size: var(--fb-text-sm);
-                font-weight: 500;
+                font: var(--md-sys-typescale-label-medium);
                 white-space: nowrap;
-                transition: color 0.3s ease;
+                transition: color var(--fb-transition-base);
             }
 
             /* Completed state */
             .step.completed .step-indicator {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
+                background-color: var(--md-sys-color-primary);
+                color: var(--md-sys-color-on-primary);
             }
 
             .step.completed .step-label {
-                color: var(--fb-text-primary);
+                color: var(--md-sys-color-on-surface);
             }
 
             /* Active state */
             .step.active .step-content {
-                background: rgba(102, 126, 234, 0.1);
+                background-color: var(--md-sys-color-primary-container);
             }
 
             .step.active .step-indicator {
-                border: 2px solid #667eea;
-                background: white;
-                color: #667eea;
-                animation: pulse 2s ease-in-out infinite;
+                background-color: var(--md-sys-color-primary);
+                color: var(--md-sys-color-on-primary);
+                box-shadow: 0 0 0 2px var(--md-sys-color-background), 0 0 0 4px var(--md-sys-color-primary-container);
             }
 
             .step.active .step-label {
-                color: #667eea;
-                font-weight: 600;
+                color: var(--md-sys-color-on-primary-container);
+                font-weight: 500;
             }
 
             /* Pending state */
             .step.pending .step-indicator {
-                background: var(--fb-bg-tertiary);
-                color: var(--fb-text-muted);
+                background-color: var(--md-sys-color-surface-variant);
+                color: var(--md-sys-color-on-surface-variant);
             }
 
             .step.pending .step-label {
-                color: var(--fb-text-muted);
+                color: var(--md-sys-color-on-surface-variant);
             }
 
             /* Connector line between steps */
             .connector {
-                width: 32px;
+                width: 40px;
                 height: 2px;
-                background: var(--fb-border);
-                transition: background 0.3s ease;
+                background-color: var(--md-sys-color-surface-variant);
+                transition: background-color var(--fb-transition-base);
                 margin: 0 var(--fb-spacing-xs);
+                border-radius: 1px;
             }
 
             .connector.completed {
-                background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            }
-
-            @keyframes pulse {
-                0%, 100% {
-                    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
-                }
-                50% {
-                    box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
-                }
+                background-color: var(--md-sys-color-primary);
             }
 
             /* Responsive: Hide labels on small screens */

@@ -27,8 +27,8 @@ export class FBInputBar extends FBElement {
             :host {
                 display: block;
                 padding: var(--fb-spacing-md) var(--fb-spacing-lg);
-                background: var(--fb-bg-secondary);
-                border-top: 1px solid var(--fb-border-light);
+                background: var(--md-sys-color-surface);
+                border-top: 1px solid var(--md-sys-color-outline-variant);
             }
 
             .container {
@@ -37,6 +37,16 @@ export class FBInputBar extends FBElement {
                 gap: var(--fb-spacing-sm);
                 max-width: 100%;
                 position: relative;
+                background: var(--md-sys-color-surface-container-high);
+                border-radius: var(--md-sys-shape-corner-extra-large);
+                padding: 4px;
+                box-shadow: var(--md-sys-elevation-1);
+                transition: box-shadow var(--fb-transition-base);
+            }
+
+            .container:focus-within {
+                box-shadow: var(--md-sys-elevation-2);
+                background: var(--md-sys-color-surface-container-highest);
             }
 
             .input-wrapper {
@@ -50,27 +60,21 @@ export class FBInputBar extends FBElement {
                 width: 100%;
                 min-height: 44px;
                 max-height: 35vh;
-                padding: 12px 14px;
-                border: 1px solid var(--fb-border);
-                border-radius: var(--fb-radius-lg);
-                background: var(--fb-bg-primary);
-                color: var(--fb-text-primary);
-                font-size: var(--fb-text-sm);
-                font-family: inherit;
+                padding: 12px 16px;
+                border: none;
+                background: transparent;
+                color: var(--md-sys-color-on-surface);
+                font-family: var(--md-ref-typeface-plain);
+                font-size: var(--md-sys-typescale-body-large);
                 line-height: 1.5;
                 resize: none;
                 outline: none;
                 box-sizing: border-box;
-                transition: border-color 0.2s, height 0.1s ease-out;
                 overflow-y: auto;
             }
 
-            textarea:focus {
-                border-color: var(--fb-primary);
-            }
-
             textarea::placeholder {
-                color: var(--fb-text-muted);
+                color: var(--md-sys-color-on-surface-variant);
             }
 
             .input-hint {
@@ -86,50 +90,53 @@ export class FBInputBar extends FBElement {
             }
 
             .icon-btn {
-                width: 36px;
-                height: 36px;
+                width: 40px;
+                height: 40px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 border: none;
                 background: transparent;
-                color: var(--fb-text-muted);
+                color: var(--md-sys-color-on-surface-variant);
                 cursor: pointer;
                 border-radius: 50%;
-                transition: all 0.2s;
+                transition: all var(--fb-transition-base);
                 flex-shrink: 0;
             }
 
             .icon-btn:hover:not(:disabled) {
-                background: var(--fb-bg-tertiary);
-                color: var(--fb-text-primary);
+                background-color: var(--md-sys-color-surface-variant);
+                color: var(--md-sys-color-on-surface);
             }
 
             .icon-btn:focus-visible {
-                outline: 2px solid var(--fb-primary);
+                outline: 2px solid var(--md-sys-color-primary);
                 outline-offset: 2px;
             }
 
             .send-btn {
-                background: var(--fb-primary);
-                color: white;
+                background-color: var(--md-sys-color-primary);
+                color: var(--md-sys-color-on-primary);
+                margin-left: 4px;
             }
 
             .send-btn:hover:not(:disabled) {
-                background: var(--fb-primary-hover);
-                color: white;
-                opacity: 1;
+                background-color: var(--md-sys-color-primary); /* Darken slightly in implementation if needed, but primary is standard */
+                box-shadow: var(--md-sys-elevation-2);
+                transform: scale(1.05);
             }
 
             .send-btn:disabled {
-                background: var(--fb-bg-tertiary);
-                color: var(--fb-text-muted);
+                background-color: var(--md-sys-color-surface-variant);
+                color: var(--md-sys-color-on-surface-variant);
                 cursor: not-allowed;
+                box-shadow: none;
+                transform: none;
             }
 
             svg {
-                width: 20px;
-                height: 20px;
+                width: 24px;
+                height: 24px;
                 fill: currentColor;
             }
         `

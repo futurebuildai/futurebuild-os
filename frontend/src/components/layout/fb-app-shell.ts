@@ -73,10 +73,14 @@ export class FBAppShell extends FBElement {
                 grid-template-columns: var(--fb-left-panel-width, 280px) 1fr 0;
             }
 
+            /* Neither right panel logic overrides this, checked in code */
+
             /* Both panels closed */
             :host([left-closed][right-closed]) {
                 grid-template-columns: 0 1fr 0;
             }
+
+            /* Force right closed strictly via attribute if needed, but grid calc above handles it */
 
             fb-panel-left {
                 grid-area: left;
@@ -180,34 +184,6 @@ export class FBAppShell extends FBElement {
                 to { opacity: 1; }
             }
 
-            /* Theme: Light */
-            .shell[data-theme="light"] {
-                --fb-bg-primary: #ffffff;
-                --fb-bg-secondary: #f5f5f5;
-                --fb-bg-tertiary: #eeeeee;
-                --fb-bg-card: #ffffff;
-                --fb-bg-panel: #fafafa;
-                --fb-text-primary: #111111;
-                --fb-text-secondary: #666666;
-                --fb-text-muted: #999999;
-                --fb-border: #e0e0e0;
-                --fb-border-light: #f0f0f0;
-            }
-
-            /* Theme: Dark (default) */
-            .shell[data-theme="dark"] {
-                --fb-bg-primary: #000000;
-                --fb-bg-secondary: #0a0a0a;
-                --fb-bg-tertiary: #1a1a1a;
-                --fb-bg-card: #111111;
-                --fb-bg-panel: #0a0a0a;
-                --fb-text-primary: #ffffff;
-                --fb-text-secondary: #aaaaaa;
-                --fb-text-muted: #666666;
-                --fb-border: #333333;
-                --fb-border-light: #222222;
-            }
-
             .shell {
                 display: contents;
             }
@@ -225,6 +201,7 @@ export class FBAppShell extends FBElement {
     @state() private _shadowModeEnabled = false;
     @state() private _isAdminRoute = false;
     @state() private _isPlatformAdmin = false;
+    @state() private _isOnboardingRoute = false;
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -292,6 +269,8 @@ export class FBAppShell extends FBElement {
             effect(() => {
                 const theme = store.theme$.value;
                 this._resolvedTheme = this._resolveTheme(theme);
+                // Sync to root for global variable overrides
+                document.documentElement.setAttribute('data-theme', this._resolvedTheme);
             })
         );
 
@@ -322,6 +301,10 @@ export class FBAppShell extends FBElement {
         this._disposeEffects.push(
             effect(() => {
                 this._rightPanelOpen = store.rightPanelOpen$.value;
+                // If on onboarding route, force right panel closed visually in render,
+                // but we also ensure attribute is synced if we want to rely on grid.
+                // However, render() logic for hiding is more robust for temporary overrides.
+                // We keep attribute logic for standard toggle behavior.
                 if (this._rightPanelOpen) {
                     this.removeAttribute('right-closed');
                 } else {
@@ -367,9 +350,12 @@ export class FBAppShell extends FBElement {
             })
         );
 
-        // Track admin route
-        this._checkAdminRoute();
-        window.addEventListener('popstate', this._handleAdminPopState);
+        // Track routes
+        this._checkRoutes();
+        window.addEventListener('popstate', this._handlePopState);
+
+        // Monkey-patch history to catch pushState/replaceState
+        this._patchHistory();
     }
 
     /**
@@ -401,12 +387,30 @@ export class FBAppShell extends FBElement {
         await clerkService.syncAuthState();
     }
 
-    private _handleAdminPopState = (): void => {
-        this._checkAdminRoute();
+    private _handlePopState = (): void => {
+        this._checkRoutes();
     };
 
-    private _checkAdminRoute(): void {
-        this._isAdminRoute = window.location.pathname.startsWith('/admin');
+    private _checkRoutes(): void {
+        const path = window.location.pathname;
+        this._isAdminRoute = path.startsWith('/admin');
+        this._isOnboardingRoute = path === '/projects/new';
+    }
+
+    private _patchHistory(): void {
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+        const self = this;
+
+        history.pushState = function (...args) {
+            originalPushState.apply(this, args);
+            self._checkRoutes();
+        };
+
+        history.replaceState = function (...args) {
+            originalReplaceState.apply(this, args);
+            self._checkRoutes();
+        };
     }
 
     override disconnectedCallback(): void {
@@ -422,6 +426,11 @@ export class FBAppShell extends FBElement {
         this._disposeEffects = [];
         super.disconnectedCallback();
     }
+
+    // Kept for backward compatibility if needed, but we use _handlePopState now
+    private _handleAdminPopState = (): void => {
+        this._checkRoutes();
+    };
 
     private _resolveTheme(theme: string): 'light' | 'dark' {
         if (theme === 'system') {
@@ -446,7 +455,13 @@ export class FBAppShell extends FBElement {
             `;
         }
 
-        const resizeHandleOffset = this._rightPanelOpen && !this._isMobile ? this._rightPanelWidth : 0;
+        // Hide right panel on onboarding, regardless of preference
+        const showRightPanel = this._isAuthenticated && this._rightPanelOpen && !this._isOnboardingRoute;
+
+        // Also ensure grid knows panel is hidden if we are on onboarding
+        // We do this by checking if we should render the actual panel element
+
+        const resizeHandleOffset = showRightPanel && !this._isMobile ? this._rightPanelWidth : 0;
 
         // Admin route: render platform admin shell (or redirect non-admins)
         if (this._isAdminRoute && this._isAuthenticated) {
@@ -475,13 +490,18 @@ export class FBAppShell extends FBElement {
         }
 
         return html`
-            <div class="shell" data-theme="${this._resolvedTheme}" style="position: relative;">
+            <!-- If onboarding, we force right-closed attribute to ensure grid layout adapts -->
+            <div class="shell" 
+                 data-theme="${this._resolvedTheme}" 
+                 ?right-closed=${!showRightPanel} 
+                 style="position: relative;">
+                 
                 <fb-file-drop></fb-file-drop>
                 ${this._isAuthenticated ? html`<fb-panel-left></fb-panel-left>` : nothing}
                 <fb-panel-center .isAuthenticated=${this._isAuthenticated}></fb-panel-center>
-                ${this._isAuthenticated ? html`<fb-panel-right></fb-panel-right>` : nothing}
+                ${showRightPanel ? html`<fb-panel-right></fb-panel-right>` : nothing}
 
-                ${this._isAuthenticated && this._rightPanelOpen && !this._isMobile ? html`
+                ${showRightPanel && !this._isMobile ? html`
                     <fb-resize-handle style="--resize-handle-offset: ${resizeHandleOffset}px;"></fb-resize-handle>
                 ` : nothing}
 

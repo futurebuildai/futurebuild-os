@@ -43,6 +43,9 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 flex-direction: column;
                 height: 100%;
                 overflow: hidden;
+                background-color: var(--md-sys-color-background);
+                color: var(--md-sys-color-on-background);
+                font-family: var(--md-ref-typeface-plain);
             }
 
             .chat-container {
@@ -50,216 +53,302 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 display: flex;
                 flex-direction: column;
                 min-height: 0;
+                position: relative;
             }
 
+            /* Scrollbar styling */
             .message-list {
                 flex: 1;
                 overflow-y: auto;
-                padding: var(--fb-spacing-md, 16px);
+                padding: var(--fb-spacing-lg) var(--fb-spacing-xl);
                 display: flex;
                 flex-direction: column;
-                gap: var(--fb-spacing-sm, 8px);
+                gap: var(--fb-spacing-md);
+                scroll-behavior: smooth;
             }
 
+            .message-list::-webkit-scrollbar {
+                width: 8px;
+            }
+            .message-list::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .message-list::-webkit-scrollbar-thumb {
+                background-color: var(--md-sys-color-outline-variant);
+                border-radius: 4px;
+            }
+
+            /* Message Bubbles */
             .message {
-                max-width: 85%;
-                padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
-                border-radius: var(--fb-radius-md, 8px);
-                font-size: var(--fb-text-sm, 14px);
-                line-height: 1.5;
-                word-wrap: break-word;
+                max-width: 70%;
+                padding: var(--fb-spacing-md) var(--fb-spacing-lg);
+                border-radius: var(--md-sys-shape-corner-large);
+                font: var(--md-sys-typescale-body-large);
+                position: relative;
+                animation: fadeIn 0.3s ease-out;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
 
             .message.user {
                 align-self: flex-end;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border-bottom-right-radius: 2px;
+                background-color: var(--md-sys-color-primary-container);
+                color: var(--md-sys-color-on-primary-container);
+                border-bottom-right-radius: var(--md-sys-shape-corner-extra-small);
+                box-shadow: var(--md-sys-elevation-1);
             }
 
             .message.assistant {
                 align-self: flex-start;
-                background: var(--fb-bg-tertiary, #f5f5f5);
-                color: var(--fb-text-primary, #1a1a1a);
-                border-bottom-left-radius: 2px;
+                background-color: var(--md-sys-color-surface-container-high);
+                color: var(--md-sys-color-on-surface);
+                border-bottom-left-radius: var(--md-sys-shape-corner-extra-small);
+                box-shadow: var(--md-sys-elevation-1);
             }
 
             .message.system {
                 align-self: center;
-                background: rgba(102, 126, 234, 0.08);
-                color: var(--fb-text-muted, #666);
-                font-size: var(--fb-text-xs, 12px);
+                background: transparent;
+                color: var(--md-sys-color-outline);
+                font: var(--md-sys-typescale-label-medium);
                 text-align: center;
                 max-width: 90%;
+                padding: var(--fb-spacing-xs);
+                border: 1px dashed var(--md-sys-color-outline-variant);
+                margin: var(--fb-spacing-sm) 0;
             }
 
             .processing-indicator {
                 align-self: flex-start;
-                padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
-                color: var(--fb-text-muted, #666);
-                font-size: var(--fb-text-sm, 14px);
+                padding: var(--fb-spacing-sm) var(--fb-spacing-md);
+                color: var(--md-sys-color-secondary);
+                font: var(--md-sys-typescale-body-medium);
                 font-style: italic;
+                display: flex;
+                align-items: center;
+                gap: 8px;
             }
 
+            .processing-indicator::before {
+                content: '';
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--md-sys-color-secondary);
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0% { transform: scale(0.8); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 1; }
+                100% { transform: scale(0.8); opacity: 0.5; }
+            }
+
+            /* Hero Dropzone Styling */
+            .hero-dropzone {
+                width: 100%;
+                max-width: 600px;
+                margin-top: var(--fb-spacing-xl);
+                animation: slideUp 0.6s ease-out;
+                --dropzone-min-height: 200px;
+            }
+
+            /* Compact Dropzone Styling */
             .dropzone-wrapper {
                 flex-shrink: 0;
-                padding: var(--fb-spacing-md, 16px);
-                border-top: 1px solid var(--fb-border-light, #eee);
+                padding: var(--fb-spacing-md) var(--fb-spacing-xl);
+                background-color: var(--md-sys-color-surface);
+                border-top: 1px solid var(--md-sys-color-outline-variant);
             }
 
+            /* Greeting Hero */
             .greeting {
-                padding: var(--fb-spacing-lg, 24px);
-                background: var(--fb-bg-tertiary, #f5f5f5);
-                border-radius: var(--fb-radius-lg, 12px);
-                margin: var(--fb-spacing-lg, 24px);
-                color: var(--fb-text-primary, #1a1a1a);
-                font-size: var(--fb-text-sm, 14px);
-                line-height: 1.6;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: var(--fb-spacing-2xl);
+                text-align: center;
+                color: var(--md-sys-color-on-background);
+                animation: slideUp 0.5s ease-out;
+                overflow-y: auto; /* Allow scrolling if hero content is tall */
+            }
+
+            @keyframes slideUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
             }
 
             .greeting-icon {
-                font-size: 24px;
-                margin-bottom: var(--fb-spacing-sm, 8px);
+                font: var(--md-sys-typescale-headline-medium);
+                margin-bottom: var(--fb-spacing-md);
+                background: var(--fb-dawn-gradient);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                display: inline-block;
+            }
+
+            .greeting strong {
+                font: var(--md-sys-typescale-title-large);
+                margin-bottom: var(--fb-spacing-sm);
+                display: block;
+            }
+
+            .greeting p {
+                font: var(--md-sys-typescale-body-medium);
+                color: var(--md-sys-color-on-surface-variant);
+                max-width: 480px;
+                line-height: 1.6;
+                margin-bottom: var(--fb-spacing-lg);
             }
 
             fb-input-bar {
                 flex-shrink: 0;
             }
+            
+            /* ... (rest of styles preserved) ... */
 
             /* Extraction card styling */
             .extraction-card {
-                background: var(--fb-bg-card, white);
-                border: 1px solid var(--fb-border);
-                border-radius: var(--fb-radius-md, 8px);
-                padding: var(--fb-spacing-md, 16px);
-                margin: var(--fb-spacing-sm, 8px) 0;
-                max-width: 90%;
+                background: var(--md-sys-color-surface-container);
+                border: 1px solid var(--md-sys-color-outline-variant);
+                border-radius: var(--md-sys-shape-corner-medium);
+                padding: var(--fb-spacing-md);
+                margin: var(--fb-spacing-xs) 0;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .extraction-header {
-                font-weight: 600;
-                font-size: var(--fb-text-sm, 14px);
-                color: var(--fb-text-primary);
-                margin-bottom: var(--fb-spacing-sm, 8px);
+                font: var(--md-sys-typescale-title-small);
+                color: var(--md-sys-color-primary);
+                margin-bottom: var(--fb-spacing-sm);
                 display: flex;
                 align-items: center;
-                gap: var(--fb-spacing-xs, 4px);
+                gap: var(--fb-spacing-sm);
             }
 
             .extraction-header svg {
-                width: 16px;
-                height: 16px;
-                color: #667eea;
+                width: 18px;
+                height: 18px;
+                fill: currentColor;
             }
 
             .extraction-fields {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: var(--fb-spacing-xs, 4px);
-                font-size: var(--fb-text-sm, 14px);
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: var(--fb-spacing-sm);
             }
 
             .extraction-field {
                 display: flex;
                 flex-direction: column;
-                padding: var(--fb-spacing-xs, 4px) 0;
             }
 
             .extraction-field-label {
-                color: var(--fb-text-muted);
-                font-size: 11px;
+                color: var(--md-sys-color-on-surface-variant);
+                font: var(--md-sys-typescale-label-small);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }
 
             .extraction-field-value {
-                color: var(--fb-text-primary);
-                font-weight: 500;
+                color: var(--md-sys-color-on-surface);
+                font: var(--md-sys-typescale-body-medium);
             }
 
             /* Procurement warning styling */
             .procurement-warning {
-                background: rgba(251, 191, 36, 0.1);
-                border: 1px solid #fbbf24;
-                border-radius: var(--fb-radius-sm, 4px);
-                padding: var(--fb-spacing-sm, 8px);
-                margin-top: var(--fb-spacing-sm, 8px);
+                background-color: var(--md-sys-color-error-container);
+                color: var(--md-sys-color-on-error-container);
+                border: none;
+                border-radius: var(--md-sys-shape-corner-small);
+                padding: var(--fb-spacing-md);
+                margin-top: var(--fb-spacing-sm);
             }
 
             .procurement-warning-header {
-                font-weight: 600;
-                font-size: var(--fb-text-sm, 14px);
-                color: #78350f;
-                margin-bottom: var(--fb-spacing-xs, 4px);
+                font: var(--md-sys-typescale-label-large);
+                color: var(--md-sys-color-on-error-container);
+                margin-bottom: var(--fb-spacing-xs);
                 display: flex;
                 align-items: center;
-                gap: var(--fb-spacing-xs, 4px);
+                gap: var(--fb-spacing-sm);
             }
 
             .procurement-warning-header svg {
-                width: 16px;
-                height: 16px;
+                width: 18px;
+                height: 18px;
+                fill: currentColor;
             }
 
             .lead-item {
-                font-size: var(--fb-text-sm, 14px);
-                color: #78350f;
-                padding: 2px 0;
-            }
-
-            .lead-item-weeks {
-                font-weight: 600;
+                font: var(--md-sys-typescale-body-small);
+                color: var(--md-sys-color-on-error-container);
+                opacity: 0.9;
             }
 
             /* Create button styling */
             .create-section {
-                padding: var(--fb-spacing-md, 16px);
-                border-top: 1px solid var(--fb-border);
-                background: var(--fb-bg-secondary);
+                padding: var(--fb-spacing-md) var(--fb-spacing-xl);
+                border-top: 1px solid var(--md-sys-color-outline-variant);
+                background: var(--md-sys-color-surface-container-low);
+                display: flex;
+                flex-direction: column;
+                gap: var(--fb-spacing-sm);
             }
 
             .create-summary {
-                font-size: var(--fb-text-sm, 14px);
-                color: var(--fb-text-muted);
-                margin-bottom: var(--fb-spacing-sm, 8px);
+                font: var(--md-sys-typescale-body-small);
+                color: var(--md-sys-color-on-surface-variant);
+                text-align: center;
             }
 
             .btn-create {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: var(--fb-spacing-xs, 4px);
+                gap: var(--fb-spacing-sm);
                 width: 100%;
-                padding: var(--fb-spacing-md, 16px);
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                font-size: var(--fb-text-md, 16px);
-                font-weight: 600;
+                padding: 12px 24px;
+                background-color: var(--md-sys-color-primary);
+                color: var(--md-sys-color-on-primary);
+                font: var(--md-sys-typescale-label-large);
                 border: none;
-                border-radius: var(--fb-radius-md, 8px);
+                border-radius: var(--md-sys-shape-corner-full);
                 cursor: pointer;
-                transition: all 0.2s;
+                transition: all var(--fb-transition-base);
+                box-shadow: var(--md-sys-elevation-2);
             }
 
             .btn-create:hover:not(:disabled) {
+                background-color: var(--fb-primary-hover); /* Fallback or calculate lighter */
+                box-shadow: var(--md-sys-elevation-3);
                 transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
             }
 
             .btn-create:disabled {
-                opacity: 0.5;
+                background-color: var(--md-sys-color-surface-variant);
+                color: var(--md-sys-color-on-surface-variant);
+                box-shadow: none;
                 cursor: not-allowed;
             }
 
             .btn-create svg {
                 width: 20px;
                 height: 20px;
+                fill: currentColor;
             }
 
             .error-message {
-                color: #dc2626;
-                font-size: var(--fb-text-sm, 14px);
-                margin-top: var(--fb-spacing-xs, 4px);
+                color: var(--md-sys-color-error);
+                font: var(--md-sys-typescale-body-small);
+                text-align: center;
             }
         `
     ];
@@ -561,15 +650,24 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                         <div class="greeting-icon">Welcome to FutureBuild</div>
                         <strong>I'm here to help set up your new project.</strong>
                         <p>Drop your building plans or permit set below, and I'll extract everything I need to generate your initial schedule. You can also describe your project if you don't have documents handy.</p>
+                        
+                        <div class="hero-dropzone">
+                            <fb-onboarding-dropzone
+                                @file-dropped=${(e: CustomEvent<{ files: File[] }>): void => { void this._handleFileDrop(e); }}
+                                ?disabled=${isProcessing.value}
+                            ></fb-onboarding-dropzone>
+                        </div>
                     </div>
-                ` : this._renderMessages()}
-
-                <div class="dropzone-wrapper">
-                    <fb-onboarding-dropzone
-                        @file-dropped=${(e: CustomEvent<{ files: File[] }>): void => { void this._handleFileDrop(e); }}
-                        ?disabled=${isProcessing.value}
-                    ></fb-onboarding-dropzone>
-                </div>
+                ` : html`
+                    ${this._renderMessages()}
+                    
+                    <div class="dropzone-wrapper">
+                        <fb-onboarding-dropzone
+                            @file-dropped=${(e: CustomEvent<{ files: File[] }>): void => { void this._handleFileDrop(e); }}
+                            ?disabled=${isProcessing.value}
+                        ></fb-onboarding-dropzone>
+                    </div>
+                `}
             </div>
 
             ${ready ? this._renderCreateSection() : html`

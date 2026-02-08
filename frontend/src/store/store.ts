@@ -94,7 +94,7 @@ const _agentActivity$ = signal<AgentActivity[]>([]);
 // UI (Updated for 3-panel layout)
 const _leftPanelOpen$ = signal<boolean>(true);
 const _rightPanelOpen$ = signal<boolean>(true);
-const _theme$ = signal<Theme>('system');
+const _theme$ = signal<Theme>('dark');
 const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
 const _activeProjectId$ = signal<string | null>(null);

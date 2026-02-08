@@ -34,37 +34,45 @@ export class FBOnboardingDropzone extends FBElement {
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                gap: var(--fb-spacing-xs, 4px);
-                padding: var(--fb-spacing-md, 16px);
-                border: 2px dashed var(--fb-border, #e5e5e5);
-                border-radius: var(--fb-radius-md, 8px);
-                background: var(--fb-bg-card, white);
+                gap: var(--fb-spacing-sm);
+                padding: var(--fb-spacing-lg);
+                border: 2px dashed var(--md-sys-color-outline-variant);
+                border-radius: var(--md-sys-shape-corner-medium);
+                background: var(--md-sys-color-surface-container);
                 cursor: pointer;
-                transition: all 0.2s;
-                min-height: 80px;
+                transition: all var(--fb-transition-base);
+                min-height: var(--dropzone-min-height, 120px);
                 outline: none;
+                position: relative;
+                overflow: hidden;
             }
 
             .dropzone:focus-visible {
-                outline: 2px solid #667eea;
+                outline: 2px solid var(--md-sys-color-primary);
                 outline-offset: 2px;
             }
 
             .dropzone:hover:not(.disabled) {
-                border-color: #667eea;
-                background: rgba(102, 126, 234, 0.02);
+                border-color: var(--md-sys-color-primary);
+                background: var(--md-sys-color-surface-container-high);
             }
 
             .dropzone.drag-over {
-                border-color: #667eea;
-                background: rgba(102, 126, 234, 0.08);
+                border-color: var(--md-sys-color-primary);
+                background: var(--md-sys-color-primary-container);
                 border-style: solid;
             }
 
+            .dropzone.drag-over .dropzone-text,
+            .dropzone.drag-over .dropzone-icon {
+                color: var(--md-sys-color-on-primary-container);
+            }
+
             .dropzone.uploading {
-                border-color: #667eea;
+                border-color: var(--md-sys-color-primary);
                 border-style: solid;
                 cursor: default;
+                background: var(--md-sys-color-surface-container-high);
             }
 
             .dropzone.disabled {
@@ -74,42 +82,44 @@ export class FBOnboardingDropzone extends FBElement {
 
             .dropzone-icon {
                 font-size: 32px;
-                opacity: 0.6;
+                color: var(--md-sys-color-primary);
+                transition: color var(--fb-transition-base);
             }
 
             .dropzone-text {
-                font-size: var(--fb-text-sm, 14px);
-                color: var(--fb-text-muted, #666);
+                font: var(--md-sys-typescale-body-medium);
+                color: var(--md-sys-color-on-surface);
                 text-align: center;
             }
 
             .dropzone-hint {
-                font-size: var(--fb-text-xs, 12px);
-                color: var(--fb-text-muted, #666);
+                font: var(--md-sys-typescale-body-small);
+                color: var(--md-sys-color-on-surface-variant);
                 text-align: center;
             }
 
             .error-message {
-                color: #dc2626;
-                font-size: var(--fb-text-sm, 14px);
+                color: var(--md-sys-color-error);
+                font: var(--md-sys-typescale-body-small);
                 text-align: center;
-                margin-top: var(--fb-spacing-xs, 4px);
+                margin-top: var(--fb-spacing-xs);
             }
 
-            .progress-container {
+            .progress-bg {
                 width: 100%;
-                max-width: 200px;
+                max-width: 240px;
                 height: 4px;
-                background: var(--fb-border, #e5e5e5);
-                border-radius: 2px;
-                margin-top: var(--fb-spacing-sm, 8px);
+                background: var(--md-sys-color-surface-variant);
+                border-radius: var(--md-sys-shape-corner-full);
+                margin-top: var(--fb-spacing-md);
                 overflow: hidden;
             }
 
-            .progress-bar {
+            .progress-fill {
                 height: 100%;
-                background: #667eea;
+                background-color: var(--md-sys-color-primary);
                 transition: width 0.3s ease;
+                width: 0%;
             }
 
             input[type="file"] {
@@ -263,12 +273,12 @@ export class FBOnboardingDropzone extends FBElement {
             <div class="dropzone-icon">⏳</div>
             <div class="dropzone-text">
                 ${this._uploadProgress < 100
-                    ? `Uploading ${this._uploadFileName}...`
-                    : 'Analyzing blueprint...'}
+                ? `Uploading ${this._uploadFileName}...`
+                : 'Analyzing blueprint...'}
             </div>
-            <div class="progress-container">
+            <div class="progress-bg">
                 <div
-                    class="progress-bar"
+                    class="progress-fill"
                     style="width: ${String(this._uploadProgress)}%"
                 ></div>
             </div>
