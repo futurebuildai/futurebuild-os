@@ -48,8 +48,9 @@ The CPM engine calculates this. The Procurement agent calculates this. We just n
 | `/project/:id` | **Project Detail** | Tapped project card or pill filter | Feed filtered to one project + right panel |
 | `/project/:id/chat` | **Project Chat** | "Tell me more" or direct nav | 2-panel: chat + artifacts |
 | `/project/:id/schedule` | **Schedule View** | Tapped Gantt card or nav | Full-width Gantt renderer |
-| `/settings` | **Settings** | User settings | Standard settings page |
-| `/settings/team` | **Team** | Team management | Standard settings page |
+| `/settings/profile` | **Profile** | User profile | Standard settings page |
+| `/settings/org` | **Org Settings** | Physics config, org info (Admin/Builder) | Standard settings page |
+| `/settings/team` | **Team** | Team management (Admin) | Standard settings page |
 | `/admin` | **Admin Shell** | Platform admin | Separate layout |
 | `/portal/*` | **Portal Views** | External contacts | Separate layout (keep V1) |
 | `/login` | **Login** | Unauthenticated | Full-screen Clerk |
@@ -71,6 +72,17 @@ The CPM engine calculates this. The Procurement agent calculates this. We just n
 - No left sidebar in default view
 - Right panel: appears when artifact is active (same as V1 behavior)
 - Mobile: project pills become horizontal scroll; bottom nav for Home/Chat/Settings
+
+**User Menu (avatar dropdown, top-right):**
+```
+[Avatar ▾]
+├── My Profile        → /settings/profile
+├── Organization      → /settings/org    (Admin/Builder only)
+├── Team & Invites    → /settings/team   (Admin only)
+├── ──────────
+├── Theme: Dark/Light (toggle inline)
+└── Sign Out
+```
 
 ### 2.3 View Details
 
@@ -135,7 +147,37 @@ Engine narrates its work in real-time (SSE stream):
 ```
 
 **Correction loop:** Input at bottom for natural language corrections.
-**Activate:** "Looks good — activate project" → `POST /api/v1/projects` → redirect to `/` with new project in feed.
+
+**Engine Calibration (first project only):**
+
+After extraction, before activation, show a lightweight calibration step. This sets org-level physics config (`PUT /api/v1/org/settings/physics`) and project-level context (stored in `ProjectContext` via `POST /api/v1/projects`). Only shown on the user's first project — subsequent projects inherit org settings silently.
+
+```
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│  Before I activate your schedule, two quick ones:    │
+│                                                      │
+│  Which days does your crew work?                     │
+│  [M ✓] [T ✓] [W ✓] [Th ✓] [F ✓] [Sa ○] [Su ○]    │
+│                                                      │
+│  How long do inspections typically take              │
+│  in your area?                                       │
+│  Rough: [3 days ▾]  Final: [5 days ▾]               │
+│                                                      │
+│  [ Use defaults and skip ]                           │
+│  [ Apply → Activate project ]                        │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Design decisions:**
+- **No speed multiplier slider here.** Speed calibration is too abstract at project creation time. The engine starts at 1.0x (industry standard) and the system observes actual performance over time (see §11.2 for passive recalibration).
+- **Work days are concrete and knowable** — every builder knows their crew's schedule.
+- **Inspection latency is local knowledge** — builders know their jurisdiction.
+- **"Use defaults and skip"** always available. No gates.
+- Supply chain volatility is not exposed — the Procurement agent handles this internally via weather + lead time math.
+
+**Activate:** "Apply → Activate project" → `PUT /api/v1/org/settings/physics` (work days) + `POST /api/v1/projects` (with inspection latency in ProjectContext) → redirect to `/` with new project in feed.
 
 **Backend:** Uses existing `POST /api/v1/agent/onboard` (multipart) + `POST /api/v1/projects`. The extraction narration is a new SSE response mode from the onboard endpoint (see §5.3).
 
@@ -202,6 +244,9 @@ Each card type maps to a backend agent output or engine event.
 | `client_report_due` | Weekly cycle (Friday) | P2 | [Review draft] [Approve & Send] |
 | `task_starting` | Task with EarlyStart in range | P3 | [Confirm] |
 | `blocker_detected` | Task with status=Blocked | P0 | [View blocker] [Tell me more] |
+| `setup_team` | System (post-first-project) | P2 | [Add contacts] [Skip for now] |
+| `setup_contacts` | SubLiaison (phase has no contact, task starting soon) | P1 | [Assign contact] [Skip notification] |
+| `calibration_drift` | Engine (see §11.2 — only on sustained major deviation) | P2 | [Adjust] [Keep current] |
 
 ### 3.2 FeedCard Data Structure
 
@@ -264,7 +309,10 @@ type FeedCardType =
   | 'daily_briefing'
   | 'client_report_due'
   | 'task_starting'
-  | 'blocker_detected';
+  | 'blocker_detected'
+  | 'setup_team'
+  | 'setup_contacts'
+  | 'calibration_drift';
 ```
 
 ### 3.3 Card Visual Design
@@ -325,7 +373,12 @@ Within each time horizon section (TODAY / THIS WEEK / HORIZON):
 | `fb-schedule-diff` | `fb-schedule-diff` | Before/after schedule comparison overlay |
 | `fb-greeting-banner` | `fb-greeting-banner` | "Good morning, Marcus" with portfolio summary metrics |
 | `fb-empty-home` | `fb-empty-home` | No-projects CTA: leads to onboarding |
-| `fb-user-menu` | `fb-user-menu` | Dropdown: settings, team, theme toggle, sign out |
+| `fb-user-menu` | `fb-user-menu` | Dropdown: profile, org settings, team, theme toggle, sign out |
+| `fb-engine-calibration` | `fb-engine-calibration` | First-project-only: work days + inspection latency before activation |
+| `fb-settings-profile` | `fb-settings-profile` | User profile page: name (editable), email, role (read-only) |
+| `fb-settings-org` | `fb-settings-org` | Org settings: physics config (speed slider + work days), org info. Admin/Builder only |
+| `fb-settings-team` | `fb-settings-team` | Team management: members list, pending invites, invite modal. Admin only |
+| `fb-contact-quick-add` | `fb-contact-quick-add` | Inline contact add form (rendered inside feed card for setup_contacts) |
 
 #### Kept (No Changes)
 
@@ -358,6 +411,7 @@ Within each time horizon section (TODAY / THIS WEEK / HORIZON):
 | `fb-agent-activity` | `fb-agent-activity` | Merge into feed. Agent actions become FeedCards, not a sidebar widget. |
 | `fb-notification-bell` | `fb-notification-bell` | Move to top bar. |
 | `fb-notification-list` | `fb-notification-list` | Keep dropdown behavior. |
+| `fb-view-settings` | `fb-view-settings` | Rebuild as router for profile/org/team sub-views. |
 
 #### Scrapped
 
@@ -422,8 +476,9 @@ type Route =
   | { view: 'project'; projectId: string }
   | { view: 'project-chat'; projectId: string; threadId?: string }
   | { view: 'project-schedule'; projectId: string }
-  | { view: 'settings' }
-  | { view: 'team' }
+  | { view: 'settings-profile' }
+  | { view: 'settings-org' }
+  | { view: 'settings-team' }
   | { view: 'admin' }
   | { view: 'login' }
   | { view: 'portal'; subpath: string };
@@ -664,8 +719,14 @@ type FeedService struct {
 | `POST /api/v1/invoices/:id/approve` | Invoice approval |
 | `POST /api/v1/invoices/:id/reject` | Invoice rejection |
 | `GET /api/v1/auth/me` | Auth state |
-| `GET /api/v1/users/me` | User profile |
-| `GET /api/v1/org/members` | Team management |
+| `GET /api/v1/users/me` | Profile settings |
+| `PUT /api/v1/users/me` | Profile edit (name) |
+| `GET /api/v1/org/settings/physics` | Org settings page (speed multiplier, work days) |
+| `PUT /api/v1/org/settings/physics` | Org settings edit + onboarding calibration |
+| `GET /api/v1/org/members` | Team settings page |
+| `POST /api/v1/admin/invites` | Team invite creation |
+| `GET /api/v1/admin/invites` | Pending invites list |
+| `DELETE /api/v1/admin/invites/:id` | Revoke invite |
 
 ---
 
@@ -830,29 +891,34 @@ Events:
 17. Add consequence calculation (SimulateSlip endpoint)
 18. Add consequence text to procurement and schedule cards
 
-### Phase 4: Onboarding Redesign
+### Phase 4: Onboarding + Settings
 19. Build `fb-onboard-flow` full-screen component
 20. Implement SSE streaming mode for onboarding endpoint
 21. Build `fb-extraction-stream` component
 22. Wire correction loop to existing onboard chat endpoint
+23. Build `fb-engine-calibration` (first-project work days + inspection latency step)
+24. Build `fb-settings-profile`, `fb-settings-org`, `fb-settings-team` pages
+25. Build `fb-user-menu` dropdown with role-gated links
+26. Wire `setup_team` and `setup_contacts` feed card types
 
 ### Phase 5: Chat Integration
-23. Wire `fb-input-bar` to real `POST /api/v1/chat` (kill mock service)
-24. Implement "Tell me more" flow: feed card context → chat thread
-25. Add context banner to chat for card-originated conversations
+27. Wire `fb-input-bar` to real `POST /api/v1/chat` (kill mock service)
+28. Implement "Tell me more" flow: feed card context → chat thread
+29. Add context banner to chat for card-originated conversations
 
 ### Phase 6: Schedule View
-26. Build `fb-schedule-view` with timeline Gantt
-27. Build `fb-schedule-task-bar` positioned by date
-28. Add dependency arrows on timeline
-29. Add float visualization (ghost bars)
-30. Add schedule diff overlay (`fb-schedule-diff`)
+30. Build `fb-schedule-view` with timeline Gantt
+31. Build `fb-schedule-task-bar` positioned by date
+32. Add dependency arrows on timeline
+33. Add float visualization (ghost bars)
+34. Add schedule diff overlay (`fb-schedule-diff`)
 
 ### Phase 7: Real-Time & Polish
-31. Implement SSE feed stream endpoint
-32. Wire store to SSE for live card updates
-33. Mobile optimization pass
-34. Accessibility audit (WCAG 2.1 AA)
+35. Implement SSE feed stream endpoint
+36. Wire store to SSE for live card updates
+37. Add passive drift detection (background calibration tracking — §11.2)
+38. Mobile optimization pass
+39. Accessibility audit (WCAG 2.1 AA)
 
 ---
 
@@ -904,10 +970,217 @@ frontend/src/styles/main.css
 
 ---
 
-## 10. Open Questions
+## 10. Settings Architecture
+
+### 10.1 Design Principle: Settings in Context
+
+Settings are not a destination — they surface at the moment they matter. The settings pages exist as a reference, but the primary discovery path is through the work itself.
+
+**Three access patterns:**
+1. **Onboarding calibration** — First project only. Work days + inspection latency.
+2. **Feed cards** — Contextual nudges when the engine detects missing config (no contact assigned, team not set up).
+3. **Settings pages** — Traditional pages via user menu dropdown. Always accessible.
+
+### 10.2 Settings Pages
+
+Accessible from the user menu (avatar dropdown in `fb-top-bar`).
+
+#### A. My Profile (`/settings/profile`)
+
+Available to all authenticated users.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  My Profile                                          │
+│                                                      │
+│  Display Name  ┌──────────────────────────┐          │
+│                │ Marcus Johnson           │  [Save]  │
+│                └──────────────────────────┘          │
+│                                                      │
+│  Email         marcus@buildco.com (managed by Clerk) │
+│  Role          Builder                               │
+│  Member Since  January 12, 2026                      │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Backend:** `GET /api/v1/users/me`, `PUT /api/v1/users/me` (name only).
+**Role:** Read-only. Tooltip: "Contact your administrator to change roles."
+
+#### B. Organization Settings (`/settings/org`)
+
+Admin and Builder roles only. Viewer/PM see read-only.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Organization Settings                               │
+│                                                      │
+│  ── Construction Physics ──────────────────────────  │
+│                                                      │
+│  Crew Speed                                          │
+│  ◄──────────── ● ──────────────────────►            │
+│  Aggressive     Standard      Relaxed                │
+│  (0.5x)         (1.0x)        (1.5x)                │
+│                                                      │
+│  Currently: 1.0x — Industry standard pace.           │
+│  Changing this recalculates all active schedules.    │
+│                                                      │
+│  Work Days                                           │
+│  [M ✓] [T ✓] [W ✓] [Th ✓] [F ✓] [Sa ○] [Su ○]    │
+│                                                      │
+│  [Save Changes]                                      │
+│                                                      │
+│  ── Organization Info ─────────────────────────────  │
+│                                                      │
+│  Name          BuildCo Construction                  │
+│  Members       4                                     │
+│  Projects      5 active                              │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Backend:** `GET /api/v1/org/settings/physics`, `PUT /api/v1/org/settings/physics`.
+**Confirmation modal:** When speed or work days change, show: "This will recalculate schedules for all active projects. Continue?" with scope choice (apply to existing vs. future only).
+
+**Live preview (stretch goal):** When the slider moves, show: "This would change 123 Main St completion from June 18 → June 4" using `GET /api/v1/projects/:id/schedule/simulate`.
+
+#### C. Team & Invites (`/settings/team`)
+
+Admin role only. Others see 403 or redirect to profile.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Team & Invites                          [+ Invite]  │
+│                                                      │
+│  ── Members (4) ───────────────────────────────────  │
+│  Marcus Johnson    marcus@buildco.com    Admin       │
+│  Sarah Chen        sarah@buildco.com     Builder     │
+│  Jake Williams     jake@buildco.com      PM          │
+│  Lisa Park         lisa@buildco.com      Viewer      │
+│                                                      │
+│  ── Pending Invites (1) ───────────────────────────  │
+│  tom@subelectric.com    Builder    Expires 2/10      │
+│                                          [Revoke]    │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Invite modal:**
+```
+Email:  [                    ]
+Role:   [Builder ▾]
+        [Send Invite]
+```
+
+**Backend:** `GET /api/v1/org/members`, `POST /api/v1/admin/invites`, `GET /api/v1/admin/invites`, `DELETE /api/v1/admin/invites/:id`.
+
+### 10.3 Contextual Settings via Feed Cards
+
+Settings surface as feed cards when the engine detects a gap:
+
+#### `setup_team` — After first project activation
+
+```
+┌──────────────────────────────────────────────────────┐
+│ 👥 SET UP YOUR TEAM                                  │
+│                                                      │
+│ I've scheduled 6 trade phases. Adding your subs      │
+│ lets me coordinate with them automatically —          │
+│ confirmations, reminders, and status checks.          │
+│                                                      │
+│ [ Add contacts → /settings/team ]  [ Later ]         │
+└──────────────────────────────────────────────────────┘
+```
+
+Shows once after first project. "Later" dismisses for 7 days, then re-shows once more. After second dismiss, gone permanently.
+
+#### `setup_contacts` — Phase missing assigned contact
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ⚠️ MISSING CONTACT                  456 Oak Ave      │
+│                                                      │
+│ Electrical rough-in starts Monday but no             │
+│ electrician is assigned. I can't send a              │
+│ confirmation request.                                │
+│                                                      │
+│ [ Assign contact ]  [ Skip this phase ]              │
+└──────────────────────────────────────────────────────┘
+```
+
+Triggered by SubLiaison agent when it attempts to send a confirmation SMS but `DirectoryService.GetContactForPhase()` returns nil. "Assign contact" opens an inline quick-add form or navigates to a contact assignment flow.
+
+---
+
+## 11. Engine Calibration Philosophy
+
+### 11.1 Principle: The Engine Earns Trust by Being Right, Not by Asking Questions
+
+Speed calibration is **not a user-facing setting in normal operation.** The speed multiplier starts at 1.0x (industry standard) and the system observes. Users should not need to think about abstract multipliers — the engine should just produce schedules that match reality.
+
+### 11.2 Passive Drift Detection (Background, Minimal Surfacing)
+
+The engine silently tracks actual task durations vs. predicted durations. This is a background calculation, not a user-facing feature.
+
+```go
+// internal/physics/calibration.go
+
+type DriftObservation struct {
+    TaskID          uuid.UUID
+    PredictedDays   float64
+    ActualDays      float64
+    Ratio           float64 // actual / predicted
+}
+
+// Accumulates over completed tasks. Only triggers a card when:
+// 1. At least 8 tasks have been completed (statistical minimum)
+// 2. The rolling average ratio deviates > 25% from 1.0 consistently
+// 3. The deviation has persisted across the last 5+ completed tasks (not a one-off)
+```
+
+**Threshold: sustained, major deviation only.** A crew finishing one task 10% early does not trigger anything. A crew consistently finishing 30% faster across 8+ tasks does.
+
+### 11.3 Calibration Drift Card (Rare)
+
+Only shown when all three conditions in §11.2 are met. This card should be infrequent — most users may never see it.
+
+```
+┌──────────────────────────────────────────────────────┐
+│ 🔧 SCHEDULE ACCURACY                                │
+│                                                      │
+│ Your crew has completed the last 10 tasks an         │
+│ average of 28% faster than predicted. Your           │
+│ schedules may be overly conservative.                │
+│                                                      │
+│ Adjusting crew speed to 0.8x would bring             │
+│ predictions closer to actual performance.             │
+│                                                      │
+│ [ Adjust to 0.8x ]  [ Keep current ]                │
+└──────────────────────────────────────────────────────┘
+```
+
+**Design decisions:**
+- No urgency indicator (P2 — blue dot, not red).
+- "Keep current" is a valid permanent answer. If dismissed, do not re-show for 90 days.
+- The card explains the **observation** (crew is faster), not the setting (speed multiplier). Users think in terms of their crew's pace, not abstract multipliers.
+- Clicking "Adjust" calls `PUT /api/v1/org/settings/physics` with the suggested value, shows confirmation modal with schedule impact.
+
+### 11.4 What Is NOT Exposed
+
+- **Supply chain volatility:** Internal to Procurement agent. Calculated from weather + lead times. Not a user knob.
+- **DHSM duration formulas:** Deterministic math based on sqft and task type. Not tunable per-org.
+- **SWIM weather model parameters:** Calibrated globally. Not per-org.
+- **Notification provider config:** Deployment-time environment variables, not user settings.
+- **Organization JSONB settings:** Reserved for future use, no UI.
+
+---
+
+## 12. Open Questions
 
 1. **Snooze persistence:** Where to store snoozed card state? Dedicated column in `feed_cards` (proposed) vs. user-scoped table?
 2. **Card deduplication:** If ProcurementAgent runs twice, how to prevent duplicate cards? Upsert on `(project_id, card_type, task_id)` composite key?
 3. **Feed pagination:** For orgs with 50+ projects, paginate or load all? Recommendation: load all for "today" section, paginate "this_week" and "horizon".
 4. **Offline/PWA:** Should the feed work offline? Would require service worker + IndexedDB cache of feed_cards.
 5. **Multi-user feed:** Should the feed show cards for all org members, or scope to the logged-in user's projects? Recommendation: scope by user's assigned projects (via RBAC).
+6. **Contact management CRUD:** No endpoint exists for creating/editing contacts directly. The directory is populated via onboarding and portal signups. Do we need a `/api/v1/contacts` CRUD for the "Assign contact" flow in `setup_contacts` cards, or can we use an inline quick-add that writes via an existing code path?
+7. **Per-project physics overrides:** Currently speed multiplier and work days are org-level. Should individual projects be able to override (e.g., a project with a different crew)? Recommendation: defer until needed — org-level covers most single-crew builders.
