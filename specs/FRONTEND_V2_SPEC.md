@@ -891,7 +891,7 @@ Events:
 17. Add consequence calculation (SimulateSlip endpoint)
 18. Add consequence text to procurement and schedule cards
 
-### Phase 4: Onboarding + Settings
+### Phase 4: Onboarding + Settings + Contacts
 19. Build `fb-onboard-flow` full-screen component
 20. Implement SSE streaming mode for onboarding endpoint
 21. Build `fb-extraction-stream` component
@@ -899,26 +899,31 @@ Events:
 23. Build `fb-engine-calibration` (first-project work days + inspection latency step)
 24. Build `fb-settings-profile`, `fb-settings-org`, `fb-settings-team` pages
 25. Build `fb-user-menu` dropdown with role-gated links
-26. Wire `setup_team` and `setup_contacts` feed card types
+26. Implement contact CRUD endpoints (`POST /api/v1/contacts`, `POST /api/v1/contacts/bulk`, `GET /api/v1/contacts`)
+27. Implement assignment endpoints (`POST/GET /api/v1/projects/:id/assignments`, bulk variant)
+28. Build `fb-contact-phase-grid` with inline add and autocomplete
+29. Build `fb-contact-bulk-input` with parse/review/save flow
+30. Build `fb-contact-inline-add` for use inside `setup_contacts` feed cards
+31. Wire `setup_team` and `setup_contacts` feed card types
 
 ### Phase 5: Chat Integration
-27. Wire `fb-input-bar` to real `POST /api/v1/chat` (kill mock service)
-28. Implement "Tell me more" flow: feed card context → chat thread
-29. Add context banner to chat for card-originated conversations
+32. Wire `fb-input-bar` to real `POST /api/v1/chat` (kill mock service)
+33. Implement "Tell me more" flow: feed card context → chat thread
+34. Add context banner to chat for card-originated conversations
 
 ### Phase 6: Schedule View
-30. Build `fb-schedule-view` with timeline Gantt
-31. Build `fb-schedule-task-bar` positioned by date
-32. Add dependency arrows on timeline
-33. Add float visualization (ghost bars)
-34. Add schedule diff overlay (`fb-schedule-diff`)
+35. Build `fb-schedule-view` with timeline Gantt
+36. Build `fb-schedule-task-bar` positioned by date
+37. Add dependency arrows on timeline
+38. Add float visualization (ghost bars)
+39. Add schedule diff overlay (`fb-schedule-diff`)
 
 ### Phase 7: Real-Time & Polish
-35. Implement SSE feed stream endpoint
-36. Wire store to SSE for live card updates
-37. Add passive drift detection (background calibration tracking — §11.2)
-38. Mobile optimization pass
-39. Accessibility audit (WCAG 2.1 AA)
+40. Implement SSE feed stream endpoint
+41. Wire store to SSE for live card updates
+42. Add passive drift detection (background calibration tracking — §11.2)
+43. Mobile optimization pass
+44. Accessibility audit (WCAG 2.1 AA)
 
 ---
 
@@ -1074,41 +1079,236 @@ Role:   [Builder ▾]
 
 **Backend:** `GET /api/v1/org/members`, `POST /api/v1/admin/invites`, `GET /api/v1/admin/invites`, `DELETE /api/v1/admin/invites/:id`.
 
-### 10.3 Contextual Settings via Feed Cards
+### 10.3 Contact & Directory Management
 
-Settings surface as feed cards when the engine detects a gap:
+Contacts (subcontractors, vendors, clients) are the link between the engine and the real world. The SubLiaison agent sends SMS/email confirmations to contacts assigned to project phases. Without contacts, the agent is silent.
 
-#### `setup_team` — After first project activation
+**Data model recap:**
+- `Contact`: Name (required), Phone, Email, Company, Role (`Subcontractor`/`Client`), ContactPreference (`SMS`/`Email`/`Both`)
+- `ProjectAssignment`: Links a Contact to a Project + WBS Phase (e.g., phase "9.0" = Rough-Ins)
+- Constraint: one contact per (project_id, wbs_phase_id) pair
 
-```
-┌──────────────────────────────────────────────────────┐
-│ 👥 SET UP YOUR TEAM                                  │
-│                                                      │
-│ I've scheduled 6 trade phases. Adding your subs      │
-│ lets me coordinate with them automatically —          │
-│ confirmations, reminders, and status checks.          │
-│                                                      │
-│ [ Add contacts → /settings/team ]  [ Later ]         │
-└──────────────────────────────────────────────────────┘
-```
+#### A. Quick-Add Flow (Primary Input Method)
 
-Shows once after first project. "Later" dismisses for 7 days, then re-shows once more. After second dismiss, gone permanently.
+Accessible from the `setup_team` feed card, the project detail contacts button, or `/project/:id/contacts`. Designed for speed — a builder should add their 6 core subs in under 60 seconds.
 
-#### `setup_contacts` — Phase missing assigned contact
+**The Phase Grid:**
+
+Shows all WBS phases for the project with empty slots for contact assignment. The builder sees trade names, not WBS codes.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ ⚠️ MISSING CONTACT                  456 Oak Ave      │
+│  Contacts — 123 Main St                              │
 │                                                      │
-│ Electrical rough-in starts Monday but no             │
-│ electrician is assigned. I can't send a              │
-│ confirmation request.                                │
+│  Assign your subs to each trade. I'll handle         │
+│  confirmations, reminders, and status checks.        │
 │                                                      │
-│ [ Assign contact ]  [ Skip this phase ]              │
+│  ┌────────────┬──────────────────────────────────┐   │
+│  │ Foundation │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Framing    │  Rodriguez Framing  📱 555-0101  │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Roofing    │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Electrical │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Plumbing   │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ HVAC       │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Insulation │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Drywall    │  + Add contact                    │   │
+│  ├────────────┼──────────────────────────────────┤   │
+│  │ Finishes   │  + Add contact                    │   │
+│  └────────────┴──────────────────────────────────┘   │
+│                                                      │
+│  [ Done ]                                            │
+│                                                      │
 └──────────────────────────────────────────────────────┘
 ```
 
-Triggered by SubLiaison agent when it attempts to send a confirmation SMS but `DirectoryService.GetContactForPhase()` returns nil. "Assign contact" opens an inline quick-add form or navigates to a contact assignment flow.
+**Clicking "+ Add contact" on a phase expands an inline row:**
+
+```
+│ Electrical │  Name: [Jake's Electric     ]         │
+│            │  Phone: [555-0199           ]         │
+│            │  Contact via: (●) SMS (○) Email (○) Both │
+│            │  [Save]  [Cancel]                      │
+```
+
+**Minimum viable input:** Name + Phone OR Email. That's it. Company is optional. Role is auto-set to `Subcontractor`. ContactPreference defaults to `SMS` if phone provided, `Email` if only email.
+
+**If the contact already exists in the org directory** (matched by phone or email), show a suggestion: "Jake Williams (555-0199) already in your directory. [Assign to Electrical]"
+
+**Reuse across projects:** Once a contact exists in the org, they appear as suggestions when adding to other projects. Type "Ja..." → autocomplete shows "Jake's Electric — 555-0199".
+
+#### B. Bulk Paste Input (Power User Shortcut)
+
+For builders who have their sub list in a spreadsheet or notes app. A textarea that accepts freeform text:
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Bulk Add Contacts                                   │
+│                                                      │
+│  Paste your contact list. One per line.              │
+│  Format: Name, Phone, Trade (optional)               │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐    │
+│  │ Jake Williams, 555-0199, Electrical          │    │
+│  │ Mike's Plumbing, 555-0201                    │    │
+│  │ Rodriguez Framing, 555-0101, Framing         │    │
+│  │ ABC HVAC, 555-0155, HVAC                     │    │
+│  │ Tom's Roofing, 555-0177                      │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                      │
+│  [Parse & Review]                                    │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**After "Parse & Review"** → shows parsed results with auto-detected trade matching:
+
+```
+│  ✓ Jake Williams     555-0199   → Electrical          │
+│  ✓ Mike's Plumbing   555-0201   → Plumbing (matched)  │
+│  ✓ Rodriguez Framing 555-0101   → Framing (matched)   │
+│  ✓ ABC HVAC          555-0155   → HVAC                 │
+│  ? Tom's Roofing     555-0177   → [Assign trade ▾]    │
+│                                                        │
+│  [Save All]                                            │
+```
+
+**Trade matching logic (client-side):** Simple keyword match on contact name or explicit trade field:
+- "Electric" / "Electrical" → phase 9.0
+- "Plumb" → phase 9.0 (or separate plumbing phase if exists)
+- "Fram" → phase 7.0
+- "HVAC" / "Mechanical" → phase 9.0
+- "Roof" → phase 8.0
+- "Drywall" → phase 10.0
+- Unmatched → show dropdown to manually assign
+
+**Parsing is lenient:** Accepts comma-separated, tab-separated, or natural text. The parser looks for phone number patterns (10+ digits, optional dashes/parens) and treats everything before as name, everything after as trade hint.
+
+#### C. Contextual Feed Cards for Contacts
+
+##### `setup_team` — After first project activation
+
+```
+┌──────────────────────────────────────────────────────┐
+│ 👥 ADD YOUR SUBS                     123 Main St     │
+│                                                      │
+│ I've scheduled 9 trade phases. Adding your subs      │
+│ lets me send them start confirmations, progress       │
+│ checks, and delay alerts automatically.               │
+│                                                      │
+│ Foundation · Framing · Roofing · Electrical ·         │
+│ Plumbing · HVAC · Insulation · Drywall · Finishes    │
+│                                                      │
+│ [ Add contacts ]  [ Paste a list ]  [ Later ]        │
+└──────────────────────────────────────────────────────┘
+```
+
+"Add contacts" opens the phase grid. "Paste a list" opens the bulk input. "Later" dismisses for 7 days, then re-shows once. After second dismiss, gone permanently.
+
+##### `setup_contacts` — Specific phase missing contact, task approaching
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ⚠️ NO ELECTRICIAN ASSIGNED           456 Oak Ave     │
+│                                                      │
+│ Electrical rough-in starts Monday. I need a          │
+│ contact to send a start confirmation.                │
+│                                                      │
+│ Name:  [                    ]                        │
+│ Phone: [                    ]                        │
+│                                                      │
+│ [ Save & Assign ]  [ Skip this phase ]               │
+└──────────────────────────────────────────────────────┘
+```
+
+**This card has the input form inline.** No navigation needed. The builder types name + phone right in the card, taps "Save & Assign", and the SubLiaison agent can immediately send a confirmation. Two fields, one tap.
+
+If the org already has contacts, show them as suggestions above the form:
+```
+│ From your directory:                                 │
+│ [Jake's Electric — 555-0199]  [Mike's Plumb — 0201] │
+```
+
+#### D. New Backend Endpoints Required
+
+```
+POST /api/v1/contacts
+Authorization: Bearer <token>
+Scope: project:create (Admin/Builder)
+Body: {
+  name: string,           // required
+  phone?: string,
+  email?: string,
+  company?: string,
+  role: "Subcontractor" | "Client",  // default: Subcontractor
+  contact_preference?: "SMS" | "Email" | "Both"  // inferred if omitted
+}
+Response: Contact (201)
+
+POST /api/v1/contacts/bulk
+Authorization: Bearer <token>
+Scope: project:create (Admin/Builder)
+Body: {
+  contacts: [{
+    name: string,
+    phone?: string,
+    email?: string,
+    company?: string
+  }]
+}
+Response: { created: Contact[], duplicates: Contact[] }
+
+GET /api/v1/contacts
+Authorization: Bearer <token>
+Query: search (optional, matches name/phone/email)
+Response: Contact[]
+
+POST /api/v1/projects/:id/assignments
+Authorization: Bearer <token>
+Scope: project:create
+Body: {
+  contact_id: string,
+  wbs_phase_id: string    // e.g., "9.0"
+}
+Response: ProjectAssignment (201)
+
+POST /api/v1/projects/:id/assignments/bulk
+Authorization: Bearer <token>
+Scope: project:create
+Body: {
+  assignments: [{
+    contact_id: string,
+    wbs_phase_id: string
+  }]
+}
+Response: { created: ProjectAssignment[] }
+
+GET /api/v1/projects/:id/assignments
+Authorization: Bearer <token>
+Scope: project:read
+Response: [{
+  phase_code: string,
+  phase_name: string,      // "Electrical", "Framing", etc.
+  contact: Contact | null  // null = unassigned
+}]
+```
+
+**Deduplication:** On `POST /api/v1/contacts`, check `(org_id, phone)` and `(org_id, email)` for existing match. If found, return existing contact instead of creating duplicate. Response includes a `matched: boolean` field so the frontend can show "Already in your directory."
+
+#### E. New Components
+
+| Component | Tag | Purpose |
+|-----------|-----|---------|
+| `fb-contact-phase-grid` | `fb-contact-phase-grid` | Phase-by-phase contact assignment grid with inline add |
+| `fb-contact-bulk-input` | `fb-contact-bulk-input` | Textarea → parsed → review → save all |
+| `fb-contact-inline-add` | `fb-contact-inline-add` | Minimal name+phone form, used inside feed cards and phase grid |
+| `fb-contact-autocomplete` | `fb-contact-autocomplete` | Type-ahead search against org directory (`GET /api/v1/contacts?search=`) |
 
 ---
 
@@ -1182,5 +1382,5 @@ Only shown when all three conditions in §11.2 are met. This card should be infr
 3. **Feed pagination:** For orgs with 50+ projects, paginate or load all? Recommendation: load all for "today" section, paginate "this_week" and "horizon".
 4. **Offline/PWA:** Should the feed work offline? Would require service worker + IndexedDB cache of feed_cards.
 5. **Multi-user feed:** Should the feed show cards for all org members, or scope to the logged-in user's projects? Recommendation: scope by user's assigned projects (via RBAC).
-6. **Contact management CRUD:** No endpoint exists for creating/editing contacts directly. The directory is populated via onboarding and portal signups. Do we need a `/api/v1/contacts` CRUD for the "Assign contact" flow in `setup_contacts` cards, or can we use an inline quick-add that writes via an existing code path?
+6. **Contact management CRUD:** RESOLVED — New endpoints defined in §10.3.D. `POST /api/v1/contacts` (single + bulk), `GET /api/v1/contacts` (search), `POST /api/v1/projects/:id/assignments` (single + bulk), `GET /api/v1/projects/:id/assignments`. Deduplication by phone/email within org.
 7. **Per-project physics overrides:** Currently speed multiplier and work days are org-level. Should individual projects be able to override (e.g., a project with a different crew)? Recommendation: defer until needed — org-level covers most single-crew builders.
