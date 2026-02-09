@@ -64,11 +64,47 @@ func (m *mockProjectService) ListProcurementItems(ctx context.Context, projectID
 	return m.listProcurementItemsResp, m.listProcurementItemsErr
 }
 
+// --- Mock ThreadService ---
+
+type mockThreadService struct{}
+
+func (m *mockThreadService) CreateThread(ctx context.Context, projectID, orgID, userID uuid.UUID, title string) (*models.Thread, error) {
+	return nil, nil
+}
+
+func (m *mockThreadService) CreateGeneralThread(ctx context.Context, projectID uuid.UUID) (*models.Thread, error) {
+	return nil, nil
+}
+
+func (m *mockThreadService) GetThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) (*models.Thread, error) {
+	return nil, nil
+}
+
+func (m *mockThreadService) ListThreads(ctx context.Context, projectID, orgID uuid.UUID, includeArchived bool) ([]models.Thread, error) {
+	return nil, nil
+}
+
+func (m *mockThreadService) ArchiveThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) error {
+	return nil
+}
+
+func (m *mockThreadService) UnarchiveThread(ctx context.Context, threadID, projectID, orgID uuid.UUID) error {
+	return nil
+}
+
+func (m *mockThreadService) GetOrCreateGeneralThread(ctx context.Context, projectID uuid.UUID) (*models.Thread, error) {
+	return nil, nil
+}
+
+func (m *mockThreadService) GetThreadMessages(ctx context.Context, threadID, projectID, orgID uuid.UUID, limit int) ([]models.ChatMessage, error) {
+	return nil, nil
+}
+
 // --- ProjectHandler Tests ---
 
 func TestProjectHandler_CreateProject_Success(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	orgID := uuid.New()
 	body := models.Project{Name: "Test Project", OrgID: orgID}
@@ -86,7 +122,7 @@ func TestProjectHandler_CreateProject_Success(t *testing.T) {
 
 func TestProjectHandler_CreateProject_MissingClaims(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	// No claims in context - should return 401 (L7: generic error, no info leak)
 	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
@@ -98,7 +134,7 @@ func TestProjectHandler_CreateProject_MissingClaims(t *testing.T) {
 
 func TestProjectHandler_CreateProject_InvalidOrgIDInClaims(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	// Create context with invalid OrgID in claims
 	ctx := middleware.WithClaims(context.Background(), &types.Claims{
@@ -115,7 +151,7 @@ func TestProjectHandler_CreateProject_InvalidOrgIDInClaims(t *testing.T) {
 
 func TestProjectHandler_CreateProject_OrgMismatch(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	claimsOrgID := uuid.New()
 	bodyOrgID := uuid.New()
@@ -133,7 +169,7 @@ func TestProjectHandler_CreateProject_OrgMismatch(t *testing.T) {
 
 func TestProjectHandler_CreateProject_MissingName(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	orgID := uuid.New()
 	body := models.Project{OrgID: orgID} // No name
@@ -150,7 +186,7 @@ func TestProjectHandler_CreateProject_MissingName(t *testing.T) {
 
 func TestProjectHandler_CreateProject_ServiceError(t *testing.T) {
 	mock := &mockProjectService{createErr: errors.New("database error")}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	orgID := uuid.New()
 	body := models.Project{Name: "Test Project", OrgID: orgID}
@@ -166,7 +202,7 @@ func TestProjectHandler_CreateProject_ServiceError(t *testing.T) {
 
 func TestProjectHandler_CreateProject_Conflict(t *testing.T) {
 	mock := &mockProjectService{createErr: types.ErrConflict}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	orgID := uuid.New()
 	body := models.Project{Name: "Test Project", OrgID: orgID}
@@ -186,7 +222,7 @@ func TestProjectHandler_GetProject_Success(t *testing.T) {
 	mock := &mockProjectService{
 		getProject: &models.Project{ID: projectID, OrgID: orgID, Name: "Test"},
 	}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID.String(), nil)
 
@@ -206,7 +242,7 @@ func TestProjectHandler_GetProject_Success(t *testing.T) {
 
 func TestProjectHandler_GetProject_NotFound(t *testing.T) {
 	mock := &mockProjectService{getErr: types.ErrNotFound}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	projectID := uuid.New()
 	orgID := uuid.New()
@@ -227,7 +263,7 @@ func TestProjectHandler_GetProject_NotFound(t *testing.T) {
 
 func TestProjectHandler_GetProject_InvalidID(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	orgID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/projects/invalid", nil)
@@ -246,7 +282,7 @@ func TestProjectHandler_GetProject_InvalidID(t *testing.T) {
 
 func TestProjectHandler_GetProject_MissingClaims(t *testing.T) {
 	mock := &mockProjectService{}
-	handler := NewProjectHandler(mock)
+	handler := NewProjectHandler(mock, &mockThreadService{})
 
 	projectID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID.String(), nil)
@@ -314,6 +350,10 @@ func (m *taskHandlerMockScheduleService) RecalculateSchedule(ctx context.Context
 }
 
 func (m *taskHandlerMockScheduleService) GetProjectSchedule(ctx context.Context, projectID, orgID uuid.UUID) (*service.ProjectScheduleSummary, error) {
+	return nil, nil
+}
+
+func (m *taskHandlerMockScheduleService) GetGanttData(ctx context.Context, projectID, orgID uuid.UUID) (*types.GanttData, error) {
 	return nil, nil
 }
 

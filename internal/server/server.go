@@ -131,8 +131,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	chatHandler := handlers.NewChatHandler(chatOrchestrator)
 
 	// Initialize notification service based on environment.
-	// Uses Resend for email, Twilio for SMS.
-	// Falls back to Console provider in development mode.
+	// Provider selection controlled by NOTIFICATION_PROVIDER env var:
+	// - "bird": Bird (MessageBird) for both SMS and email
+	// - "legacy": Resend for email, Twilio for SMS
+	// - default: Console provider (development mode)
 	// See LAUNCH_STRATEGY.md Task A3 and LAUNCH_PLAN.md P2.
 	notificationService := service.NewNotificationService(
 		cfg.ResendAPIKey,
@@ -141,6 +143,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		cfg.TwilioAccountSID,
 		cfg.TwilioAuthToken,
 		cfg.TwilioFromNumber,
+		cfg.BirdAccessKey,
+		cfg.BirdOriginator,
+		cfg.NotificationProvider,
 	)
 	directoryService := service.NewDirectoryService(db)
 
@@ -228,15 +233,28 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// Integration Readiness Check System: per-provider probes for 3P service health.
 	// Each probe creates a short-lived client from raw config — no interference with live services.
-	readinessService := readiness.NewService(15*time.Second,
+	// Notification probes are conditionally added based on NOTIFICATION_PROVIDER.
+	readinessCheckers := []readiness.Checker{
 		readiness.NewDatabaseProbe(db),
 		readiness.NewClerkProbe(cfg.ClerkIssuerURL),
 		readiness.NewRedisProbe(cfg.RedisURL),
-		readiness.NewResendProbe(cfg.ResendAPIKey),
-		readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
 		readiness.NewVertexAIProbe(cfg.VertexProjectID, cfg.VertexLocation),
 		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),
-	)
+	}
+
+	// Add notification probes based on provider selection
+	switch cfg.NotificationProvider {
+	case "bird":
+		readinessCheckers = append(readinessCheckers, readiness.NewBirdProbe(cfg.BirdAccessKey))
+	case "legacy":
+		readinessCheckers = append(readinessCheckers,
+			readiness.NewResendProbe(cfg.ResendAPIKey),
+			readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
+		)
+	// default: no notification probes for console mode
+	}
+
+	readinessService := readiness.NewService(15*time.Second, readinessCheckers...)
 	readinessHandler := handlers.NewReadinessHandler(readinessService, cfg.Environment)
 
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent

@@ -62,6 +62,12 @@ type Config struct {
 	TwilioAuthToken  string
 	TwilioFromNumber string
 
+	// Bird (MessageBird) configuration. Unified SMS + Email provider.
+	// See migration plan for Twilio/Resend → Bird.
+	BirdAccessKey        string
+	BirdOriginator       string // SMS sender ID (alphanumeric or phone number)
+	NotificationProvider string // "bird", "legacy", or "console"
+
 	// AuditWALPath is the file path for the audit Write-Ahead Log.
 	// Used as a fallback when DB and DLQ are unavailable. See LAUNCH_PLAN.md.
 	AuditWALPath string
@@ -165,6 +171,9 @@ func LoadConfig() (*Config, error) {
 		TwilioAccountSID:           os.Getenv("TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:            os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:           os.Getenv("TWILIO_FROM_NUMBER"),
+		BirdAccessKey:              os.Getenv("BIRD_ACCESS_KEY"),
+		BirdOriginator:             getEnvOrDefault("BIRD_ORIGINATOR", "FutureBuild"),
+		NotificationProvider:       getEnvOrDefault("NOTIFICATION_PROVIDER", "legacy"),
 		AuditWALPath:               getEnvOrDefault("AUDIT_WAL_PATH", "/var/lib/futurebuild/audit.wal"),
 		ClerkIssuerURL:             os.Getenv("CLERK_ISSUER_URL"),
 		ClerkAudience:              os.Getenv("CLERK_AUDIENCE"),

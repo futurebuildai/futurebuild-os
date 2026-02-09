@@ -23,6 +23,17 @@ services:
   - key: GCP_SA_JSON_CONTENT
     scope: RUN_TIME
     type: SECRET
+  # Unified Notifications (Bird/MessageBird)
+  # Set NOTIFICATION_PROVIDER=bird to use Bird, "legacy" for Twilio+Resend
+  - key: NOTIFICATION_PROVIDER
+    value: "legacy"
+    scope: RUN_TIME
+  - key: BIRD_ACCESS_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: BIRD_ORIGINATOR
+    value: "FutureBuild"
+    scope: RUN_TIME
 
   health_check:
     http_path: /health

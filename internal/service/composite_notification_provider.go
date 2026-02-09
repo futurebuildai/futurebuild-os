@@ -49,11 +49,40 @@ func (c *CompositeNotificationProvider) SendSMS(contactID string, message string
 // NewNotificationService creates the appropriate notification service based on configuration.
 // This is a factory function that simplifies server.go wiring.
 //
-// Configuration logic:
-// - If Resend API key is set, use Resend for email
-// - If Twilio credentials are set, use Twilio for SMS
-// - Otherwise, fall back to console logging (development mode)
+// Provider logic (controlled by NOTIFICATION_PROVIDER env var):
+// - "bird": Use Bird (MessageBird) for both SMS and Email
+// - "legacy": Use Resend for email, Twilio for SMS (original behavior)
+// - "console" or default: Fall back to console logging (development mode)
 func NewNotificationService(
+	resendAPIKey string,
+	emailFromAddress, emailFromName string,
+	twilioAccountSID, twilioAuthToken, twilioFromNumber string,
+	birdAccessKey, birdOriginator string,
+	provider string,
+) types.NotificationService {
+	switch provider {
+	case "bird":
+		if birdAccessKey == "" {
+			slog.Warn("notification: NOTIFICATION_PROVIDER=bird but BIRD_ACCESS_KEY not set, falling back to console")
+			return NewConsoleEmailProvider()
+		}
+		slog.Info("notification: using Bird for SMS and email")
+		return NewBirdProvider(birdAccessKey, birdOriginator, emailFromAddress, emailFromName)
+
+	case "legacy":
+		return newLegacyNotificationService(
+			resendAPIKey, emailFromAddress, emailFromName,
+			twilioAccountSID, twilioAuthToken, twilioFromNumber,
+		)
+
+	default:
+		slog.Info("notification: using Console (development mode)")
+		return NewConsoleEmailProvider()
+	}
+}
+
+// newLegacyNotificationService creates the composite Resend + Twilio provider.
+func newLegacyNotificationService(
 	resendAPIKey string,
 	emailFromAddress, emailFromName string,
 	twilioAccountSID, twilioAuthToken, twilioFromNumber string,

@@ -80,7 +80,7 @@ services:
         value: "FutureBuild (Staging)"
         scope: RUN_TIME
 
-      # ── SMS ───────────────────────────────────────────────
+      # ── SMS (Legacy: Twilio) ─────────────────────────────
       - key: TWILIO_ACCOUNT_SID
         scope: RUN_TIME
         type: SECRET
@@ -90,6 +90,18 @@ services:
       - key: TWILIO_FROM_NUMBER
         scope: RUN_TIME
         type: SECRET
+
+      # ── Unified Notifications (Bird/MessageBird) ────────
+      # Set NOTIFICATION_PROVIDER=bird to use Bird, "legacy" for Twilio+Resend
+      - key: NOTIFICATION_PROVIDER
+        value: "legacy"
+        scope: RUN_TIME
+      - key: BIRD_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: BIRD_ORIGINATOR
+        value: "FutureBuild"
+        scope: RUN_TIME
 
       # ── Webhook Security ──────────────────────────────────
       - key: WEBHOOK_SECRET

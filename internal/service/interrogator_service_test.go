@@ -150,18 +150,19 @@ func TestGetNextQuestion_SkipsPopulatedFields(t *testing.T) {
 func TestGetNextQuestion_ReturnsEmptyWhenComplete(t *testing.T) {
 	svc := NewInterrogatorService(&MockAIClient{})
 
-	// All fields populated
+	// All fields populated (must match models.GetPriorityFields())
 	state := map[string]any{
-		"name":                     "Smith Residence",
-		"address":                  "123 Main St",
-		"gsf":                      3200.0,
-		"foundation_type":          "slab",
-		"stories":                  2,
-		"topography":               "flat",
-		"soil_conditions":          "normal",
-		"bedrooms":                 4,
-		"bathrooms":                3,
-		"supply_chain_volatility": "low",
+		"name":            "Smith Residence",
+		"address":         "123 Main St",
+		"start_date":      "2024-03-01",
+		"square_footage":  3200.0,
+		"foundation_type": "slab",
+		"stories":         2,
+		"topography":      "flat",
+		"soil_conditions": "normal",
+		"bedrooms":        4,
+		"bathrooms":       3,
+		"holidays":        "none",
 	}
 	field, _ := svc.getNextQuestion(state)
 	assert.Equal(t, "", field)
@@ -170,7 +171,7 @@ func TestGetNextQuestion_ReturnsEmptyWhenComplete(t *testing.T) {
 func TestGetNextQuestion_FollowsPriorityMatrix(t *testing.T) {
 	svc := NewInterrogatorService(&MockAIClient{})
 
-	// P0 fields: name, address
+	// P0 fields: name, address, start_date, square_footage, foundation_type
 	state1 := map[string]any{}
 	field1, _ := svc.getNextQuestion(state1)
 	assert.Equal(t, "name", field1)
@@ -179,10 +180,15 @@ func TestGetNextQuestion_FollowsPriorityMatrix(t *testing.T) {
 	field2, _ := svc.getNextQuestion(state2)
 	assert.Equal(t, "address", field2)
 
-	// P1 fields: gsf, foundation_type, stories
+	// After name+address, start_date is next P0 field
 	state3 := map[string]any{"name": "Test", "address": "123 Main"}
 	nextField, _ := svc.getNextQuestion(state3)
-	assert.Contains(t, []string{"gsf", "foundation_type", "stories"}, nextField)
+	assert.Equal(t, "start_date", nextField)
+
+	// After start_date, square_footage is next
+	state4 := map[string]any{"name": "Test", "address": "123 Main", "start_date": "2024-03-01"}
+	nextField2, _ := svc.getNextQuestion(state4)
+	assert.Equal(t, "square_footage", nextField2)
 }
 
 func TestCheckReadyToCreate_RequiresNameAndAddress(t *testing.T) {

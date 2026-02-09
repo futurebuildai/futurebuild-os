@@ -9,11 +9,13 @@ import (
 // criticalServices are services that must be healthy in production/staging.
 // A not_configured critical service in production triggers overall "failed".
 // In staging it triggers "degraded".
+// Note: Only one of bird/resend is registered based on NOTIFICATION_PROVIDER.
 var criticalServices = map[string]bool{
 	"database":  true,
 	"clerk":     true,
 	"redis":     true,
 	"resend":    true,
+	"bird":      true,
 	"vertex_ai": true,
 }
 
