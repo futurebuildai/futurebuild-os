@@ -100,6 +100,17 @@ export interface ProjectPill {
 }
 
 /**
+ * ActionResponse — structured response from POST /api/v1/portfolio/feed/action.
+ */
+export interface ActionResponse {
+    success: boolean;
+    effect: 'dismiss' | 'navigate' | 'none';
+    message?: string;
+    navigate_to?: string;
+    payload?: Record<string, unknown>;
+}
+
+/**
  * PortfolioFeedResponse — full response from GET /api/v1/portfolio/feed.
  */
 export interface PortfolioFeedResponse {

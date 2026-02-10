@@ -17,7 +17,7 @@ import { get, post, put, del } from './http';
 import type { GanttData, Contact, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
-import type { PortfolioFeedResponse } from '../types/feed';
+import type { PortfolioFeedResponse, ActionResponse } from '../types/feed';
 
 // ============================================================================
 // Auth Types
@@ -692,8 +692,8 @@ export const api = {
             cardId: string,
             actionId: string,
             payload?: Record<string, unknown>
-        ): Promise<{ success: boolean; message: string }> {
-            return post<{ success: boolean; message: string }>('/portfolio/feed/action', {
+        ): Promise<ActionResponse> {
+            return post<ActionResponse>('/portfolio/feed/action', {
                 card_id: cardId,
                 action_id: actionId,
                 payload,

@@ -217,25 +217,50 @@ export class FBHomeFeed extends FBElement {
     }
 
     private _handleCardAction(e: CustomEvent<{ cardId: string; actionId: string; projectId: string }>) {
-        const { cardId, actionId } = e.detail;
+        const { cardId, actionId, projectId } = e.detail;
 
+        // Client-side navigation actions — no API call needed
+        switch (actionId) {
+            case 'view_briefing':
+            case 'view_details':
+                this.emit('fb-navigate', { view: 'project', id: projectId });
+                return;
+            case 'view_schedule':
+                this.emit('fb-navigate', { view: 'project-schedule', id: projectId });
+                return;
+        }
+
+        // Dismiss — optimistic removal via dedicated endpoint
         if (actionId === 'dismiss') {
-            api.portfolio.dismissCard(cardId).then(() => {
-                this._cards = this._cards.filter((c) => c.id !== cardId);
-            }).catch(() => { /* silently fail, card stays */ });
+            this._cards = this._cards.filter((c) => c.id !== cardId);
+            api.portfolio.dismissCard(cardId).catch(() => {
+                this._loadFeed(); // Reload on failure
+            });
             return;
         }
 
+        // Snooze — optimistic removal via dedicated endpoint
         if (actionId === 'snooze') {
-            api.portfolio.snoozeCard(cardId, 24).then(() => {
-                this._cards = this._cards.filter((c) => c.id !== cardId);
-            }).catch(() => { /* silently fail */ });
+            this._cards = this._cards.filter((c) => c.id !== cardId);
+            api.portfolio.snoozeCard(cardId, 24).catch(() => {
+                this._loadFeed();
+            });
             return;
         }
 
-        // Delegate other actions up
-        api.portfolio.executeAction(cardId, actionId).catch(() => {
-            // TODO: show toast on failure
+        // All other actions — call executeAction and handle response
+        api.portfolio.executeAction(cardId, actionId).then((resp) => {
+            if (resp.effect === 'dismiss') {
+                this._cards = this._cards.filter((c) => c.id !== cardId);
+            }
+            if (resp.effect === 'navigate' && resp.navigate_to) {
+                this.emit('fb-navigate', { path: resp.navigate_to });
+            }
+            if (resp.message) {
+                this.emit('fb-toast', { message: resp.message });
+            }
+        }).catch(() => {
+            this.emit('fb-toast', { message: 'Action failed. Please try again.', type: 'error' });
         });
     }
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -75,6 +76,31 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		Cards:    feed.Cards,
 		Projects: projects,
 	})
+}
+
+// ActionResponse is the structured response from ExecuteAction.
+// The frontend uses `effect` to determine post-action behavior:
+//   - "dismiss": remove the card from the feed list
+//   - "navigate": client-side route to `navigate_to`
+//   - "none": no visual change (informational)
+type ActionResponse struct {
+	Success    bool                   `json:"success"`
+	Effect     string                 `json:"effect"`
+	Message    string                 `json:"message,omitempty"`
+	NavigateTo string                 `json:"navigate_to,omitempty"`
+	Payload    map[string]interface{} `json:"payload,omitempty"`
+}
+
+// formatSnoozeLabel returns a human-readable snooze duration.
+func formatSnoozeLabel(hours int) string {
+	if hours < 24 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	days := hours / 24
+	if days == 1 {
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
 }
 
 // PortfolioFeedResponse wraps the feed response with project list for pills.
@@ -208,41 +234,94 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For now, handle dismiss and snooze actions.
-	// Additional action routing (order_now, confirm_start, etc.) will be added in Phase 3.
+	cardID, err := uuid.Parse(req.CardID)
+	if err != nil {
+		http.Error(w, "Invalid card_id", http.StatusBadRequest)
+		return
+	}
+
+	resp := ActionResponse{Success: true, Effect: "none"}
+
 	switch req.ActionID {
 	case "dismiss":
-		cardID, err := uuid.Parse(req.CardID)
-		if err != nil {
-			http.Error(w, "Invalid card_id", http.StatusBadRequest)
-			return
-		}
 		if err := h.feedService.DismissCard(ctx, orgID, cardID); err != nil {
 			http.Error(w, "Failed to dismiss card", http.StatusInternalServerError)
 			return
 		}
+		resp.Effect = "dismiss"
+		resp.Message = "Card dismissed"
+
 	case "snooze":
-		cardID, err := uuid.Parse(req.CardID)
-		if err != nil {
-			http.Error(w, "Invalid card_id", http.StatusBadRequest)
-			return
+		hours := 24
+		if h, ok := req.Payload["hours"].(float64); ok && h > 0 && h <= 168 {
+			hours = int(h)
 		}
-		// Default snooze: 24 hours
-		until := time.Now().Add(24 * time.Hour)
+		until := time.Now().Add(time.Duration(hours) * time.Hour)
 		if err := h.feedService.SnoozeCard(ctx, orgID, cardID, until); err != nil {
 			http.Error(w, "Failed to snooze card", http.StatusInternalServerError)
 			return
 		}
+		resp.Effect = "dismiss"
+		resp.Message = "Snoozed for " + formatSnoozeLabel(hours)
+
+	case "order_now":
+		if err := h.feedService.MarkProcurementOrdered(ctx, orgID, cardID); err != nil {
+			slog.Error("feed: mark ordered failed", "error", err, "card_id", cardID)
+			http.Error(w, "Failed to mark as ordered", http.StatusInternalServerError)
+			return
+		}
+		resp.Effect = "dismiss"
+		resp.Message = "Item marked as ordered"
+
+	case "view_briefing", "view_details":
+		// Look up project from card for navigation
+		card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+		if err != nil {
+			http.Error(w, "Card not found", http.StatusNotFound)
+			return
+		}
+		resp.Effect = "navigate"
+		resp.NavigateTo = "/project/" + card.ProjectID.String()
+
+	case "view_schedule":
+		card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+		if err != nil {
+			http.Error(w, "Card not found", http.StatusNotFound)
+			return
+		}
+		resp.Effect = "navigate"
+		resp.NavigateTo = "/project/" + card.ProjectID.String() + "/schedule"
+
+	case "resend":
+		// Re-sending sub confirmation is complex (needs SubLiaisonAgent).
+		// For now, snooze 1h so the agent picks it up on next scan.
+		until := time.Now().Add(1 * time.Hour)
+		if err := h.feedService.SnoozeCard(ctx, orgID, cardID, until); err != nil {
+			http.Error(w, "Failed to resend", http.StatusInternalServerError)
+			return
+		}
+		resp.Effect = "dismiss"
+		resp.Message = "Confirmation will be resent shortly"
+
+	case "call_sub":
+		// Frontend-only action — return the task context for dialer
+		card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+		if err != nil {
+			http.Error(w, "Card not found", http.StatusNotFound)
+			return
+		}
+		resp.Effect = "none"
+		resp.Message = "Contact information loaded"
+		if card.TaskID != nil {
+			resp.Payload = map[string]interface{}{"task_id": card.TaskID.String()}
+		}
+
 	default:
-		// Phase 3: Route to appropriate service methods
 		slog.Info("feed: unhandled action", "action_id", req.ActionID, "card_id", req.CardID, "org_id", orgID)
-		http.Error(w, "Action not yet implemented", http.StatusNotImplemented)
+		http.Error(w, "Unknown action: "+req.ActionID, http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Action executed",
-	})
+	_ = json.NewEncoder(w).Encode(resp)
 }

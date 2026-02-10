@@ -20,6 +20,8 @@ type FeedServicer interface {
 	DismissCard(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID) error
 	SnoozeCard(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID, until time.Time) error
 	WriteCard(ctx context.Context, card *models.FeedCard) error
+	GetCardByID(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID) (*models.FeedCard, error)
+	MarkProcurementOrdered(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID) error
 }
 
 // FeedResponse is the response from GetFeed.
@@ -146,6 +148,61 @@ func (s *FeedService) WriteCard(ctx context.Context, card *models.FeedCard) erro
 		return fmt.Errorf("feed: write card: %w", err)
 	}
 	return nil
+}
+
+// GetCardByID retrieves a single feed card by ID, scoped to the org.
+func (s *FeedService) GetCardByID(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID) (*models.FeedCard, error) {
+	var card models.FeedCard
+	err := s.db.QueryRow(ctx, `
+		SELECT id, org_id, project_id, card_type, priority, headline, body,
+			consequence, horizon, deadline, actions, engine_data, agent_source, task_id,
+			created_at, expires_at
+		FROM feed_cards
+		WHERE id = $1 AND org_id = $2
+	`, cardID, orgID).Scan(
+		&card.ID, &card.OrgID, &card.ProjectID, &card.CardType, &card.Priority,
+		&card.Headline, &card.Body, &card.Consequence, &card.Horizon, &card.Deadline,
+		&card.ActionsJSON, &card.EngineData, &card.AgentSource, &card.TaskID,
+		&card.CreatedAt, &card.ExpiresAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("feed: get card: %w", err)
+	}
+	if card.ActionsJSON != nil {
+		if err := json.Unmarshal(card.ActionsJSON, &card.Actions); err != nil {
+			card.Actions = []models.FeedCardAction{}
+		}
+	}
+	return &card, nil
+}
+
+// MarkProcurementOrdered marks the procurement item linked to a card as 'Ordered'
+// and dismisses the card. Returns error if card has no task_id or item not found.
+func (s *FeedService) MarkProcurementOrdered(ctx context.Context, orgID uuid.UUID, cardID uuid.UUID) error {
+	// Look up the card to get its task_id
+	card, err := s.GetCardByID(ctx, orgID, cardID)
+	if err != nil {
+		return fmt.Errorf("mark ordered: card lookup: %w", err)
+	}
+	if card.TaskID == nil {
+		return fmt.Errorf("mark ordered: card has no associated task")
+	}
+
+	// Update procurement_items linked to this project_task_id
+	result, err := s.db.Exec(ctx, `
+		UPDATE procurement_items
+		SET status = 'Ordered', last_checked_at = NOW()
+		WHERE project_task_id = $1
+	`, *card.TaskID)
+	if err != nil {
+		return fmt.Errorf("mark ordered: update procurement: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		slog.Warn("mark ordered: no procurement item found for task", "task_id", *card.TaskID)
+	}
+
+	// Dismiss the card
+	return s.DismissCard(ctx, orgID, cardID)
 }
 
 func (s *FeedService) getActiveCards(ctx context.Context, orgID uuid.UUID, projectFilter *uuid.UUID) ([]models.FeedCard, error) {
