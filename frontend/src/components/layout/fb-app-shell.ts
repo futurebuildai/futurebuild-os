@@ -395,11 +395,14 @@ export class FBAppShell extends FBElement {
         history.pushState = function (...args) {
             originalPushState.apply(this, args);
             self._syncRoute();
+            // Notify other components (e.g., mobile-nav) of route change
+            window.dispatchEvent(new Event('fb-route-change'));
         };
 
         history.replaceState = function (...args) {
             originalReplaceState.apply(this, args);
             self._syncRoute();
+            window.dispatchEvent(new Event('fb-route-change'));
         };
     }
 
@@ -490,8 +493,8 @@ export class FBAppShell extends FBElement {
 
             case 'project': {
                 const route = this._route as { view: 'project'; projectId: string };
-                // Project view is a filtered feed
-                return html`<fb-home-feed .setFilter=${route.projectId}></fb-home-feed>`;
+                // Project view is a filtered feed — pass projectId as reactive property
+                return html`<fb-home-feed .projectFilter=${route.projectId}></fb-home-feed>`;
             }
 
             case 'onboard':

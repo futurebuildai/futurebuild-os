@@ -8,7 +8,7 @@
  * - Empty state for new users (redirect to onboarding)
  */
 import { html, css, nothing } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { api } from '../../services/api';
 import { store, type ChatCardContext } from '../../store/store';
@@ -132,6 +132,11 @@ export class FBHomeFeed extends FBElement {
                 opacity: 0.9;
             }
 
+            .empty-cta:focus-visible {
+                outline: 2px solid var(--fb-accent, #6366f1);
+                outline-offset: 2px;
+            }
+
             .error {
                 padding: 16px;
                 background: var(--fb-surface-1, #1a1a2e);
@@ -140,6 +145,26 @@ export class FBHomeFeed extends FBElement {
                 color: #ef4444;
                 font-size: 14px;
                 margin-top: 24px;
+            }
+
+            .error-retry {
+                display: inline-flex;
+                align-items: center;
+                margin-top: 12px;
+                padding: 8px 20px;
+                border-radius: 6px;
+                border: 1px solid #ef4444;
+                background: transparent;
+                color: #ef4444;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .error-retry:hover {
+                background: #ef4444;
+                color: #fff;
             }
 
             @media (max-width: 768px) {
@@ -154,6 +179,12 @@ export class FBHomeFeed extends FBElement {
         `,
     ];
 
+    /**
+     * External project filter — set by parent (e.g., app-shell project route).
+     * When changed, triggers a filtered feed reload.
+     */
+    @property({ type: String, attribute: 'project-filter' }) projectFilter: string | null = null;
+
     @state() private _greeting = '';
     @state() private _summary: PortfolioSummary | null = null;
     @state() private _cards: FeedCard[] = [];
@@ -164,6 +195,10 @@ export class FBHomeFeed extends FBElement {
 
     override connectedCallback() {
         super.connectedCallback();
+        // Apply external filter if provided
+        if (this.projectFilter) {
+            this._filterProjectId = this.projectFilter;
+        }
         this._loadFeed();
 
         // Listen for filter changes from top bar
@@ -172,6 +207,17 @@ export class FBHomeFeed extends FBElement {
         // Subscribe to SSE feed stream for live updates
         this._unsubSSE = feedSSE.subscribe(this._handleSSEEvent);
         feedSSE.connect();
+    }
+
+    /** React to external projectFilter property changes */
+    override willUpdate(changedProperties: Map<string, unknown>): void {
+        if (changedProperties.has('projectFilter')) {
+            const newFilter = this.projectFilter;
+            if (newFilter !== this._filterProjectId) {
+                this._filterProjectId = newFilter;
+                this._loadFeed();
+            }
+        }
     }
 
     override disconnectedCallback() {
@@ -385,15 +431,23 @@ export class FBHomeFeed extends FBElement {
     override render() {
         if (this._loading) {
             return html`
-                <div class="greeting skeleton skeleton-text" style="width: 200px; height: 32px;"></div>
-                ${this._renderLoading()}
+                <main role="main" aria-label="Portfolio Feed" aria-busy="true">
+                    <div class="greeting skeleton skeleton-text" style="width: 200px; height: 32px;"></div>
+                    ${this._renderLoading()}
+                </main>
             `;
         }
 
         if (this._error) {
             return html`
-                <div class="greeting">Something went wrong</div>
-                <div class="error">${this._error}</div>
+                <main role="main" aria-label="Portfolio Feed">
+                    <div class="greeting">Something went wrong</div>
+                    <div class="error">
+                        ${this._error}
+                        <br />
+                        <button class="error-retry" @click=${() => this._loadFeed()}>Retry</button>
+                    </div>
+                </main>
             `;
         }
 

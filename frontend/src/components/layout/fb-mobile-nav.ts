@@ -31,20 +31,22 @@ const TABS: NavTab[] = [
     {
         id: 'projects',
         label: 'Projects',
-        path: '/projects',
-        match: (p) => p === '/projects' || p.startsWith('/projects/'),
+        path: '/',
+        // V2 routes: /project/:id, /project/:id/schedule — highlight Projects tab
+        match: (p) => p.startsWith('/project/') || p === '/projects' || p.startsWith('/projects/') || p === '/onboard',
     },
     {
         id: 'chat',
         label: 'Chat',
-        path: '/chat',
-        match: (p) => p === '/chat',
+        path: '/',
+        // V2 routes: /project/:id/chat — highlight Chat tab
+        match: (p) => p.includes('/chat'),
     },
     {
         id: 'settings',
         label: 'Settings',
-        path: '/settings',
-        match: (p) => p === '/settings' || p.startsWith('/settings/'),
+        path: '/settings/profile',
+        match: (p) => p === '/settings' || p.startsWith('/settings/') || p === '/contacts',
     },
 ];
 
@@ -155,20 +157,32 @@ export class FBMobileNav extends FBElement {
         super.connectedCallback();
         this._activePath = window.location.pathname;
         window.addEventListener('popstate', this._handlePopState);
+        // Also listen for pushState-driven route changes from fb-app-shell
+        window.addEventListener('fb-route-change', this._handlePopState);
     }
 
     override disconnectedCallback(): void {
         window.removeEventListener('popstate', this._handlePopState);
+        window.removeEventListener('fb-route-change', this._handlePopState);
         super.disconnectedCallback();
     }
 
-    private _navigate(path: string): void {
+    private _navigate(tabId: string, defaultPath: string): void {
         // Close any open mobile panels first
         if (store.leftPanelOpen$.value) {
             store.actions.setLeftPanelOpen(false);
         }
         if (store.rightPanelOpen$.value) {
             store.actions.setRightPanelOpen(false);
+        }
+
+        // Determine the actual path based on active project context
+        let path = defaultPath;
+        const activeProject = store.activeProjectId$.value;
+        if (tabId === 'projects' && activeProject) {
+            path = `/project/${activeProject}`;
+        } else if (tabId === 'chat' && activeProject) {
+            path = `/project/${activeProject}/chat`;
         }
 
         window.history.pushState({}, '', path);
@@ -199,7 +213,7 @@ export class FBMobileNav extends FBElement {
                     return html`
                         <button
                             class="tab ${isActive ? 'active' : ''}"
-                            @click=${(): void => { this._navigate(tab.path); }}
+                            @click=${(): void => { this._navigate(tab.id, tab.path); }}
                             aria-label="${tab.label}"
                             aria-current=${isActive ? 'page' : 'false'}
                             role="tab"

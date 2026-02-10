@@ -206,6 +206,7 @@ export class FBViewDirectory extends FBViewElement {
 
     @state() private _contacts: Contact[] = [];
     @state() private _loading = true;
+    @state() private _error: string | null = null;
     @state() private _search = '';
     @state() private _showAddForm = false;
     private _searchTimeout = 0;
@@ -216,10 +217,12 @@ export class FBViewDirectory extends FBViewElement {
 
     private async _loadContacts() {
         this._loading = true;
+        this._error = null;
         try {
             this._contacts = await api.contacts.list(this._search || undefined);
-        } catch {
+        } catch (err) {
             this._contacts = [];
+            this._error = err instanceof Error ? err.message : 'Failed to load contacts';
         } finally {
             this._loading = false;
         }
@@ -281,7 +284,20 @@ export class FBViewDirectory extends FBViewElement {
                 />
             </div>
 
-            ${this._loading ? this._renderLoading() : this._renderContacts()}
+            ${this._loading
+                ? this._renderLoading()
+                : this._error
+                    ? html`
+                        <div class="empty" role="alert">
+                            <div class="empty-title" style="color: #ef4444;">Something went wrong</div>
+                            <div>${this._error}</div>
+                            <button
+                                style="margin-top: 12px; padding: 8px 20px; border-radius: 6px; border: 1px solid #ef4444; background: transparent; color: #ef4444; font-size: 13px; font-weight: 600; cursor: pointer;"
+                                @click=${() => this._loadContacts()}
+                            >Retry</button>
+                        </div>
+                    `
+                    : this._renderContacts()}
         `;
     }
 

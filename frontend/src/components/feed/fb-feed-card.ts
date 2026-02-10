@@ -27,6 +27,8 @@ const CARD_ICONS: Partial<Record<FeedCardType, string>> = {
     invoice_ready: '\uD83D\uDCB0', // 💰
     setup_team: '\uD83D\uDC65',    // 👥
     setup_contacts: '\uD83D\uDCDE', // 📞
+    calibration_drift: '\uD83D\uDCC9', // 📉
+    budget_alert: '\uD83D\uDCB8',    // 💸
     milestone: '\uD83C\uDFC1',     // 🏁
     welcome: '\uD83D\uDC4B',       // 👋
 };
@@ -164,6 +166,11 @@ export class FBFeedCard extends FBElement {
                 color: #fff;
             }
 
+            .action-btn:focus-visible {
+                outline: 2px solid var(--fb-accent, #6366f1);
+                outline-offset: 2px;
+            }
+
             .deadline {
                 font-size: 12px;
                 color: var(--fb-text-tertiary, #707080);
@@ -188,6 +195,12 @@ export class FBFeedCard extends FBElement {
 
             .tell-me-more:hover {
                 opacity: 0.8;
+            }
+
+            .tell-me-more:focus-visible {
+                outline: 2px solid var(--fb-accent, #6366f1);
+                outline-offset: 2px;
+                border-radius: 4px;
             }
 
             @media (max-width: 768px) {

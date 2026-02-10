@@ -239,13 +239,36 @@ export class FBViewSchedule extends FBViewElement {
                 z-index: 1;
             }
 
-            .loading, .empty {
+            .loading, .empty, .error-state {
                 display: flex;
+                flex-direction: column;
                 align-items: center;
                 justify-content: center;
                 height: 200px;
                 color: var(--fb-text-secondary, #a0a0b0);
                 font-size: 14px;
+                gap: 12px;
+            }
+
+            .error-state {
+                color: #ef4444;
+            }
+
+            .retry-btn {
+                padding: 8px 20px;
+                border-radius: 6px;
+                border: 1px solid #ef4444;
+                background: transparent;
+                color: #ef4444;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .retry-btn:hover {
+                background: #ef4444;
+                color: #fff;
             }
 
             .legend {
@@ -277,9 +300,15 @@ export class FBViewSchedule extends FBViewElement {
                     padding: 12px;
                 }
 
-                .label {
+                .task-label {
                     width: 120px;
+                    min-width: 120px;
                     font-size: 11px;
+                }
+
+                .date-axis-label-col {
+                    width: 120px;
+                    min-width: 120px;
                 }
 
                 .legend {
@@ -292,6 +321,7 @@ export class FBViewSchedule extends FBViewElement {
 
     @state() private _data: GanttData | null = null;
     @state() private _loading = false;
+    @state() private _error: string | null = null;
     @state() private _projectId: string | null = null;
     @state() private _recalculating = false;
 
@@ -318,10 +348,12 @@ export class FBViewSchedule extends FBViewElement {
 
     private async _loadSchedule(projectId: string): Promise<void> {
         this._loading = true;
+        this._error = null;
         try {
             this._data = await api.schedule.get(projectId);
-        } catch {
+        } catch (err) {
             this._data = null;
+            this._error = err instanceof Error ? err.message : 'Failed to load schedule';
         } finally {
             this._loading = false;
         }
@@ -475,7 +507,19 @@ export class FBViewSchedule extends FBViewElement {
         if (this._loading) {
             return html`
                 <div class="toolbar"><span class="toolbar-title">Schedule</span></div>
-                <div class="loading">Loading schedule...</div>
+                <div class="loading" aria-busy="true">Loading schedule...</div>
+            `;
+        }
+
+        if (this._error) {
+            return html`
+                <div class="toolbar"><span class="toolbar-title">Schedule</span></div>
+                <div class="error-state" role="alert">
+                    <span>${this._error}</span>
+                    <button class="retry-btn" @click=${() => { if (this._projectId) void this._loadSchedule(this._projectId); }}>
+                        Retry
+                    </button>
+                </div>
             `;
         }
 

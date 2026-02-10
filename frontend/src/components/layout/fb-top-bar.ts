@@ -221,16 +221,27 @@ export class FBTopBar extends FBElement {
     override connectedCallback() {
         super.connectedCallback();
         document.addEventListener('click', this._handleOutsideClick);
+        document.addEventListener('keydown', this._handleKeyDown);
     }
 
     override disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener('click', this._handleOutsideClick);
+        document.removeEventListener('keydown', this._handleKeyDown);
     }
 
     private _handleOutsideClick = (e: Event) => {
         if (this._menuOpen && !this.contains(e.target as Node)) {
             this._menuOpen = false;
+        }
+    };
+
+    /** Close menu on Escape key (WCAG 2.1 requirement) */
+    private _handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && this._menuOpen) {
+            this._menuOpen = false;
+            // Return focus to the avatar button
+            this.shadowRoot?.querySelector<HTMLElement>('.avatar')?.focus();
         }
     };
 
