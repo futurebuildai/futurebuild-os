@@ -228,6 +228,9 @@ export class FBHomeFeed extends FBElement {
             case 'view_schedule':
                 this.emit('fb-navigate', { view: 'project-schedule', id: projectId });
                 return;
+            case 'add_contacts':
+                this.emit('fb-navigate', { view: 'contacts' });
+                return;
         }
 
         // Dismiss — optimistic removal via dedicated endpoint

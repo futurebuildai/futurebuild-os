@@ -44,6 +44,9 @@ import '../admin/fb-admin-shell';
 import '../chat/fb-message-list';
 import '../chat/fb-input-bar';
 
+// V2 onboarding
+import '../views/fb-view-onboarding';
+
 /**
  * Route type for V2 URL-based routing.
  * See FRONTEND_V2_SPEC.md §4.3
@@ -494,12 +497,7 @@ export class FBAppShell extends FBElement {
             }
 
             case 'onboard':
-                // Phase 4: Full onboarding flow component
-                return html`
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--fb-text-secondary);">
-                        Onboarding flow — coming in Phase 4
-                    </div>
-                `;
+                return html`<fb-view-onboarding></fb-view-onboarding>`;
 
             case 'project-chat': {
                 // V1 chat components until replaced in Phase 5

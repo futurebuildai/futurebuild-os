@@ -9,6 +9,7 @@ import { html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import type { FeedCard, FeedCardType } from '../../types/feed';
+import './fb-contact-inline-add';
 
 const CARD_ICONS: Partial<Record<FeedCardType, string>> = {
     daily_briefing: '\u2600',      // ☀
@@ -169,12 +170,16 @@ export class FBFeedCard extends FBElement {
                 margin-left: auto;
             }
 
+            .inline-form {
+                padding: 12px 0 0 20px;
+            }
+
             @media (max-width: 768px) {
                 .card {
                     padding: 12px 14px;
                 }
 
-                .body, .consequence, .actions-row {
+                .body, .consequence, .actions-row, .inline-form {
                     padding-left: 0;
                 }
             }
@@ -189,6 +194,15 @@ export class FBFeedCard extends FBElement {
             actionId,
             projectId: this.card.project_id,
         });
+    }
+
+    private _handleContactSaved() {
+        // Dismiss the setup_contacts card after a contact is saved + assigned
+        this._handleAction('dismiss');
+    }
+
+    private _handleContactCancelled() {
+        this._handleAction('dismiss');
     }
 
     private _formatDeadline(deadline: string): string {
@@ -232,23 +246,33 @@ export class FBFeedCard extends FBElement {
                     ? html`<div class="consequence">${this.card.consequence}</div>`
                     : nothing}
 
-                ${(this.card.actions?.length ?? 0) > 0
+                ${this.card.card_type === 'setup_contacts'
                     ? html`
-                          <div class="actions-row">
-                              ${this.card.actions.map(
-                                  (a) => html`
-                                      <button
-                                          class="action-btn"
-                                          data-style=${a.style}
-                                          @click=${() => this._handleAction(a.id)}
-                                      >
-                                          ${a.label}
-                                      </button>
-                                  `
-                              )}
+                          <div class="inline-form">
+                              <fb-contact-inline-add
+                                  .projectId=${this.card.project_id}
+                                  @fb-contact-saved=${this._handleContactSaved}
+                                  @fb-contact-cancelled=${this._handleContactCancelled}
+                              ></fb-contact-inline-add>
                           </div>
                       `
-                    : nothing}
+                    : (this.card.actions?.length ?? 0) > 0
+                        ? html`
+                              <div class="actions-row">
+                                  ${this.card.actions.map(
+                                      (a) => html`
+                                          <button
+                                              class="action-btn"
+                                              data-style=${a.style}
+                                              @click=${() => this._handleAction(a.id)}
+                                          >
+                                              ${a.label}
+                                          </button>
+                                      `
+                                  )}
+                              </div>
+                          `
+                        : nothing}
             </div>
         `;
     }

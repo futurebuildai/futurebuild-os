@@ -65,7 +65,7 @@ type Server struct {
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
 	projectService := service.NewProjectService(db)
 	threadService := service.NewThreadService(db)
-	projectHandler := handlers.NewProjectHandler(projectService, threadService)
+	projectHandler := handlers.NewProjectHandler(projectService, threadService) // feedService wired below via WithFeedService
 
 	// See PRODUCTION_PLAN.md Step 32
 	scheduleService := service.NewScheduleService(db)
@@ -166,6 +166,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// V2: Portfolio feed service (created early for agent injection)
 	feedService := service.NewFeedService(db)
+
+	// Wire feedService into ProjectHandler for setup_team card generation
+	projectHandler.WithFeedService(feedService)
 
 	inboundProcessor := agents.NewInboundProcessor(
 		db,

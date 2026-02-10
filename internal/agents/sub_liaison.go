@@ -170,6 +170,12 @@ func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) 
 			"task_id", taskID,
 			"error", err,
 		)
+
+		// V2 Feed: Write setup_contacts card prompting builder to assign a contact
+		// See FRONTEND_V2_SPEC.md §10.3.C
+		if a.feedWriter != nil {
+			a.writeSetupContactsCard(ctx, task, phaseCode)
+		}
 		return nil
 	}
 
@@ -412,6 +418,54 @@ func (a *SubLiaisonAgent) writeSubDelayCard(ctx context.Context, task *taskDetai
 	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
 		slog.Error("failed to write sub delay feed card", "task_id", task.ID, "error", err)
 	}
+}
+
+// writeSetupContactsCard creates a setup_contacts card when a phase has no assigned contact
+// and a task in that phase is approaching. The card includes an inline form for quick assignment.
+// See FRONTEND_V2_SPEC.md §10.3.C
+func (a *SubLiaisonAgent) writeSetupContactsCard(ctx context.Context, task *taskDetails, phaseCode string) {
+	tradeName := phaseTradeNames[phaseCode]
+	if tradeName == "" {
+		tradeName = "Phase " + phaseCode
+	}
+
+	headline := fmt.Sprintf("No %s contact assigned", strings.ToLower(tradeName))
+	body := fmt.Sprintf("%s starts %s. I need a contact to send a start confirmation.", task.Name, formatDate(task.EarlyStart))
+
+	agentSource := "SubLiaisonAgent"
+	card := &models.FeedCard{
+		OrgID:       task.OrgID,
+		ProjectID:   task.ProjectID,
+		CardType:    models.FeedCardSetupContacts,
+		Priority:    models.FeedCardPriorityUrgent,
+		Headline:    headline,
+		Body:        body,
+		Horizon:     models.FeedCardHorizonToday,
+		Deadline:    task.EarlyStart,
+		AgentSource: &agentSource,
+		TaskID:      &task.ID,
+		Actions: []models.FeedCardAction{
+			{ID: "assign_contact", Label: "Save & Assign", Style: "primary"},
+			{ID: "dismiss", Label: "Skip this phase", Style: "secondary"},
+		},
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write setup_contacts feed card", "task_id", task.ID, "phase_code", phaseCode, "error", err)
+	}
+}
+
+// phaseTradeNames maps WBS phase codes to human-readable trade names.
+var phaseTradeNames = map[string]string{
+	"5":  "Permit & Site Prep",
+	"6":  "Foundation",
+	"7":  "Framing",
+	"8":  "Roofing & Exterior",
+	"9":  "Rough-Ins (MEP)",
+	"10": "Insulation & Drywall",
+	"11": "Finishes",
+	"12": "Final Inspections",
+	"13": "Punch List & Closeout",
 }
 
 // --- Private Helper Methods ---

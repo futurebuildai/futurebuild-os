@@ -10,7 +10,7 @@
  * through AI document extraction and natural conversation.
  */
 import { html, css, TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
 import { api } from '../../services/api';
@@ -24,6 +24,7 @@ import {
 
 import '../features/onboarding/fb-onboarding-chat';
 import '../features/onboarding/fb-onboarding-steps';
+import '../features/onboarding/fb-engine-calibration';
 
 @customElement('fb-view-onboarding')
 export class FBViewOnboarding extends FBViewElement {
@@ -100,6 +101,9 @@ export class FBViewOnboarding extends FBViewElement {
      */
     @property({ type: Object, attribute: 'initial-values' }) initialValues: Partial<CreateProjectRequest> = {};
 
+    /** When true, show calibration step before navigating home */
+    @state() private _showCalibration = false;
+
     private _disposeEffect: (() => void) | null = null;
 
     override connectedCallback(): void {
@@ -157,6 +161,12 @@ export class FBViewOnboarding extends FBViewElement {
             // Select the new project (triggers thread loading + General thread auto-select)
             store.actions.setActiveProject(projectId);
 
+            // First project → show calibration step before navigating home
+            if (current.length === 0) {
+                this._showCalibration = true;
+                return;
+            }
+
             // Navigate to chat view
             this._navigateTo('/');
         } catch {
@@ -165,7 +175,36 @@ export class FBViewOnboarding extends FBViewElement {
         }
     }
 
+    private _handleCalibrationDone(): void {
+        this._showCalibration = false;
+        this._navigateTo('/');
+    }
+
     override render(): TemplateResult {
+        if (this._showCalibration) {
+            return html`
+                <div class="wizard-header">
+                    <span class="wizard-title">Calibrate Your Engine</span>
+                    <button
+                        class="close-btn"
+                        @click=${(): void => { this._handleCalibrationDone(); }}
+                        aria-label="Skip calibration"
+                        title="Skip"
+                    >
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="wizard-body">
+                    <fb-engine-calibration
+                        @fb-calibration-applied=${(): void => { this._handleCalibrationDone(); }}
+                        @fb-calibration-skipped=${(): void => { this._handleCalibrationDone(); }}
+                    ></fb-engine-calibration>
+                </div>
+            `;
+        }
+
         return html`
             <div class="wizard-header">
                 <span class="wizard-title">New Project</span>

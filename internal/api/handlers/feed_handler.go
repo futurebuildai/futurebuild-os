@@ -317,6 +317,20 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			resp.Payload = map[string]interface{}{"task_id": card.TaskID.String()}
 		}
 
+	case "add_contacts":
+		// Navigate to contact directory — card stays visible
+		resp.Effect = "navigate"
+		resp.NavigateTo = "/contacts"
+
+	case "assign_contact":
+		// Contact was assigned inline — dismiss the setup_contacts card
+		if err := h.feedService.DismissCard(ctx, orgID, cardID); err != nil {
+			http.Error(w, "Failed to dismiss card", http.StatusInternalServerError)
+			return
+		}
+		resp.Effect = "dismiss"
+		resp.Message = "Contact assigned"
+
 	default:
 		slog.Info("feed: unhandled action", "action_id", req.ActionID, "card_id", req.CardID, "org_id", orgID)
 		http.Error(w, "Unknown action: "+req.ActionID, http.StatusBadRequest)
