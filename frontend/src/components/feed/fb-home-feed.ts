@@ -11,6 +11,7 @@ import { html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { api } from '../../services/api';
+import { store, type ChatCardContext } from '../../store/store';
 import type { FeedCard, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
 
 interface GroupedCards {
@@ -231,6 +232,26 @@ export class FBHomeFeed extends FBElement {
             case 'add_contacts':
                 this.emit('fb-navigate', { view: 'contacts' });
                 return;
+            case 'tell_me_more': {
+                // Find the card to get full context
+                const card = this._cards.find((c) => c.id === cardId);
+                if (card) {
+                    const ctx: ChatCardContext = {
+                        cardId: card.id,
+                        cardType: card.card_type,
+                        headline: card.headline,
+                        body: card.body,
+                        consequence: card.consequence ?? '',
+                        projectId: card.project_id,
+                        projectName: card.project_name ?? '',
+                        taskId: card.task_id ?? '',
+                    };
+                    store.actions.setChatCardContext(ctx);
+                    store.actions.setActiveProject(card.project_id);
+                    this.emit('fb-navigate', { view: 'project-chat', projectId: card.project_id });
+                }
+                return;
+            }
         }
 
         // Dismiss — optimistic removal via dedicated endpoint

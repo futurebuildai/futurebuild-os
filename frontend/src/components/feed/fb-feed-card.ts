@@ -174,6 +174,22 @@ export class FBFeedCard extends FBElement {
                 padding: 12px 0 0 20px;
             }
 
+            .tell-me-more {
+                display: block;
+                padding: 8px 0 0 20px;
+                font-size: 13px;
+                color: var(--fb-accent, #6366f1);
+                cursor: pointer;
+                background: none;
+                border: none;
+                text-align: left;
+                transition: opacity 0.15s;
+            }
+
+            .tell-me-more:hover {
+                opacity: 0.8;
+            }
+
             @media (max-width: 768px) {
                 .card {
                     padding: 12px 14px;
@@ -273,8 +289,22 @@ export class FBFeedCard extends FBElement {
                               </div>
                           `
                         : nothing}
+
+                ${this._showTellMeMore()
+                    ? html`
+                          <button
+                              class="tell-me-more"
+                              @click=${() => this._handleAction('tell_me_more')}
+                          >Tell me more \u2192</button>
+                      `
+                    : nothing}
             </div>
         `;
+    }
+
+    private _showTellMeMore(): boolean {
+        const skip: FeedCardType[] = ['setup_team', 'setup_contacts', 'welcome'];
+        return !skip.includes(this.card.card_type);
     }
 }
 

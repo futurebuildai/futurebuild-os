@@ -121,6 +121,20 @@ const _shadowActiveView$ = signal<'log' | 'docs'>('log');
 const _selectedDecisionId$ = signal<string | null>(null);
 const _selectedDocPath$ = signal<string | null>(null);
 
+// V2 Phase 5: Chat context from feed card "Tell me more" flow
+// See FRONTEND_V2_SPEC.md §7 Step 33
+export interface ChatCardContext {
+    cardId: string;
+    cardType: string;
+    headline: string;
+    body: string;
+    consequence: string;
+    projectId: string;
+    projectName: string;
+    taskId: string;
+}
+const _chatCardContext$ = signal<ChatCardContext | null>(null);
+
 // ============================================================================
 // Computed Values
 // ============================================================================
@@ -557,6 +571,11 @@ const actions: StoreActions = {
         _completionReport$.value = report;
     },
 
+    // V2 Phase 5: Chat card context
+    setChatCardContext(ctx: ChatCardContext | null): void {
+        _chatCardContext$.value = ctx;
+    },
+
     // ---- Session Reset (Step 58.5: State Hygiene) ----
 
     resetSession(): void {
@@ -605,6 +624,9 @@ const actions: StoreActions = {
 
         // Completion
         _completionReport$.value = null;
+
+        // Chat card context
+        _chatCardContext$.value = null;
 
         // Shadow Mode (SHADOW_VIEWER_specs.md)
         _shadowModeEnabled$.value = false;
@@ -684,6 +706,9 @@ export const store = {
 
     // ---- Completion Report State (readonly) ----
     completionReport$: _completionReport$ as ReadonlySignal<CompletionReport | null>,
+
+    // ---- Chat Card Context (V2 Phase 5: "Tell me more") ----
+    chatCardContext$: _chatCardContext$ as ReadonlySignal<ChatCardContext | null>,
 
     // ---- Shadow Mode State (readonly, SHADOW_VIEWER_specs.md) ----
     shadowModeEnabled$: _shadowModeEnabled$ as ReadonlySignal<boolean>,

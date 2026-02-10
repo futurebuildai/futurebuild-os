@@ -40,11 +40,8 @@ import './fb-mobile-nav';
 import '../shadow/shadow-layout';
 import '../admin/fb-admin-shell';
 
-// V1 components still used for chat/schedule views until replaced
-import '../chat/fb-message-list';
-import '../chat/fb-input-bar';
-
-// V2 onboarding
+// V2 views
+import '../views/fb-view-chat';
 import '../views/fb-view-onboarding';
 
 /**
@@ -499,15 +496,8 @@ export class FBAppShell extends FBElement {
             case 'onboard':
                 return html`<fb-view-onboarding></fb-view-onboarding>`;
 
-            case 'project-chat': {
-                // V1 chat components until replaced in Phase 5
-                return html`
-                    <div style="display: flex; flex-direction: column; height: 100%;">
-                        <fb-message-list></fb-message-list>
-                        <fb-input-bar></fb-input-bar>
-                    </div>
-                `;
-            }
+            case 'project-chat':
+                return html`<fb-view-chat></fb-view-chat>`;
 
             case 'project-schedule': {
                 // Phase 6: Full schedule view
