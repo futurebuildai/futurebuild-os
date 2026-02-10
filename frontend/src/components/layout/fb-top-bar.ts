@@ -271,6 +271,11 @@ export class FBTopBar extends FBElement {
         this.emit('fb-sign-out', {});
     }
 
+    private _toggleTheme() {
+        this._menuOpen = false;
+        this.emit('fb-toggle-theme', {});
+    }
+
     private _getInitials(): string {
         if (!this.userName) return '?';
         const parts = this.userName.trim().split(/\s+/);
@@ -371,6 +376,10 @@ export class FBTopBar extends FBElement {
                               </button>
                           `
                         : nothing}
+                    <div class="menu-divider"></div>
+                    <button class="menu-item" role="menuitem" @click=${this._toggleTheme}>
+                        Toggle Theme
+                    </button>
                     <div class="menu-divider"></div>
                     <button class="menu-item menu-item--danger" role="menuitem" @click=${this._handleSignOut}>
                         Sign Out

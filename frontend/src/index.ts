@@ -24,9 +24,11 @@ import { FBMobileNav } from './components/layout/fb-mobile-nav';
 // V2 Feed components
 import { FBHomeFeed } from './components/feed/fb-home-feed';
 import { FBFeedCard } from './components/feed/fb-feed-card';
+import { FBFeedSection } from './components/feed/fb-feed-section';
+import { FBGreetingBanner } from './components/feed/fb-greeting-banner';
+import { FBEmptyHome } from './components/feed/fb-empty-home';
 
-// V1 Layout (kept for portal & backward compat, pending removal)
-import { FBPanelCenter } from './components/layout/fb-panel-center';
+// V2 Layout - Right panel for artifacts
 import { FBPanelRight } from './components/layout/fb-panel-right';
 
 // Chat Components (Step 52, retained for project-chat view)
@@ -43,6 +45,28 @@ import { FBArtifactInvoice } from './components/artifacts/fb-artifact-invoice';
 
 // Feature Components (Step 56)
 import { FBFileDrop } from './components/features/fb-file-drop';
+
+// V2 Settings Components
+import { FBSettingsProfile } from './components/settings/fb-settings-profile';
+import { FBSettingsOrg } from './components/settings/fb-settings-org';
+import { FBSettingsTeam } from './components/settings/fb-settings-team';
+
+// V2 Project Components
+import { FBProjectHeader } from './components/project/fb-project-header';
+
+// V2 Onboarding Components
+import { FBOnboardFlow } from './components/features/onboarding/fb-onboard-flow';
+import { FBExtractionStream } from './components/features/onboarding/fb-extraction-stream';
+
+// V2 Schedule Components
+import { FBScheduleTaskBar } from './components/schedule/fb-schedule-task-bar';
+import { FBScheduleDiff } from './components/schedule/fb-schedule-diff';
+
+// V2 Contact Components
+import { FBContactPhaseGrid } from './components/contacts/fb-contact-phase-grid';
+import { FBContactBulkInput } from './components/contacts/fb-contact-bulk-input';
+import { FBContactDetail } from './components/contacts/fb-contact-detail';
+import { FBContactDirectory } from './components/contacts/fb-contact-directory';
 
 // Base Components (Step 58.5)
 import { FBErrorBoundary } from './components/base/fb-error-boundary';
@@ -76,8 +100,10 @@ const registered = registerComponents({
     // V2 feed
     'fb-home-feed': FBHomeFeed,
     'fb-feed-card': FBFeedCard,
-    // V1 layout (portal compat, pending removal)
-    'fb-panel-center': FBPanelCenter,
+    'fb-feed-section': FBFeedSection,
+    'fb-greeting-banner': FBGreetingBanner,
+    'fb-empty-home': FBEmptyHome,
+    // V2 layout - right panel for artifacts
     'fb-panel-right': FBPanelRight,
     // Chat (retained for project-chat view)
     'fb-message-list': FBMessageList,
@@ -92,6 +118,23 @@ const registered = registerComponents({
     // Features
     'fb-file-drop': FBFileDrop,
     'fb-error-boundary': FBErrorBoundary,
+    // V2 Settings
+    'fb-settings-profile': FBSettingsProfile,
+    'fb-settings-org': FBSettingsOrg,
+    'fb-settings-team': FBSettingsTeam,
+    // V2 Project
+    'fb-project-header': FBProjectHeader,
+    // V2 Onboarding
+    'fb-onboard-flow': FBOnboardFlow,
+    'fb-extraction-stream': FBExtractionStream,
+    // V2 Schedule
+    'fb-schedule-task-bar': FBScheduleTaskBar,
+    'fb-schedule-diff': FBScheduleDiff,
+    // V2 Contacts
+    'fb-contact-phase-grid': FBContactPhaseGrid,
+    'fb-contact-bulk-input': FBContactBulkInput,
+    'fb-contact-detail': FBContactDetail,
+    'fb-contact-directory': FBContactDirectory,
     // Notifications
     'fb-notification-bell': FBNotificationBell,
     'fb-notification-list': FBNotificationList,

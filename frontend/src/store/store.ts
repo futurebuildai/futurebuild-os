@@ -91,9 +91,9 @@ const _chatError$ = signal<string | null>(null);
 const _focusTasks$ = signal<FocusTask[]>([]);
 const _agentActivity$ = signal<AgentActivity[]>([]);
 
-// UI (Updated for 3-panel layout)
-const _leftPanelOpen$ = signal<boolean>(true);
-const _rightPanelOpen$ = signal<boolean>(true);
+// UI (V2: No left panel, right panel only shows when artifact active)
+const _leftPanelOpen$ = signal<boolean>(false);
+const _rightPanelOpen$ = signal<boolean>(false);
 const _theme$ = signal<Theme>('dark');
 const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
@@ -293,7 +293,8 @@ const actions: StoreActions = {
             _threads$.value = _threads$.value.map((t) => {
                 if (t.id !== id) return t;
                 // Remove archivedAt by destructuring it out
-                const { archivedAt: _, ...rest } = t;
+                const { archivedAt: _removed, ...rest } = t;
+                void _removed; // Intentionally unused - destructuring to remove property
                 return rest as Thread;
             });
         } else {

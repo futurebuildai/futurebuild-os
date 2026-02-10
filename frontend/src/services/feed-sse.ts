@@ -58,15 +58,15 @@ class FeedSSEService {
             };
 
             // Listen to named event types from the server
-            this._eventSource.addEventListener('card_added', (e: MessageEvent) => {
+            this._eventSource.addEventListener('card_added', (e: MessageEvent<string>) => {
                 this._dispatch(this._parseCardEvent('card_added', e.data));
             });
 
-            this._eventSource.addEventListener('card_updated', (e: MessageEvent) => {
+            this._eventSource.addEventListener('card_updated', (e: MessageEvent<string>) => {
                 this._dispatch(this._parseCardEvent('card_updated', e.data));
             });
 
-            this._eventSource.addEventListener('card_removed', (e: MessageEvent) => {
+            this._eventSource.addEventListener('card_removed', (e: MessageEvent<string>) => {
                 this._dispatch(this._parseRemovedEvent(e.data));
             });
 

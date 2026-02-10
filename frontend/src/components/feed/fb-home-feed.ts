@@ -14,6 +14,9 @@ import { api } from '../../services/api';
 import { store, type ChatCardContext } from '../../store/store';
 import { feedSSE } from '../../services/feed-sse';
 import type { FeedCard, FeedSSEEvent, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
+import './fb-feed-section';
+import './fb-greeting-banner';
+import './fb-empty-home';
 
 interface GroupedCards {
     today: FeedCard[];
@@ -21,11 +24,7 @@ interface GroupedCards {
     horizon: FeedCard[];
 }
 
-const HORIZON_LABELS: Record<FeedCardHorizon, string> = {
-    today: 'Today',
-    this_week: 'This Week',
-    horizon: 'On the Horizon',
-};
+// Horizon labels moved to fb-feed-section component
 
 @customElement('fb-home-feed')
 export class FBHomeFeed extends FBElement {
@@ -375,34 +374,6 @@ export class FBHomeFeed extends FBElement {
         });
     }
 
-    private _handleStartProject() {
-        this.emit('fb-navigate', { view: 'onboard' });
-    }
-
-    private _renderSummary() {
-        if (!this._summary) return nothing;
-        const s = this._summary;
-
-        const parts: string[] = [];
-        if (s.active_project_count > 0) {
-            parts.push(`${s.active_project_count} active project${s.active_project_count > 1 ? 's' : ''}`);
-        }
-        if (s.total_tasks > 0) {
-            parts.push(`${s.total_tasks} tasks`);
-        }
-
-        return html`
-            <div class="summary">
-                ${parts.length > 0
-                    ? html`<span class="summary-stat">${parts.join(' \u00B7 ')}</span>`
-                    : nothing}
-                ${s.critical_alerts > 0
-                    ? html` \u00B7 <span class="summary-alert">${s.critical_alerts} need${s.critical_alerts > 1 ? '' : 's'} attention</span>`
-                    : nothing}
-            </div>
-        `;
-    }
-
     private _renderLoading() {
         return html`
             <div class="loading">
@@ -413,26 +384,13 @@ export class FBHomeFeed extends FBElement {
         `;
     }
 
-    private _renderEmpty() {
-        return html`
-            <div class="empty">
-                <div class="empty-title">Your engine is ready</div>
-                <div class="empty-body">
-                    Add your first project and I'll build your schedule,<br />
-                    track your subs, and watch your deadlines.
-                </div>
-                <button class="empty-cta" @click=${this._handleStartProject}>
-                    Start a project
-                </button>
-            </div>
-        `;
-    }
+    // _renderEmpty replaced by fb-empty-home component
 
     override render() {
         if (this._loading) {
             return html`
                 <main role="main" aria-label="Portfolio Feed" aria-busy="true">
-                    <div class="greeting skeleton skeleton-text" style="width: 200px; height: 32px;"></div>
+                    <fb-greeting-banner loading></fb-greeting-banner>
                     ${this._renderLoading()}
                 </main>
             `;
@@ -441,7 +399,7 @@ export class FBHomeFeed extends FBElement {
         if (this._error) {
             return html`
                 <main role="main" aria-label="Portfolio Feed">
-                    <div class="greeting">Something went wrong</div>
+                    <fb-greeting-banner greeting="Something went wrong"></fb-greeting-banner>
                     <div class="error">
                         ${this._error}
                         <br />
@@ -451,11 +409,9 @@ export class FBHomeFeed extends FBElement {
             `;
         }
 
+        // No projects: show full-screen empty state
         if (this._cards.length === 0 && (!this._summary || this._summary.active_project_count === 0)) {
-            return html`
-                <div class="greeting">${this._greeting}</div>
-                ${this._renderEmpty()}
-            `;
+            return html`<fb-empty-home></fb-empty-home>`;
         }
 
         const groups = this._groupCards();
@@ -463,8 +419,10 @@ export class FBHomeFeed extends FBElement {
 
         return html`
             <main role="main" aria-label="Portfolio Feed">
-                <div class="greeting" role="heading" aria-level="1">${this._greeting}</div>
-                ${this._renderSummary()}
+                <fb-greeting-banner
+                    greeting=${this._greeting}
+                    .summary=${this._summary}
+                ></fb-greeting-banner>
 
                 ${this._cards.length === 0
                     ? html`
@@ -476,16 +434,17 @@ export class FBHomeFeed extends FBElement {
                           const cards = groups[h];
                           if (!cards || cards.length === 0) return nothing;
                           return html`
-                              <section class="horizon-group" aria-label="${HORIZON_LABELS[h]}">
-                                  <div class="horizon-label" role="heading" aria-level="2">${HORIZON_LABELS[h]}</div>
-                                  <div class="cards" role="feed" @fb-card-action=${this._handleCardAction}>
-                                      ${cards.map(
-                                          (card) => html`
-                                              <fb-feed-card .card=${card} role="article"></fb-feed-card>
-                                          `
-                                      )}
-                                  </div>
-                              </section>
+                              <fb-feed-section
+                                  horizon=${h}
+                                  card-count=${cards.length}
+                                  @fb-card-action=${this._handleCardAction}
+                              >
+                                  ${cards.map(
+                                      (card) => html`
+                                          <fb-feed-card .card=${card} role="article"></fb-feed-card>
+                                      `
+                                  )}
+                              </fb-feed-section>
                           `;
                       })}
             </main>

@@ -44,6 +44,13 @@ import '../admin/fb-admin-shell';
 import '../views/fb-view-chat';
 import '../views/fb-view-onboarding';
 import '../views/fb-view-schedule';
+import '../views/fb-view-login';
+import '../portal/fb-portal-shell';
+
+// V2 Settings (individual pages)
+import '../settings/fb-settings-profile';
+import '../settings/fb-settings-org';
+import '../settings/fb-settings-team';
 
 /**
  * Route type for V2 URL-based routing.
@@ -507,9 +514,11 @@ export class FBAppShell extends FBElement {
                 return html`<fb-view-schedule></fb-view-schedule>`;
 
             case 'settings-profile':
+                return html`<fb-settings-profile></fb-settings-profile>`;
             case 'settings-org':
+                return html`<fb-settings-org></fb-settings-org>`;
             case 'settings-team':
-                return html`<fb-view-settings></fb-view-settings>`;
+                return html`<fb-settings-team></fb-settings-team>`;
 
             case 'contacts':
                 return html`<fb-view-directory></fb-view-directory>`;
@@ -547,10 +556,10 @@ export class FBAppShell extends FBElement {
             `;
         }
 
-        // Portal routes pass through to V1 panel-center for now
+        // Portal routes use dedicated portal shell
         if (this._route.view === 'portal') {
             return html`
-                <fb-panel-center .isAuthenticated=${false}></fb-panel-center>
+                <fb-portal-shell></fb-portal-shell>
                 <fb-toast-container></fb-toast-container>
             `;
         }
@@ -579,7 +588,7 @@ export class FBAppShell extends FBElement {
 
             <div class="content-area">
                 ${this._isAuthenticated ? this._renderContent() : html`
-                    <fb-panel-center .isAuthenticated=${false}></fb-panel-center>
+                    <fb-view-login></fb-view-login>
                 `}
             </div>
 

@@ -1,12 +1,12 @@
 /**
- * FBViewProjects - Projects Gallery View
- * See PROJECT_ONBOARDING_SPEC.md Step 62.5
+ * FBViewProjects - Projects Gallery View (V2 Simplified)
+ * See FRONTEND_V2_SPEC.md §8 - V1 project components removed
  *
- * Displays all projects in a responsive grid layout with:
- * - Project cards showing name, address, status, and completion
- * - Empty state when no projects exist
- * - Loading skeleton during data fetch
- * - "New Project" button that opens creation dialog
+ * Displays projects in a grid. Clicking navigates to /project/:id.
+ * "New Project" navigates to /onboard.
+ *
+ * Note: In V2, the primary project navigation is via top-bar pills.
+ * This view exists for direct /projects route access.
  */
 import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
@@ -14,11 +14,7 @@ import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
 import { store } from '../../store/store';
 import { api, Project as APIProject } from '../../services/api';
-import type { ProjectSummary, ProjectDetail } from '../../store/types';
-
-// Import project components
-import '../features/project/fb-project-card';
-import '../features/project/fb-project-dialog';
+import type { ProjectSummary } from '../../store/types';
 
 /**
  * Convert API Project to store ProjectSummary format.
@@ -95,6 +91,76 @@ export class FBViewProjects extends FBViewElement {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
                 gap: var(--fb-spacing-lg);
+            }
+
+            /* V2 Simple Project Card */
+            .project-card {
+                background: var(--fb-bg-card);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-lg);
+                padding: var(--fb-spacing-lg);
+                cursor: pointer;
+                transition: border-color 0.15s ease, transform 0.15s ease;
+            }
+
+            .project-card:hover {
+                border-color: var(--fb-primary);
+                transform: translateY(-2px);
+            }
+
+            .project-card:focus-visible {
+                outline: 2px solid var(--fb-primary);
+                outline-offset: 2px;
+            }
+
+            .project-name {
+                font-size: var(--fb-text-lg);
+                font-weight: 600;
+                color: var(--fb-text-primary);
+                margin: 0 0 var(--fb-spacing-xs) 0;
+            }
+
+            .project-address {
+                font-size: var(--fb-text-sm);
+                color: var(--fb-text-secondary);
+                margin: 0 0 var(--fb-spacing-md) 0;
+            }
+
+            .project-meta {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .project-status {
+                display: inline-flex;
+                align-items: center;
+                padding: var(--fb-spacing-xs) var(--fb-spacing-sm);
+                background: var(--fb-bg-tertiary);
+                border-radius: var(--fb-radius-full, 9999px);
+                font-size: var(--fb-text-xs);
+                font-weight: 500;
+                color: var(--fb-text-secondary);
+            }
+
+            .project-status[data-status="Active"] {
+                background: rgba(34, 197, 94, 0.1);
+                color: #22c55e;
+            }
+
+            .project-status[data-status="Preconstruction"] {
+                background: rgba(59, 130, 246, 0.1);
+                color: #3b82f6;
+            }
+
+            .project-status[data-status="Completed"] {
+                background: rgba(107, 114, 128, 0.1);
+                color: #6b7280;
+            }
+
+            .project-completion {
+                font-size: var(--fb-text-sm);
+                color: var(--fb-text-muted);
             }
 
             /* Empty State */
@@ -176,7 +242,6 @@ export class FBViewProjects extends FBViewElement {
 
     @state() private _projects: ProjectSummary[] = [];
     @state() private _loading = true;
-    @state() private _dialogOpen = false;
 
     private _disposeEffect?: () => void;
 
@@ -213,40 +278,15 @@ export class FBViewProjects extends FBViewElement {
     }
 
     private _handleNewProject(): void {
-        this._dialogOpen = true;
+        // V2: Navigate to onboarding flow instead of opening dialog
+        window.history.pushState({}, '', '/onboard');
+        window.dispatchEvent(new PopStateEvent('popstate'));
     }
 
-    private _handleDialogClose(): void {
-        this._dialogOpen = false;
-    }
-
-    private _handleProjectCreated(e: CustomEvent<ProjectDetail>): void {
-        const project = e.detail;
-
-        // Add to store as summary
-        const summary: ProjectSummary = {
-            id: project.id,
-            name: project.name,
-            address: project.address,
-            status: project.status,
-            completionPercentage: project.completionPercentage,
-            createdAt: project.createdAt,
-            updatedAt: project.updatedAt,
-        };
-
-        // Update store with new project
-        store.actions.setProjects([...this._projects, summary]);
-
-        // Close dialog
-        this._dialogOpen = false;
-
-        // Select the new project
-        store.actions.selectProject(project.id);
-    }
-
-    private _handleProjectSelected(e: CustomEvent<{ id: string }>): void {
-        const { id } = e.detail;
-        store.actions.selectProject(id);
+    private _handleProjectClick(projectId: string): void {
+        // Navigate to project detail (filtered feed)
+        window.history.pushState({}, '', `/project/${projectId}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
     }
 
     private _renderSkeleton(): TemplateResult {
@@ -297,10 +337,30 @@ export class FBViewProjects extends FBViewElement {
             <div class="grid">
                 ${this._projects.map(
                     (project) => html`
-                        <fb-project-card
-                            .project=${project}
-                            @project-selected=${this._handleProjectSelected.bind(this)}
-                        ></fb-project-card>
+                        <div
+                            class="project-card"
+                            tabindex="0"
+                            role="button"
+                            aria-label="View ${project.name}"
+                            @click=${(): void => { this._handleProjectClick(project.id); }}
+                            @keydown=${(e: KeyboardEvent): void => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    this._handleProjectClick(project.id);
+                                }
+                            }}
+                        >
+                            <h3 class="project-name">${project.name}</h3>
+                            <p class="project-address">${project.address}</p>
+                            <div class="project-meta">
+                                <span class="project-status" data-status="${project.status}">
+                                    ${project.status}
+                                </span>
+                                <span class="project-completion">
+                                    ${project.completionPercentage}% complete
+                                </span>
+                            </div>
+                        </div>
                     `
                 )}
             </div>
@@ -331,12 +391,6 @@ export class FBViewProjects extends FBViewElement {
                     ? this._renderEmptyState()
                     : this._renderGrid()
             }
-
-            <fb-project-dialog
-                ?open=${this._dialogOpen}
-                @close=${this._handleDialogClose.bind(this)}
-                @project-created=${this._handleProjectCreated.bind(this)}
-            ></fb-project-dialog>
         `;
     }
 }

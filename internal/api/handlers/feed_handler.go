@@ -37,10 +37,22 @@ func (h *FeedHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate org_id is present and valid
+	if claims.OrgID == "" {
+		slog.Warn("feed: user has no organization",
+			"user_id", claims.UserID,
+			"email", claims.Email)
+		http.Error(w, "User not associated with an organization", http.StatusForbidden)
+		return
+	}
+
 	orgID, err := uuid.Parse(claims.OrgID)
 	if err != nil {
-		slog.Error("feed: invalid org_id in claims", "error", err)
-		http.Error(w, "Invalid organization", http.StatusInternalServerError)
+		slog.Error("feed: invalid org_id format in claims",
+			"error", err,
+			"org_id_raw", claims.OrgID,
+			"user_id", claims.UserID)
+		http.Error(w, "Invalid organization ID format", http.StatusInternalServerError)
 		return
 	}
 
