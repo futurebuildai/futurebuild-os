@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/middleware"
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/httputil"
 	"github.com/google/uuid"
@@ -107,8 +108,8 @@ func formatSnoozeLabel(hours int) string {
 type PortfolioFeedResponse struct {
 	Greeting string                        `json:"greeting"`
 	Summary  service.PortfolioSummary      `json:"summary"`
-	Cards    interface{}                   `json:"cards"`
-	Projects interface{}                   `json:"projects"`
+	Cards    []models.FeedCard             `json:"cards"`
+	Projects []models.Project              `json:"projects"`
 }
 
 // DismissCard handles POST /api/v1/portfolio/feed/dismiss.

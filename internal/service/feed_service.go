@@ -236,6 +236,7 @@ func (s *FeedService) getActiveCards(ctx context.Context, orgID uuid.UUID, proje
 			fc.priority ASC,
 			fc.deadline ASC NULLS LAST,
 			fc.created_at DESC
+		LIMIT 200
 	`
 
 	rows, err := s.db.Query(ctx, query, args...)

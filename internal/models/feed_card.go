@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ type FeedCard struct {
 	Deadline     *time.Time       `json:"deadline,omitempty" db:"deadline"`
 	Actions      []FeedCardAction `json:"actions" db:"-"`
 	ActionsJSON  []byte           `json:"-" db:"actions"`
-	EngineData   []byte           `json:"engine_data,omitempty" db:"engine_data"`
+	EngineData   json.RawMessage  `json:"engine_data,omitempty" db:"engine_data"`
 	AgentSource  *string          `json:"agent_source,omitempty" db:"agent_source"`
 	TaskID       *uuid.UUID       `json:"task_id,omitempty" db:"task_id"`
 	DismissedAt  *time.Time       `json:"dismissed_at,omitempty" db:"dismissed_at"`

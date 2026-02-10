@@ -232,7 +232,7 @@ export class FBFeedCard extends FBElement {
                     ? html`<div class="consequence">${this.card.consequence}</div>`
                     : nothing}
 
-                ${this.card.actions.length > 0
+                ${(this.card.actions?.length ?? 0) > 0
                     ? html`
                           <div class="actions-row">
                               ${this.card.actions.map(
