@@ -1384,3 +1384,387 @@ Only shown when all three conditions in §11.2 are met. This card should be infr
 5. **Multi-user feed:** Should the feed show cards for all org members, or scope to the logged-in user's projects? Recommendation: scope by user's assigned projects (via RBAC).
 6. **Contact management CRUD:** RESOLVED — New endpoints defined in §10.3.D. `POST /api/v1/contacts` (single + bulk), `GET /api/v1/contacts` (search), `POST /api/v1/projects/:id/assignments` (single + bulk), `GET /api/v1/projects/:id/assignments`. Deduplication by phone/email within org.
 7. **Per-project physics overrides:** Currently speed multiplier and work days are org-level. Should individual projects be able to override (e.g., a project with a different crew)? Recommendation: defer until needed — org-level covers most single-crew builders.
+
+---
+
+## 13. Contact Model Expansion — Access Tiers & CRM Fields
+
+### 13.1 The Problem
+
+The current Contact model is a thin address book entry: Name, Phone, Email, Company, Role (`Client`/`Subcontractor`), ContactPreference. This creates three gaps:
+
+1. **No trade knowledge.** The agent knows a contact is a "Subcontractor" but not that they're an electrician. When a new project needs an electrician, the agent can't suggest one from the existing directory. Trade affinity is only captured implicitly at the ProjectAssignment level (which WBS phase they're linked to).
+
+2. **No access differentiation.** Every contact is treated the same, but in reality:
+   - Most field subs just reply to SMS confirmations ("YES" / "NO")
+   - Clients and key subs need to view schedules, documents, invoices via the portal
+   - The portal auth system exists but there's no flag distinguishing who should receive magic-link access vs. who only gets texts
+
+3. **No history.** No record of how reliable a contact is, when they were last used, or how responsive they are. The builder carries this knowledge in their head. The agent should learn it over time.
+
+### 13.2 Design Principles
+
+- **Fast input stays fast.** The Quick-Add flow (§10.3.A) still requires only Name + Phone. Expanded fields are optional and can be filled in later — by the user, by the agent (inferring trades from assignments), or never.
+- **Agent-writable fields.** Some fields are computed by the system, not entered by the user. The agent observes behavior and enriches the contact record over time.
+- **Portal access is opt-in.** Defaults to off. Enabling it requires an email address. The builder explicitly grants portal access — the system never auto-enables it.
+
+### 13.3 Contact Access Tiers
+
+Two tiers, controlled by a single `portal_enabled` boolean:
+
+| | **Passive (default)** | **Portal-Enabled** |
+|---|---|---|
+| **Flag** | `portal_enabled = false` | `portal_enabled = true` |
+| **Requirement** | Phone OR Email | Email (required) + Phone (optional) |
+| **Receives** | SMS/email from SubLiaison agent | Same + magic-link portal invites |
+| **Can access** | Nothing — responds to messages only | Portal dashboard: tasks, schedule, documents, invoices, messaging |
+| **Agent behavior** | "Reply YES to confirm Monday start" | "View your upcoming tasks and upload documents: [link]" |
+| **Typical persona** | Day-to-day field sub, material vendor | Homeowner client, GC partner, key sub with document needs |
+
+**Validation rules:**
+- `portal_enabled = true` requires non-null `email`
+- Setting `portal_enabled = true` does NOT auto-send a magic link. The builder (or SubLiaison agent on first task notification) triggers the initial invite.
+- Revoking portal access (`portal_enabled = false`) invalidates any active portal tokens for that contact.
+
+**SubLiaison agent adaptation:**
+```go
+// When notifying a contact about an upcoming task:
+if contact.PortalEnabled && contact.Email != nil {
+    // Send magic-link email with task context + portal dashboard link
+    // Email includes: task name, scheduled date, project address, portal link
+    sendPortalNotification(ctx, contact, task, project)
+} else if contact.Phone != nil {
+    // Send SMS: "Hi {name}, {task} at {address} is scheduled for {date}. Reply YES to confirm."
+    sendSMSConfirmation(ctx, contact, task)
+} else if contact.Email != nil {
+    // Send plain email (no portal link): "Hi {name}, {task} is scheduled for {date}. Reply to confirm."
+    sendEmailConfirmation(ctx, contact, task)
+}
+```
+
+### 13.4 Expanded Contact Fields
+
+#### A. User-Entered Fields (New)
+
+| Field | Type | Required | Purpose |
+|-------|------|----------|---------|
+| `trades` | `text[]` | No | Trade specialties: `["Electrical", "Fire Alarm", "Low Voltage"]`. Key for agent attribution — enables cross-project contact suggestions. |
+| `license_number` | `varchar(100)` | No | Contractor license. Useful for compliance, inspection coordination. |
+| `address_city` | `varchar(100)` | No | Business city. Enables service area matching. |
+| `address_state` | `varchar(50)` | No | Business state. |
+| `address_zip` | `varchar(20)` | No | Business zip. Enables proximity matching to project sites. |
+| `website` | `varchar(500)` | No | Business website. |
+| `notes` | `text` | No | Freeform builder notes: "prefers morning starts", "always needs 2-day lead time". Agent-readable context. |
+| `portal_enabled` | `boolean` | No | Default `false`. See §13.3. |
+| `source` | `varchar(50)` | No | How the contact was created: `manual`, `bulk_import`, `agent_inferred`. Default `manual`. |
+
+#### B. Agent-Computed Fields (System-Written, Read-Only to User)
+
+These fields are updated by background processes, never directly edited by users. They power agent intelligence and surface in the contact directory UI as read-only badges/stats.
+
+| Field | Type | Updated By | Purpose |
+|-------|------|-----------|---------|
+| `last_contacted_at` | `timestamptz` | SubLiaison agent | When the system last sent this contact a message. Prevents over-contacting. |
+| `total_projects` | Computed (not stored) | JOIN on `project_assignments` | Number of projects this contact has been assigned to. |
+| `avg_response_time_hours` | `numeric(6,1)` | InboundProcessor | Average hours between outbound message and inbound response. Computed from `communication_logs`. |
+| `on_time_rate` | `numeric(4,2)` | DailyFocusAgent | Percentage of assigned tasks where the contact confirmed and work started within the scheduled window. |
+| `updated_at` | `timestamptz` | Trigger | Last modification timestamp. |
+
+**Agent attribution logic using these fields:**
+
+When the agent needs to suggest a contact for a trade phase on a new project:
+```go
+// internal/service/directory_service.go
+
+func (s *DirectoryService) SuggestContactsForPhase(ctx context.Context, orgID uuid.UUID, tradeHint string, projectZip string) ([]ContactSuggestion, error) {
+    // 1. Find contacts with matching trade in their trades[] array
+    // 2. If no explicit trade match, fall back to contacts who've been assigned
+    //    to similar WBS phases on past projects (inferred trade)
+    // 3. Rank by: on_time_rate (desc), avg_response_time (asc), total_projects (desc)
+    // 4. Optionally filter by proximity (contact zip vs. project zip)
+    // 5. Return top 3 suggestions with confidence reason
+}
+```
+
+#### C. Trade Inference (Agent-Driven Enrichment)
+
+Most builders won't manually tag trades on their contacts — they'll just assign "Rodriguez" to the Framing phase. The system should learn from this:
+
+```go
+// After a ProjectAssignment is created:
+func (s *DirectoryService) InferTradesFromAssignment(ctx context.Context, contactID uuid.UUID, wbsPhaseID string) {
+    tradeName := MapWBSPhaseToTrade(wbsPhaseID) // "7.0" → "Framing"
+
+    // Add to contact's trades[] if not already present
+    // UPDATE contacts SET trades = array_append(trades, $1)
+    // WHERE id = $2 AND NOT ($1 = ANY(trades))
+
+    // Mark source as agent_inferred if trades were previously empty
+}
+```
+
+Phase-to-trade mapping:
+| WBS Phase | Trade Name |
+|-----------|-----------|
+| 5.2 | Sitework |
+| 6.0 | Foundation |
+| 7.0 | Framing |
+| 8.0 | Roofing |
+| 9.0 | Rough-Ins (Electrical/Plumbing/HVAC) |
+| 10.0 | Insulation & Drywall |
+| 11.0 | Interior Finishes |
+| 12.0 | Exterior Finishes |
+| 13.0 | Final / Punch |
+
+For phase 9.0 (Rough-Ins), the system should assign the specific sub-trade based on the task name within the phase, not just "Rough-Ins."
+
+### 13.5 Database Migration
+
+```sql
+-- Migration: expand_contacts_for_crm
+
+-- New user-editable fields
+ALTER TABLE contacts ADD COLUMN trades TEXT[] DEFAULT '{}';
+ALTER TABLE contacts ADD COLUMN license_number VARCHAR(100);
+ALTER TABLE contacts ADD COLUMN address_city VARCHAR(100);
+ALTER TABLE contacts ADD COLUMN address_state VARCHAR(50);
+ALTER TABLE contacts ADD COLUMN address_zip VARCHAR(20);
+ALTER TABLE contacts ADD COLUMN website VARCHAR(500);
+ALTER TABLE contacts ADD COLUMN notes TEXT;
+ALTER TABLE contacts ADD COLUMN portal_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE contacts ADD COLUMN source VARCHAR(50) DEFAULT 'manual';
+
+-- Agent-computed fields
+ALTER TABLE contacts ADD COLUMN last_contacted_at TIMESTAMPTZ;
+ALTER TABLE contacts ADD COLUMN avg_response_time_hours NUMERIC(6,1);
+ALTER TABLE contacts ADD COLUMN on_time_rate NUMERIC(4,2);
+ALTER TABLE contacts ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Index for trade-based lookups
+CREATE INDEX idx_contacts_trades ON contacts USING GIN(trades);
+
+-- Index for portal-enabled contacts (agent query: "who needs portal notifications?")
+CREATE INDEX idx_contacts_portal ON contacts(org_id) WHERE portal_enabled = TRUE;
+
+-- Index for geographic proximity matching
+CREATE INDEX idx_contacts_zip ON contacts(org_id, address_zip) WHERE address_zip IS NOT NULL;
+
+-- Trigger: auto-update updated_at
+CREATE OR REPLACE FUNCTION update_contacts_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER contacts_updated_at
+    BEFORE UPDATE ON contacts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_contacts_updated_at();
+```
+
+### 13.6 Updated Contact CRUD Endpoints
+
+The endpoints defined in §10.3.D are expanded to support the new fields:
+
+**`POST /api/v1/contacts` — Create contact (updated body)**
+```json
+{
+  "name": "Jake Williams",
+  "phone": "555-0199",
+  "email": "jake@jakeselectric.com",
+  "company": "Jake's Electric LLC",
+  "role": "Subcontractor",
+  "contact_preference": "SMS",
+  "trades": ["Electrical", "Fire Alarm"],
+  "license_number": "EC-2024-1234",
+  "address_city": "Austin",
+  "address_state": "TX",
+  "address_zip": "78701",
+  "website": "https://jakeselectric.com",
+  "notes": "Prefers morning starts. 2-day lead time needed.",
+  "portal_enabled": false
+}
+```
+
+All new fields are optional. Minimum input remains: `name` + (`phone` OR `email`).
+
+**`GET /api/v1/contacts` — List/search contacts (updated query params)**
+```
+GET /api/v1/contacts?search=jake              // name/phone/email search (existing)
+GET /api/v1/contacts?trade=Electrical          // filter by trade
+GET /api/v1/contacts?portal_enabled=true       // filter portal contacts
+GET /api/v1/contacts?include_stats=true        // include computed fields (total_projects, etc.)
+```
+
+**`PUT /api/v1/contacts/:id` — Update contact**
+```
+PUT /api/v1/contacts/:id
+Authorization: Bearer <token>
+Body: { partial Contact fields }
+Response: Contact (200)
+```
+
+Supports partial update. Specifically for toggling `portal_enabled`:
+- Setting `portal_enabled: true` validates that `email` is non-null (400 if missing)
+- Setting `portal_enabled: false` invalidates active portal tokens: `UPDATE portal_tokens SET used = true WHERE contact_id = $1 AND used = false`
+
+**`GET /api/v1/contacts/:id/history` — Contact interaction history (new)**
+```
+GET /api/v1/contacts/:id/history
+Authorization: Bearer <token>
+Response: {
+  projects: [{
+    project_id: string,
+    project_name: string,
+    phases_assigned: string[],
+    status: "active" | "completed"
+  }],
+  recent_messages: [{
+    direction: "inbound" | "outbound",
+    channel: "sms" | "email",
+    summary: string,
+    timestamp: string
+  }],
+  stats: {
+    total_projects: number,
+    avg_response_time_hours: number | null,
+    on_time_rate: number | null
+  }
+}
+```
+
+### 13.7 UI Changes for Contact Tiers & Expanded Fields
+
+#### A. Phase Grid Update (§10.3.A)
+
+The inline add form gets one new visible element — a portal toggle — and the trade is auto-inferred from the phase:
+
+```
+│ Electrical │  Name:  [Jake Williams          ]         │
+│            │  Phone: [555-0199               ]         │
+│            │  Email: [jake@jakeselectric.com ] (opt)   │
+│            │  Contact via: (●) SMS (○) Email (○) Both  │
+│            │  ☐ Grant portal access                     │
+│            │  [Save]  [Cancel]                          │
+```
+
+- Trade is auto-set to the phase name (e.g., "Electrical") — no user input needed
+- "Grant portal access" checkbox only appears when email is entered
+- Checking it sets `portal_enabled = true`
+- Helper text below checkbox: "Portal contacts can view schedules, upload documents, and message you through FutureBuild."
+
+#### B. Contact Detail Card (New Component: `fb-contact-detail`)
+
+When tapping a contact in the phase grid or directory, a slide-over panel shows full details:
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Jake Williams                              [Edit]   │
+│  Jake's Electric LLC                                 │
+│  ────────────────────────────────────────────────── │
+│                                                      │
+│  📱 555-0199          ✉️ jake@jakeselectric.com      │
+│  📍 Austin, TX 78701   🌐 jakeselectric.com          │
+│  License: EC-2024-1234                               │
+│                                                      │
+│  Trades: [Electrical] [Fire Alarm]                   │
+│  Contact via: SMS                                    │
+│  Portal: ● Enabled                                   │
+│                                                      │
+│  ── Notes ──────────────────────────────────────── │
+│  Prefers morning starts. 2-day lead time needed.     │
+│                                                      │
+│  ── Performance ────────────────────────────────── │
+│  Projects: 3          On-time: 92%                   │
+│  Avg response: 1.2 hrs    Last contacted: 2 days ago │
+│                                                      │
+│  ── Project History ────────────────────────────── │
+│  123 Main St        Electrical    ● Active           │
+│  456 Oak Ave        Electrical    ✓ Completed        │
+│  789 Pine Dr        Fire Alarm    ✓ Completed        │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Performance section** only appears after 2+ project assignments. Stats are read-only, computed by agents. This is where the CRM value lives — a builder can see at a glance that Jake responds fast and is on-time 92% of the time.
+
+#### C. Contact Directory View (`/settings/contacts` or `/contacts`)
+
+A searchable, filterable directory of all org contacts. Not project-scoped — this is the org-wide address book.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Directory                    [+ Add]  [Bulk Import] │
+│                                                      │
+│  Search: [                    ]  Trade: [All ▾]      │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Jake Williams    Jake's Electric   Electrical │   │
+│  │ 📱 555-0199   ● Portal   3 projects   92% OT │   │
+│  ├──────────────────────────────────────────────┤   │
+│  │ Rodriguez Framing                    Framing  │   │
+│  │ 📱 555-0101   ○ SMS only  2 projects  87% OT │   │
+│  ├──────────────────────────────────────────────┤   │
+│  │ Mike's Plumbing                     Plumbing  │   │
+│  │ 📱 555-0201   ○ SMS only  1 project   — OT   │   │
+│  ├──────────────────────────────────────────────┤   │
+│  │ Sarah Thompson (Client)                       │   │
+│  │ ✉️ sarah@gmail.com  ● Portal  1 project       │   │
+│  └──────────────────────────────────────────────┘   │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+Badge system:
+- `● Portal` (green) — portal-enabled contact
+- `○ SMS only` (gray) — passive contact, SMS/email only
+- `92% OT` — on-time rate (only shown after 2+ projects)
+- Trade tags as pills
+
+#### D. Bulk Paste Update (§10.3.B)
+
+The bulk paste parser is extended to accept optional fields. The format stays lenient:
+
+```
+Jake Williams, 555-0199, jake@jakeselectric.com, Electrical, EC-2024-1234
+Mike's Plumbing, 555-0201
+Rodriguez Framing, 555-0101, Framing
+Sarah Thompson, sarah@gmail.com, Client, portal
+```
+
+Parser rules for new fields:
+- Email detected by `@` character
+- Trade matched against known trade names (same keyword list as §10.3.B)
+- License detected by pattern: 2-3 letters + dash + digits (e.g., `EC-2024-1234`)
+- `"portal"` keyword anywhere in the line sets `portal_enabled = true`
+- `"client"` keyword sets `role = Client` instead of default `Subcontractor`
+
+### 13.8 New Components
+
+| Component | Tag | Purpose |
+|-----------|-----|---------|
+| `fb-contact-detail` | `fb-contact-detail` | Slide-over panel with full contact info, stats, and history |
+| `fb-contact-directory` | `fb-contact-directory` | Org-wide searchable/filterable contact list |
+| `fb-contact-portal-toggle` | `fb-contact-portal-toggle` | Inline toggle for portal access with validation + confirmation |
+| `fb-contact-stats` | `fb-contact-stats` | Read-only performance badges (on-time rate, response time, project count) |
+
+### 13.9 Implementation Notes
+
+**Phase 4 additions** (append to existing Phase 4 in §7):
+- Step 26.1: Create `expand_contacts_for_crm` migration
+- Step 26.2: Update Contact model in `internal/models/iam.go` with new fields
+- Step 26.3: Update contact CRUD handlers for new fields + portal toggle validation
+- Step 26.4: Implement `SuggestContactsForPhase` in DirectoryService
+- Step 26.5: Implement trade inference on assignment creation
+- Step 28.1: Add portal toggle to `fb-contact-inline-add`
+- Step 30.1: Build `fb-contact-detail` slide-over
+- Step 30.2: Build `fb-contact-directory` page
+- Step 30.3: Add `/contacts` route to app shell
+
+**Phase 7 additions** (agent enrichment, after real-time):
+- Step 42.1: Implement `avg_response_time_hours` computation in InboundProcessor
+- Step 42.2: Implement `on_time_rate` computation in DailyFocusAgent
+- Step 42.3: Implement `last_contacted_at` update in SubLiaison
+- Step 42.4: Implement trade inference trigger on ProjectAssignment creation
