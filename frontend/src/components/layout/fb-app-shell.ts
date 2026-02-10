@@ -210,6 +210,7 @@ export class FBAppShell extends FBElement {
     @state() private _shadowModeEnabled = false;
     @state() private _isPlatformAdmin = false;
     @state() private _userName = '';
+    @state() private _userRole = '';
     @state() private _projects: ProjectPill[] = [];
 
     private _disposeEffects: (() => void)[] = [];
@@ -291,10 +292,11 @@ export class FBAppShell extends FBElement {
             })
         );
 
-        // User name for avatar
+        // User name + role for avatar and menu
         this._disposeEffects.push(
             effect(() => {
                 this._userName = store.user$.value?.name ?? '';
+                this._userRole = store.user$.value?.role ?? '';
             })
         );
 
@@ -521,19 +523,10 @@ export class FBAppShell extends FBElement {
             case 'settings-profile':
             case 'settings-org':
             case 'settings-team':
-                // Phase 4: Settings pages
-                return html`
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--fb-text-secondary);">
-                        Settings — coming in Phase 4
-                    </div>
-                `;
+                return html`<fb-view-settings></fb-view-settings>`;
 
             case 'contacts':
-                return html`
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--fb-text-secondary);">
-                        Contact directory — coming in Phase 4
-                    </div>
-                `;
+                return html`<fb-view-directory></fb-view-directory>`;
 
             case 'login':
                 return nothing;
@@ -592,6 +585,7 @@ export class FBAppShell extends FBElement {
                               .projects=${this._projects}
                               .activeFilter=${activeFilter}
                               .userName=${this._userName}
+                              .userRole=${this._userRole}
                           ></fb-top-bar>
                       `
                     : nothing}
