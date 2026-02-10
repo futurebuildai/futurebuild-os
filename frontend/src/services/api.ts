@@ -17,6 +17,7 @@ import { get, post, put, del } from './http';
 import type { GanttData, Contact, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
+import type { PortfolioFeedResponse } from '../types/feed';
 
 // ============================================================================
 // Auth Types
@@ -664,6 +665,61 @@ export const api = {
          */
         reject(id: string, reason?: string): Promise<InvoiceResponse> {
             return post<InvoiceResponse>(`/invoices/${id}/reject`, { reason: reason ?? '' });
+        },
+    },
+
+    /**
+     * Portfolio feed endpoints.
+     * See FRONTEND_V2_SPEC.md §5.1
+     */
+    portfolio: {
+        /**
+         * Get the portfolio feed with cards, summary, and project pills.
+         * @param projectId - Optional project filter
+         */
+        getFeed(projectId?: string): Promise<PortfolioFeedResponse> {
+            const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+            return get<PortfolioFeedResponse>(`/portfolio/feed${query}`);
+        },
+
+        /**
+         * Execute an action on a feed card.
+         * @param cardId - Feed card UUID
+         * @param actionId - Action identifier
+         * @param payload - Optional action data
+         */
+        executeAction(
+            cardId: string,
+            actionId: string,
+            payload?: Record<string, unknown>
+        ): Promise<{ success: boolean; message: string }> {
+            return post<{ success: boolean; message: string }>('/portfolio/feed/action', {
+                card_id: cardId,
+                action_id: actionId,
+                payload,
+            });
+        },
+
+        /**
+         * Dismiss a feed card.
+         * @param cardId - Feed card UUID
+         */
+        dismissCard(cardId: string): Promise<{ success: boolean }> {
+            return post<{ success: boolean }>('/portfolio/feed/dismiss', {
+                card_id: cardId,
+            });
+        },
+
+        /**
+         * Snooze a feed card.
+         * @param cardId - Feed card UUID
+         * @param hours - Snooze duration in hours
+         */
+        snoozeCard(cardId: string, hours: number): Promise<{ success: boolean }> {
+            return post<{ success: boolean }>('/portfolio/feed/snooze', {
+                card_id: cardId,
+                hours,
+            });
         },
     },
 

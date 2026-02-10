@@ -55,6 +55,7 @@ type Server struct {
 	ThreadHandler        *handlers.ThreadHandler        // Thread support: conversation threads
 	CompletionHandler    *handlers.CompletionHandler    // Project Completion: complete + report
 	ReadinessHandler     *handlers.ReadinessHandler     // Integration readiness checks
+	FeedHandler          *handlers.FeedHandler          // V2: Portfolio feed endpoint
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -227,6 +228,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		clerkWebhookHandler = handlers.NewClerkWebhookHandler(db, cfg.ClerkWebhookSecret)
 	}
 
+	// V2: Portfolio feed service + handler
+	feedService := service.NewFeedService(db)
+	feedHandler := handlers.NewFeedHandler(feedService)
+
 	// Project Completion: service + handler
 	completionService := service.NewCompletionService(db)
 	completionHandler := handlers.NewCompletionHandler(completionService, notificationService, directoryService)
@@ -293,6 +298,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ThreadHandler:        threadHandler,        // Thread support
 		CompletionHandler:    completionHandler,    // Project Completion
 		ReadinessHandler:     readinessHandler,     // Integration readiness checks
+		FeedHandler:          feedHandler,          // V2: Portfolio feed
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -398,6 +404,16 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/physics", s.ConfigHandler.GetPhysics)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/physics", s.ConfigHandler.UpdatePhysics)
+		})
+
+		// V2: Portfolio feed — aggregated feed cards across all projects
+		// See FRONTEND_V2_SPEC.md §5.1
+		r.Route("/portfolio", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/feed", s.FeedHandler.GetFeed)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Post("/feed/action", s.FeedHandler.ExecuteAction)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Post("/feed/dismiss", s.FeedHandler.DismissCard)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Post("/feed/snooze", s.FeedHandler.SnoozeCard)
 		})
 
 		r.Route("/projects", func(r chi.Router) {
