@@ -421,6 +421,7 @@ func (s *Server) routes() {
 		r.Route("/portfolio", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/feed", s.FeedHandler.GetFeed)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/feed/stream", s.FeedHandler.StreamFeed)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/action", s.FeedHandler.ExecuteAction)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/dismiss", s.FeedHandler.DismissCard)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/snooze", s.FeedHandler.SnoozeCard)

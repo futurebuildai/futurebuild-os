@@ -119,3 +119,37 @@ export interface PortfolioFeedResponse {
     cards: FeedCard[];
     projects: ProjectPill[];
 }
+
+// ============================================================================
+// SSE Feed Stream Events (Phase 7 Step 40)
+// See FRONTEND_V2_SPEC.md §6.5
+// ============================================================================
+
+/**
+ * SSE event: a new card was added to the feed.
+ */
+export interface FeedCardAddedEvent {
+    type: 'card_added';
+    card: FeedCard;
+}
+
+/**
+ * SSE event: an existing card was updated (e.g., priority change).
+ */
+export interface FeedCardUpdatedEvent {
+    type: 'card_updated';
+    card: FeedCard;
+}
+
+/**
+ * SSE event: a card was removed (dismissed, expired, or snoozed).
+ */
+export interface FeedCardRemovedEvent {
+    type: 'card_removed';
+    card_id: string;
+}
+
+/**
+ * Union of all feed SSE event types.
+ */
+export type FeedSSEEvent = FeedCardAddedEvent | FeedCardUpdatedEvent | FeedCardRemovedEvent;

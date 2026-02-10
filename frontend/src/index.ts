@@ -15,7 +15,6 @@ import './styles/main.css';
 
 // Component registration
 import { registerComponents } from './components/registry';
-import { FBDemoButton } from './components/base/demo-button';
 
 // V2 Layout components
 import { FBAppShell } from './components/layout/fb-app-shell';
@@ -70,7 +69,6 @@ import './app-root';
 
 // Register all components
 const registered = registerComponents({
-    'fb-demo-button': FBDemoButton,
     // V2 layout
     'fb-app-shell': FBAppShell,
     'fb-top-bar': FBTopBar,

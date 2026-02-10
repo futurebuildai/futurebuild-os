@@ -10,6 +10,7 @@ import { html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import type { ProjectPill } from '../../types/feed';
+import '../notifications/fb-notification-bell';
 
 @customElement('fb-top-bar')
 export class FBTopBar extends FBElement {
@@ -312,6 +313,7 @@ export class FBTopBar extends FBElement {
                 </div>
 
                 <div class="actions">
+                    <fb-notification-bell></fb-notification-bell>
                     <div class="avatar-wrap">
                         <button
                             class="avatar"

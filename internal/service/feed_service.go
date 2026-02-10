@@ -399,5 +399,98 @@ func (s *FeedService) ListActiveProjectsForOrg(ctx context.Context, orgID uuid.U
 	return projects, rows.Err()
 }
 
+// ============================================================================
+// SSE / LISTEN-NOTIFY Support (Phase 7 Step 42)
+// See FRONTEND_V2_SPEC.md §6.5
+// ============================================================================
+
+// FeedChangeEvent is an SSE-ready event sent to connected clients.
+type FeedChangeEvent struct {
+	Type    string      `json:"type"`    // "card_added", "card_updated", "card_removed"
+	Payload interface{} `json:"payload"` // FeedCard for added/updated, {card_id: string} for removed
+}
+
+// SubscribeFeedChanges opens a PostgreSQL LISTEN on the "feed_changes" channel
+// and returns a channel of FeedChangeEvents scoped to the given org.
+// The caller must invoke the returned unsub function to release the connection.
+func (s *FeedService) SubscribeFeedChanges(ctx context.Context, orgID uuid.UUID) (<-chan FeedChangeEvent, func(), error) {
+	conn, err := s.db.Acquire(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("feed subscribe: acquire conn: %w", err)
+	}
+
+	_, err = conn.Exec(ctx, "LISTEN feed_changes")
+	if err != nil {
+		conn.Release()
+		return nil, nil, fmt.Errorf("feed subscribe: LISTEN: %w", err)
+	}
+
+	ch := make(chan FeedChangeEvent, 64)
+
+	// Background goroutine reads notifications from pgx and dispatches to channel
+	done := make(chan struct{})
+	go func() {
+		defer close(ch)
+		defer conn.Release()
+		for {
+			notification, err := conn.Conn().WaitForNotification(ctx)
+			if err != nil {
+				// Context cancelled (client disconnected) or connection error
+				select {
+				case <-done:
+				default:
+				}
+				return
+			}
+
+			// Parse the notification payload: {"op":"INSERT","org_id":"...","card_id":"..."}
+			var note struct {
+				Op    string    `json:"op"`
+				OrgID uuid.UUID `json:"org_id"`
+				CardID uuid.UUID `json:"card_id"`
+			}
+			if err := json.Unmarshal([]byte(notification.Payload), &note); err != nil {
+				slog.Warn("feed subscribe: bad notification payload", "payload", notification.Payload, "error", err)
+				continue
+			}
+
+			// Only deliver events for this org
+			if note.OrgID != orgID {
+				continue
+			}
+
+			switch note.Op {
+			case "INSERT":
+				card, err := s.GetCardByID(ctx, orgID, note.CardID)
+				if err != nil {
+					slog.Warn("feed subscribe: card lookup failed", "card_id", note.CardID, "error", err)
+					continue
+				}
+				ch <- FeedChangeEvent{Type: "card_added", Payload: card}
+			case "UPDATE":
+				card, err := s.GetCardByID(ctx, orgID, note.CardID)
+				if err != nil {
+					continue
+				}
+				// If the card was dismissed or snoozed, treat as removed
+				if card.DismissedAt != nil || (card.SnoozedUntil != nil && card.SnoozedUntil.After(time.Now())) {
+					ch <- FeedChangeEvent{Type: "card_removed", Payload: map[string]string{"card_id": note.CardID.String()}}
+				} else {
+					ch <- FeedChangeEvent{Type: "card_updated", Payload: card}
+				}
+			case "DELETE":
+				ch <- FeedChangeEvent{Type: "card_removed", Payload: map[string]string{"card_id": note.CardID.String()}}
+			}
+		}
+	}()
+
+	unsub := func() {
+		close(done)
+		// Cancel the context to unblock WaitForNotification — conn.Release handled by goroutine
+	}
+
+	return ch, unsub, nil
+}
+
 // Suppress unused import warnings for pgx (used by interface alignment)
 var _ = pgx.ErrNoRows

@@ -269,6 +269,24 @@ export class FBViewSchedule extends FBViewElement {
                 height: 10px;
                 border-radius: 2px;
             }
+
+            @media (max-width: 768px) {
+                .toolbar {
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 12px;
+                }
+
+                .label {
+                    width: 120px;
+                    font-size: 11px;
+                }
+
+                .legend {
+                    flex-wrap: wrap;
+                    padding: 8px 12px;
+                }
+            }
         `,
     ];
 
@@ -387,7 +405,8 @@ export class FBViewSchedule extends FBViewElement {
         const width = Math.max(daysBetween(barStart, barEnd) * DAY_WIDTH, 4);
 
         return html`
-            <div class="task-row" @click=${() => this.emit('fb-task-selected', { wbsCode: task.wbs_code, name: task.name })}>
+            <div class="task-row" role="listitem" @click=${() => this.emit('fb-task-selected', { wbsCode: task.wbs_code, name: task.name })}
+                aria-label="${task.wbs_code} ${task.name}: ${task.early_start} to ${task.early_finish}">
                 <div class="task-label">
                     <span class="task-wbs">${task.wbs_code}</span>
                     <span class="task-name">${task.name}</span>
@@ -473,21 +492,22 @@ export class FBViewSchedule extends FBViewElement {
         const projEnd = this._data.projected_end_date;
 
         return html`
-            <div class="toolbar">
+            <div class="toolbar" role="toolbar" aria-label="Schedule controls">
                 <span class="toolbar-title">Schedule</span>
                 <span class="toolbar-spacer"></span>
                 ${projEnd ? html`
                     <span class="toolbar-info">Projected end: ${new Date(projEnd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 ` : nothing}
-                <button class="recalc-btn" ?disabled=${this._recalculating} @click=${this._handleRecalculate.bind(this)}>
+                <button class="recalc-btn" ?disabled=${this._recalculating} @click=${this._handleRecalculate.bind(this)}
+                    aria-label="${this._recalculating ? 'Recalculating schedule' : 'Recalculate schedule'}">
                     ${this._recalculating ? 'Recalculating...' : 'Recalculate'}
                 </button>
             </div>
 
-            <div class="scroll-container">
+            <div class="scroll-container" role="region" aria-label="Gantt timeline" tabindex="0">
                 <div class="gantt-canvas" style="width: ${canvasWidth}px">
                     ${this._renderDateAxis(startDate, totalDays)}
-                    <div class="task-rows">
+                    <div class="task-rows" role="list" aria-label="Project tasks">
                         ${this._data.tasks.map((t) => this._renderTaskRow(t, startDate))}
                         ${(this._data.dependencies?.length ?? 0) > 0
                             ? this._renderDependencyArrows(this._data.tasks, this._data.dependencies!, startDate)
@@ -497,7 +517,7 @@ export class FBViewSchedule extends FBViewElement {
                 </div>
             </div>
 
-            <div class="legend">
+            <div class="legend" role="complementary" aria-label="Chart legend">
                 <div class="legend-item"><span class="legend-dot" style="background: var(--fb-accent, #6366f1)"></span> Normal</div>
                 <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span> Critical Path</div>
                 <div class="legend-item"><span class="legend-dot" style="background: #22c55e"></span> Completed</div>

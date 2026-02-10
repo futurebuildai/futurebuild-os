@@ -340,3 +340,73 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+// StreamFeed handles GET /api/v1/portfolio/feed/stream.
+// Implements Server-Sent Events (SSE) for live feed card updates.
+// See FRONTEND_V2_SPEC.md §6.5 — uses PostgreSQL LISTEN/NOTIFY under the hood.
+func (h *FeedHandler) StreamFeed(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	claims, err := middleware.GetClaims(ctx)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orgID, err := uuid.Parse(claims.OrgID)
+	if err != nil {
+		http.Error(w, "Invalid organization", http.StatusInternalServerError)
+		return
+	}
+
+	// Verify SSE support (flusher interface)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	// Subscribe to feed card notifications for this org
+	ch, unsub, err := h.feedService.SubscribeFeedChanges(ctx, orgID)
+	if err != nil {
+		slog.Error("feed: failed to subscribe to changes", "error", err, "org_id", orgID)
+		http.Error(w, "Failed to open stream", http.StatusInternalServerError)
+		return
+	}
+	defer unsub()
+
+	// Send initial keepalive comment to confirm connection
+	_, _ = fmt.Fprintf(w, ": connected\n\n")
+	flusher.Flush()
+
+	// Keepalive ticker to prevent proxy timeouts
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		case event, ok := <-ch:
+			if !ok {
+				return // Channel closed
+			}
+			data, err := json.Marshal(event.Payload)
+			if err != nil {
+				slog.Error("feed: failed to marshal SSE event", "error", err)
+				continue
+			}
+			_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, data)
+			flusher.Flush()
+		}
+	}
+}

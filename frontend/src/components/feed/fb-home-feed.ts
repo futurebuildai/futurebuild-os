@@ -12,7 +12,8 @@ import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { api } from '../../services/api';
 import { store, type ChatCardContext } from '../../store/store';
-import type { FeedCard, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
+import { feedSSE } from '../../services/feed-sse';
+import type { FeedCard, FeedSSEEvent, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
 
 interface GroupedCards {
     today: FeedCard[];
@@ -159,6 +160,7 @@ export class FBHomeFeed extends FBElement {
     @state() private _loading = true;
     @state() private _error: string | null = null;
     @state() private _filterProjectId: string | null = null;
+    private _unsubSSE: (() => void) | null = null;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -166,12 +168,51 @@ export class FBHomeFeed extends FBElement {
 
         // Listen for filter changes from top bar
         this.addEventListener('fb-filter-change', this._onFilterChange as EventListener);
+
+        // Subscribe to SSE feed stream for live updates
+        this._unsubSSE = feedSSE.subscribe(this._handleSSEEvent);
+        feedSSE.connect();
     }
 
     override disconnectedCallback() {
         super.disconnectedCallback();
         this.removeEventListener('fb-filter-change', this._onFilterChange as EventListener);
+        if (this._unsubSSE) {
+            this._unsubSSE();
+            this._unsubSSE = null;
+        }
+        feedSSE.disconnect();
     }
+
+    /** Handle live feed SSE events */
+    private _handleSSEEvent = (event: FeedSSEEvent): void => {
+        switch (event.type) {
+            case 'card_added': {
+                // Apply project filter if active
+                if (this._filterProjectId && event.card.project_id !== this._filterProjectId) return;
+                // Insert sorted by priority (lower = higher priority)
+                const cards = [...this._cards];
+                const idx = cards.findIndex((c) => c.priority > event.card.priority);
+                if (idx === -1) {
+                    cards.push(event.card);
+                } else {
+                    cards.splice(idx, 0, event.card);
+                }
+                this._cards = cards;
+                break;
+            }
+            case 'card_updated': {
+                this._cards = this._cards.map((c) =>
+                    c.id === event.card.id ? event.card : c
+                );
+                break;
+            }
+            case 'card_removed': {
+                this._cards = this._cards.filter((c) => c.id !== event.card_id);
+                break;
+            }
+        }
+    };
 
     private _onFilterChange = (e: CustomEvent<{ projectId: string | null }>) => {
         this._filterProjectId = e.detail.projectId;
@@ -367,31 +408,33 @@ export class FBHomeFeed extends FBElement {
         const horizons: FeedCardHorizon[] = ['today', 'this_week', 'horizon'];
 
         return html`
-            <div class="greeting">${this._greeting}</div>
-            ${this._renderSummary()}
+            <main role="main" aria-label="Portfolio Feed">
+                <div class="greeting" role="heading" aria-level="1">${this._greeting}</div>
+                ${this._renderSummary()}
 
-            ${this._cards.length === 0
-                ? html`
-                      <div class="empty">
-                          <div class="empty-body">All clear. No items need your attention right now.</div>
-                      </div>
-                  `
-                : horizons.map((h) => {
-                      const cards = groups[h];
-                      if (!cards || cards.length === 0) return nothing;
-                      return html`
-                          <div class="horizon-group">
-                              <div class="horizon-label">${HORIZON_LABELS[h]}</div>
-                              <div class="cards" @fb-card-action=${this._handleCardAction}>
-                                  ${cards.map(
-                                      (card) => html`
-                                          <fb-feed-card .card=${card}></fb-feed-card>
-                                      `
-                                  )}
-                              </div>
+                ${this._cards.length === 0
+                    ? html`
+                          <div class="empty" role="status">
+                              <div class="empty-body">All clear. No items need your attention right now.</div>
                           </div>
-                      `;
-                  })}
+                      `
+                    : horizons.map((h) => {
+                          const cards = groups[h];
+                          if (!cards || cards.length === 0) return nothing;
+                          return html`
+                              <section class="horizon-group" aria-label="${HORIZON_LABELS[h]}">
+                                  <div class="horizon-label" role="heading" aria-level="2">${HORIZON_LABELS[h]}</div>
+                                  <div class="cards" role="feed" @fb-card-action=${this._handleCardAction}>
+                                      ${cards.map(
+                                          (card) => html`
+                                              <fb-feed-card .card=${card} role="article"></fb-feed-card>
+                                          `
+                                      )}
+                                  </div>
+                              </section>
+                          `;
+                      })}
+            </main>
         `;
     }
 }

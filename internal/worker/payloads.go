@@ -17,6 +17,7 @@ const (
 	TypeProcurementNotification = "task:procurement_notification"
 	TypeSkillExecution          = "task:skill_execution" // FutureShade Action Bridge
 	TypeReviewPR                = "task:review_pr"       // Automated PR Review
+	TypeDriftDetection          = "task:drift_detection"  // V2 Phase 7: Passive drift detection
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -113,4 +114,10 @@ func NewReviewPRTask(payload ReviewPRPayload) (*asynq.Task, error) {
 		return nil, err
 	}
 	return asynq.NewTask(TypeReviewPR, payloadBytes, asynq.Queue("default")), nil
+}
+
+// NewDriftDetectionTask creates a task for passive drift detection.
+// See FRONTEND_V2_SPEC.md §11.2
+func NewDriftDetectionTask() *asynq.Task {
+	return asynq.NewTask(TypeDriftDetection, nil)
 }
