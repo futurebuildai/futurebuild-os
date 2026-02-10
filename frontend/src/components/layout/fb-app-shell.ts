@@ -43,6 +43,7 @@ import '../admin/fb-admin-shell';
 // V2 views
 import '../views/fb-view-chat';
 import '../views/fb-view-onboarding';
+import '../views/fb-view-schedule';
 
 /**
  * Route type for V2 URL-based routing.
@@ -499,14 +500,8 @@ export class FBAppShell extends FBElement {
             case 'project-chat':
                 return html`<fb-view-chat></fb-view-chat>`;
 
-            case 'project-schedule': {
-                // Phase 6: Full schedule view
-                return html`
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--fb-text-secondary);">
-                        Schedule view — coming in Phase 6
-                    </div>
-                `;
-            }
+            case 'project-schedule':
+                return html`<fb-view-schedule></fb-view-schedule>`;
 
             case 'settings-profile':
             case 'settings-org':
