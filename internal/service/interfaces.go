@@ -119,3 +119,8 @@ type GitHubServicer interface {
 	FetchPRDiff(ctx context.Context, owner, repo string, prNumber int) (string, error)
 	PostPRComment(ctx context.Context, owner, repo string, prNumber int, body string) error
 }
+
+// FeedServicer defines the contract for portfolio feed operations.
+// See FRONTEND_V2_SPEC.md §5.1, §5.5
+// Note: Primary definition is in feed_service.go with the implementation.
+// Listed here for discoverability alongside other service interfaces.

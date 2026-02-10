@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -66,12 +67,13 @@ type InboundVisionVerifier interface {
 // This is a Reactor (inbound/passive), separate from SubLiaisonAgent (outbound/active).
 // See PRODUCTION_PLAN.md Step 48 (Separation of Concerns Amendment)
 type InboundProcessor struct {
-	db        *pgxpool.Pool
-	directory InboundContactLookup
-	schedule  InboundProgressUpdater
-	vision    InboundVisionVerifier
-	log       *slog.Logger
-	clock     clock.Clock
+	db         *pgxpool.Pool
+	directory  InboundContactLookup
+	schedule   InboundProgressUpdater
+	vision     InboundVisionVerifier
+	log        *slog.Logger
+	clock      clock.Clock
+	feedWriter FeedWriter // V2: writes sub confirmation/delay cards to portfolio feed
 }
 
 // NewInboundProcessor creates a new InboundProcessor with injected dependencies.
@@ -92,6 +94,13 @@ func NewInboundProcessor(
 		log:       slog.With("component", "inbound_processor"),
 		clock:     clk,
 	}
+}
+
+// WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
+// If not set, no feed cards are written (backward compatible).
+func (p *InboundProcessor) WithFeedWriter(fw FeedWriter) *InboundProcessor {
+	p.feedWriter = fw
+	return p
 }
 
 // ProcessIncoming handles a normalized inbound message.
@@ -181,6 +190,10 @@ func (p *InboundProcessor) ProcessIncoming(ctx context.Context, msg InboundMessa
 			"contact_id", contact.ID,
 			"task_id", taskID,
 		)
+		// V2 Feed: Write sub_confirmation card
+		if p.feedWriter != nil && taskID != nil {
+			p.writeInboundConfirmationCard(ctx, *taskID, *projectID, contact, msg.Body)
+		}
 		return nil
 	}
 
@@ -190,6 +203,10 @@ func (p *InboundProcessor) ProcessIncoming(ctx context.Context, msg InboundMessa
 			p.log.Error("failed to create risk flag", "error", err)
 		}
 		_ = p.logInboundMessage(ctx, &contact.ID, taskID, msg, "DELAY_FLAGGED")
+		// V2 Feed: Write sub delay card (elevated priority)
+		if p.feedWriter != nil && taskID != nil {
+			p.writeInboundDelayCard(ctx, *taskID, *projectID, contact, msg.Body)
+		}
 		return nil
 	}
 
@@ -584,6 +601,72 @@ func VerifySignature(body []byte, signature, secret string) bool {
 	expectedSig := hex.EncodeToString(mac.Sum(nil))
 
 	return hmac.Equal([]byte(signature), []byte(expectedSig))
+}
+
+// --- Feed Card Writers ---
+
+// writeInboundConfirmationCard creates a sub_confirmation card when a sub confirms.
+func (p *InboundProcessor) writeInboundConfirmationCard(ctx context.Context, taskID, projectID uuid.UUID, contact *types.Contact, body string) {
+	orgID, err := p.getProjectOrgID(ctx, projectID)
+	if err != nil {
+		p.log.Error("failed to get org_id for confirmation card", "project_id", projectID, "error", err)
+		return
+	}
+
+	taskName, _ := p.getTaskDescription(ctx, taskID)
+	agentSource := "InboundProcessor"
+	card := &models.FeedCard{
+		OrgID:       orgID,
+		ProjectID:   projectID,
+		CardType:    models.FeedCardSubConfirmation,
+		Priority:    models.FeedCardPriorityLow,
+		Headline:    fmt.Sprintf("%s confirmed for %s", contact.Name, taskName),
+		Body:        fmt.Sprintf("%s (%s) confirmed: \"%s\"", contact.Name, contact.Company, truncateString(body, 100)),
+		Horizon:     models.FeedCardHorizonToday,
+		AgentSource: &agentSource,
+		TaskID:      &taskID,
+		Actions: []models.FeedCardAction{
+			{ID: "dismiss", Label: "Got It", Style: "primary"},
+		},
+	}
+
+	if err := p.feedWriter.WriteCard(ctx, card); err != nil {
+		p.log.Error("failed to write sub_confirmation feed card", "task_id", taskID, "error", err)
+	}
+}
+
+// writeInboundDelayCard creates a sub_unconfirmed card when a sub reports a delay.
+func (p *InboundProcessor) writeInboundDelayCard(ctx context.Context, taskID, projectID uuid.UUID, contact *types.Contact, body string) {
+	orgID, err := p.getProjectOrgID(ctx, projectID)
+	if err != nil {
+		p.log.Error("failed to get org_id for delay card", "project_id", projectID, "error", err)
+		return
+	}
+
+	taskName, _ := p.getTaskDescription(ctx, taskID)
+	agentSource := "InboundProcessor"
+	consequence := "Subcontractor indicated a potential delay. Review impact on schedule."
+	card := &models.FeedCard{
+		OrgID:       orgID,
+		ProjectID:   projectID,
+		CardType:    models.FeedCardSubUnconfirmed,
+		Priority:    models.FeedCardPriorityUrgent,
+		Headline:    fmt.Sprintf("Delay reported by %s for %s", contact.Name, taskName),
+		Body:        fmt.Sprintf("%s (%s) reported: \"%s\"", contact.Name, contact.Company, truncateString(body, 100)),
+		Consequence: &consequence,
+		Horizon:     models.FeedCardHorizonToday,
+		AgentSource: &agentSource,
+		TaskID:      &taskID,
+		Actions: []models.FeedCardAction{
+			{ID: "view_schedule", Label: "View Schedule Impact", Style: "primary"},
+			{ID: "call_sub", Label: "Call Sub", Style: "secondary"},
+			{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+		},
+	}
+
+	if err := p.feedWriter.WriteCard(ctx, card); err != nil {
+		p.log.Error("failed to write sub delay feed card", "task_id", taskID, "error", err)
+	}
 }
 
 func nilIfEmpty(s string) *string {

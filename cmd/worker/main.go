@@ -72,6 +72,8 @@ func main() {
 	// Critical Blocker A Remediation: Add geocoding and directory services
 	geocodingService := service.NewGeocodingService()
 	directoryService := service.NewDirectoryService(dbPool)
+	// V2 Feed: FeedService for agent card population
+	feedService := service.NewFeedService(dbPool)
 
 	// 6. Initialize Agents
 	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
@@ -86,13 +88,14 @@ func main() {
 		realClock,
 		geocodingService, // Critical Blocker A
 		directoryService, // Critical Blocker A
-	)
+	).WithFeedWriter(feedService) // V2 Feed: Write daily_briefing cards
 
 	// Procurement Agent for long-lead item monitoring
 	// See PRODUCTION_PLAN.md Step 46, 49
 	// Config Decoupling: Load ProcurementConfig from environment (defaults if not set)
 	procurementCfg := config.LoadProcurementConfigFromEnv()
-	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg)
+	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg).
+		WithFeedWriter(feedService) // V2 Feed: Write procurement cards
 
 	// 6.5 FutureShade Action Bridge: Initialize Skills Registry
 	// See specs/FUTURESHADE_AGENTS_SPEC.md Section 4

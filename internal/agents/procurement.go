@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colton/futurebuild/internal/config"
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/clock"
 	pkgsync "github.com/colton/futurebuild/pkg/sync"
 	"github.com/colton/futurebuild/pkg/types"
@@ -28,13 +29,14 @@ type NotificationEnqueuer interface {
 // P1 Performance Fix: Uses batching and async notifications to reduce DB round-trips
 // Config Decoupling: Uses ProcurementConfig for tunable business rules.
 type ProcurementAgent struct {
-	repo      ProcurementRepository
-	weather   types.WeatherService
-	clock     clock.Clock
-	notifier  NotificationEnqueuer
-	batchSize int
-	config    config.ProcurementConfig // Config decoupling: tunable business rules
-	mutex     pkgsync.DistributedMutex // P0 Reliability Fix: Prevents duplicate execution across replicas
+	repo       ProcurementRepository
+	weather    types.WeatherService
+	clock      clock.Clock
+	notifier   NotificationEnqueuer
+	batchSize  int
+	config     config.ProcurementConfig // Config decoupling: tunable business rules
+	mutex      pkgsync.DistributedMutex // P0 Reliability Fix: Prevents duplicate execution across replicas
+	feedWriter FeedWriter               // V2: writes procurement cards to portfolio feed
 }
 
 // DefaultBatchSize is the number of items to batch before flushing.
@@ -86,6 +88,12 @@ func (a *ProcurementAgent) WithBatchSize(size int) *ProcurementAgent {
 	return a
 }
 
+// WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
+func (a *ProcurementAgent) WithFeedWriter(fw FeedWriter) *ProcurementAgent {
+	a.feedWriter = fw
+	return a
+}
+
 // WithDistributedMutex sets the distributed mutex for Blue/Green deployment safety.
 // P0 Reliability Fix: Required for production multi-replica deployments.
 func (a *ProcurementAgent) WithDistributedMutex(mutex pkgsync.DistributedMutex) *ProcurementAgent {
@@ -105,6 +113,9 @@ type procurementRow struct {
 	// ZipCode for weather lookup - nil indicates missing location data (requires ConfigurationError)
 	ZipCode       *string
 	ProjectTaskID uuid.UUID
+	// V2 Feed: Project context for feed card generation
+	ProjectID uuid.UUID
+	OrgID     uuid.UUID
 }
 
 // alertResult holds the calculated status for a procurement item.
@@ -114,6 +125,11 @@ type alertResult struct {
 	CalculatedOrderDate time.Time
 	ShouldNotify        bool
 	Message             string
+	// V2 Feed: Project context carried from procurementRow for card generation
+	ProjectID     uuid.UUID
+	OrgID         uuid.UUID
+	ItemName      string
+	ProjectTaskID uuid.UUID
 }
 
 // ItemProcessor is a callback function for processing procurement items one-by-one.
@@ -296,8 +312,82 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 		}
 	}
 
+	// V2 Feed: Write procurement feed cards for notifiable items
+	if a.feedWriter != nil {
+		a.writeProcurementCards(ctx, resultsToLog)
+	}
+
 	slog.Debug("batch flushed", "count", len(batch))
 	return nil
+}
+
+// writeProcurementCards creates feed cards for procurement alerts.
+func (a *ProcurementAgent) writeProcurementCards(ctx context.Context, results []alertResult) {
+	agentSource := "ProcurementAgent"
+	for _, result := range results {
+		if result.ProjectID == uuid.Nil {
+			continue
+		}
+
+		var cardType models.FeedCardType
+		var priority int
+		switch result.NewStatus {
+		case types.ProcurementAlertCritical:
+			cardType = models.FeedCardProcurementCritical
+			priority = models.FeedCardPriorityCritical
+		case types.ProcurementAlertWarning:
+			cardType = models.FeedCardProcurementWarning
+			priority = models.FeedCardPriorityUrgent
+		default:
+			continue
+		}
+
+		horizon := models.FeedCardHorizonThisWeek
+		if !result.CalculatedOrderDate.IsZero() {
+			daysUntil := int(result.CalculatedOrderDate.Sub(a.clock.Now()).Hours() / 24)
+			if daysUntil <= 0 {
+				horizon = models.FeedCardHorizonToday
+			} else if daysUntil > 7 {
+				horizon = models.FeedCardHorizonHorizon
+			}
+		}
+
+		var deadline *time.Time
+		if !result.CalculatedOrderDate.IsZero() {
+			d := result.CalculatedOrderDate
+			deadline = &d
+		}
+
+		taskID := result.ProjectTaskID
+
+		card := &models.FeedCard{
+			OrgID:       result.OrgID,
+			ProjectID:   result.ProjectID,
+			CardType:    cardType,
+			Priority:    priority,
+			Headline:    result.Message,
+			Body:        fmt.Sprintf("Item: %s. Must order by %s.", result.ItemName, result.CalculatedOrderDate.Format("Jan 02, 2006")),
+			Horizon:     horizon,
+			Deadline:    deadline,
+			AgentSource: &agentSource,
+			TaskID:      &taskID,
+			Actions: []models.FeedCardAction{
+				{ID: "order_now", Label: "Mark Ordered", Style: "primary"},
+				{ID: "view_details", Label: "View Details", Style: "secondary"},
+				{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+			},
+		}
+
+		if result.NewStatus == types.ProcurementAlertCritical {
+			c := "Delayed ordering may cause schedule slip on the critical path."
+			card.Consequence = &c
+		}
+
+		if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+			slog.Error("failed to write procurement feed card",
+				"item_id", result.ID, "project_id", result.ProjectID, "error", err)
+		}
+	}
 }
 
 // streamItems iterates through procurement items via repository callback.
@@ -316,8 +406,12 @@ func (a *ProcurementAgent) analyzeItem(item procurementRow, now time.Time) alert
 	warningThresholdDays := a.config.LeadTimeWarningThreshold
 
 	result := alertResult{
-		ID:        item.ID,
-		NewStatus: types.ProcurementAlertOK,
+		ID:            item.ID,
+		NewStatus:     types.ProcurementAlertOK,
+		ProjectID:     item.ProjectID,
+		OrgID:         item.OrgID,
+		ItemName:      item.Name,
+		ProjectTaskID: item.ProjectTaskID,
 	}
 
 	if item.EarlyStart == nil {

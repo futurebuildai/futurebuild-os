@@ -163,13 +163,16 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
 	}
 
+	// V2: Portfolio feed service (created early for agent injection)
+	feedService := service.NewFeedService(db)
+
 	inboundProcessor := agents.NewInboundProcessor(
 		db,
 		directoryService, // Implements InboundContactLookup
 		adapters.NewScheduleServiceAdapter(scheduleService, db), // Implements InboundProgressUpdater
 		visionVerifier,
 		clock.RealClock{},
-	)
+	).WithFeedWriter(feedService) // V2 Feed: Write sub confirmation/delay cards
 	webhookHandler := handlers.NewWebhookHandler(inboundProcessor, cfg.WebhookSecret)
 
 	// Phase 12: Main app auth via Clerk; AuthHandler serves /auth/me only.
@@ -228,8 +231,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		clerkWebhookHandler = handlers.NewClerkWebhookHandler(db, cfg.ClerkWebhookSecret)
 	}
 
-	// V2: Portfolio feed service + handler
-	feedService := service.NewFeedService(db)
+	// V2: Portfolio feed handler (feedService created earlier for agent injection)
 	feedHandler := handlers.NewFeedHandler(feedService)
 
 	// Project Completion: service + handler
