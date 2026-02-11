@@ -358,7 +358,10 @@ export class FBSettingsTeam extends FBElement {
             this._members = [
                 { id: '1', name: 'Current User', email: 'you@company.com', role: 'Admin', status: 'active' },
             ];
-            this._pendingInvites = [];
+            this._pendingInvites = [
+                { id: 'inv_1', name: 'Sarah Chen', email: 'sarah.chen@company.com', role: 'Builder', status: 'pending' },
+                { id: 'inv_2', name: 'Mike Torres', email: 'mike.t@partner.com', role: 'PM', status: 'pending' },
+            ];
         } catch (err) {
             console.warn('[FBSettingsTeam] Failed to load team:', err);
         } finally {

@@ -261,22 +261,22 @@ export class FBFeedCard extends FBElement {
                     <div class="title-area">
                         <div class="headline">${this.card.headline}</div>
                         ${this.card.project_name
-                            ? html`<div class="project-label">${this.card.project_name}</div>`
-                            : nothing}
+                ? html`<div class="project-label">${this.card.project_name}</div>`
+                : nothing}
                     </div>
                     ${this.card.deadline
-                        ? html`<span class="deadline">${this._formatDeadline(this.card.deadline)}</span>`
-                        : nothing}
+                ? html`<span class="deadline">${this._formatDeadline(this.card.deadline)}</span>`
+                : nothing}
                 </div>
 
                 <div class="body">${this.card.body}</div>
 
                 ${this.card.consequence
-                    ? html`<div class="consequence">${this.card.consequence}</div>`
-                    : nothing}
+                ? html`<div class="consequence">${this.card.consequence}</div>`
+                : nothing}
 
                 ${this.card.card_type === 'setup_contacts'
-                    ? html`
+                ? html`
                           <div class="inline-form">
                               <fb-contact-inline-add
                                   .projectId=${this.card.project_id}
@@ -285,11 +285,11 @@ export class FBFeedCard extends FBElement {
                               ></fb-contact-inline-add>
                           </div>
                       `
-                    : (this.card.actions?.length ?? 0) > 0
-                        ? html`
+                : (this.card.actions?.length ?? 0) > 0
+                    ? html`
                               <div class="actions-row">
                                   ${this.card.actions.map(
-                                      (a) => html`
+                        (a) => html`
                                           <button
                                               class="action-btn"
                                               data-style=${a.style}
@@ -298,19 +298,22 @@ export class FBFeedCard extends FBElement {
                                               ${a.label}
                                           </button>
                                       `
-                                  )}
+                    )}
                               </div>
                           `
-                        : nothing}
+                    : nothing}
 
                 ${this._showTellMeMore()
-                    ? html`
+                ? html`
                           <button
                               class="tell-me-more"
-                              @click=${() => this._handleAction('tell_me_more')}
+                              @click=${(e: Event) => {
+                        e.stopPropagation();
+                        this._handleAction('tell_me_more');
+                    }}
                           >Tell me more \u2192</button>
                       `
-                    : nothing}
+                : nothing}
             </div>
         `;
     }

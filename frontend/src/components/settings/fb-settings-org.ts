@@ -442,10 +442,10 @@ export class FBSettingsOrg extends FBElement {
                     <label>Standard Work Week</label>
                     <div class="workdays-container">
                         ${DAY_LABELS.map((label, i) => {
-                            const dayNum = i + 1;
-                            const isActive = this._workDays.includes(dayNum);
-                            const fullName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i];
-                            return html`
+            const dayNum = i + 1;
+            const isActive = this._workDays.includes(dayNum);
+            const fullName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i];
+            return html`
                                 <button
                                     class="day-toggle ${isActive ? 'active' : ''}"
                                     ?disabled=${this._saving}
@@ -457,7 +457,7 @@ export class FBSettingsOrg extends FBElement {
                                     ${label}
                                 </button>
                             `;
-                        })}
+        })}
                     </div>
                 </div>
 
@@ -471,6 +471,33 @@ export class FBSettingsOrg extends FBElement {
                         </button>
                     </div>
                 ` : nothing}
+            </div>
+
+            <div class="card">
+                <div class="card-title">Organization Info</div>
+
+                <div class="form-group">
+                    <label>Organization Name</label>
+                    <input
+                        type="text"
+                        .value=${'FutureBuild Construction'}
+                        readonly
+                    />
+                    <div style="font-size: 12px; color: var(--fb-text-tertiary, #707080); margin-top: 4px;">
+                        Contact support to change your organization name
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 24px; margin-top: 16px;">
+                    <div>
+                        <div style="font-size: 13px; color: var(--fb-text-secondary, #a0a0b0); margin-bottom: 4px;">Members</div>
+                        <div style="font-size: 20px; font-weight: 700; color: var(--fb-text-primary, #e0e0e0);">1</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--fb-text-secondary, #a0a0b0); margin-bottom: 4px;">Active Projects</div>
+                        <div style="font-size: 20px; font-weight: 700; color: var(--fb-text-primary, #e0e0e0);">2</div>
+                    </div>
+                </div>
             </div>
         `;
     }

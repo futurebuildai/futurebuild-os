@@ -10,9 +10,9 @@
 import { html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
-import { api } from '../../services/api';
 import { store, type ChatCardContext } from '../../store/store';
 import { feedSSE } from '../../services/feed-sse';
+import { mockFeedService } from '../../services/mock-feed-service'; // Use mock service
 import type { FeedCard, FeedSSEEvent, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
 import './fb-feed-section';
 import './fb-greeting-banner';
@@ -106,16 +106,77 @@ export class FBHomeFeed extends FBElement {
                 margin-bottom: 8px;
             }
 
-            .empty-body {
-                font-size: 15px;
+            .empty-state-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 60px 24px;
+                text-align: center;
                 color: var(--fb-text-secondary, #a0a0b0);
+                gap: 32px;
+                min-height: 400px;
+            }
+
+            .widget-clock {
+                font-size: 64px;
+                font-weight: 200;
+                color: var(--fb-text-primary, #e0e0e0);
+                font-variant-numeric: tabular-nums;
+                letter-spacing: -2px;
+            }
+
+            .widget-date {
+                font-size: 18px;
+                font-weight: 500;
+                color: var(--fb-accent, #6366f1);
+                margin-top: -24px;
                 margin-bottom: 24px;
-                line-height: 1.5;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .widget-weather {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 16px;
+                color: var(--fb-text-primary, #e0e0e0);
+                background: rgba(255, 255, 255, 0.05);
+                padding: 8px 16px;
+                border-radius: 20px;
+            }
+
+            .widget-haiku {
+                max-width: 400px;
+                font-style: italic;
+                line-height: 1.6;
+                position: relative;
+                padding: 20px;
+                border-left: 3px solid var(--fb-accent, #6366f1);
+                background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
+                border-radius: 0 8px 8px 0;
+                text-align: left;
+            }
+
+            .haiku-text {
+                white-space: pre-line;
+                font-size: 16px;
+                color: var(--fb-text-primary, #e0e0e0);
+            }
+
+            .haiku-meta {
+                margin-top: 12px;
+                font-size: 12px;
+                color: var(--fb-text-tertiary, #707080);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
 
             .empty-cta {
                 display: inline-flex;
                 align-items: center;
+                gap: 8px;
                 padding: 12px 28px;
                 border-radius: 8px;
                 background: var(--fb-accent, #6366f1);
@@ -190,7 +251,12 @@ export class FBHomeFeed extends FBElement {
     @state() private _loading = true;
     @state() private _error: string | null = null;
     @state() private _filterProjectId: string | null = null;
+    @state() private _currentTime = new Date();
+    @state() private _currentHaiku = this._getRandomHaiku();
+    @state() private _currentWeather = this._getMockWeather();
+
     private _unsubSSE: (() => void) | null = null;
+    private _timer: number | null = null;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -206,6 +272,11 @@ export class FBHomeFeed extends FBElement {
         // Subscribe to SSE feed stream for live updates
         this._unsubSSE = feedSSE.subscribe(this._handleSSEEvent);
         feedSSE.connect();
+
+        // Clock timer
+        this._timer = window.setInterval(() => {
+            this._currentTime = new Date();
+        }, 1000);
     }
 
     /** React to external projectFilter property changes */
@@ -227,6 +298,32 @@ export class FBHomeFeed extends FBElement {
             this._unsubSSE = null;
         }
         feedSSE.disconnect();
+        if (this._timer) {
+            clearInterval(this._timer);
+            this._timer = null;
+        }
+    }
+
+    private _getRandomHaiku() {
+        const haikus = [
+            "Code flows like river,\nBugs are stones within the stream,\nTesting smooths the path.",
+            "Servers hum softly,\nData travelers at rest,\nSystem writes its logs.",
+            "Pixels on the screen,\nPainting logic in the light,\nUser finds their way.",
+            "Build script starts to run,\nDependencies are fetched now,\nGreen checkmarks delight.",
+            "Silence in the feed,\nTasks completed, mind at ease,\nFocus on the now.",
+            "Screens glow in the dark,\nLines of code build silent worlds,\nLogic finds its home."
+        ];
+        return haikus[Math.floor(Math.random() * haikus.length)];
+    }
+
+    private _getMockWeather() {
+        const weathers = [
+            { temp: 72, condition: 'Sunny', icon: 'sunny' },
+            { temp: 65, condition: 'Cloudy', icon: 'cloud' },
+            { temp: 68, condition: 'Partly Cloudy', icon: 'partly_cloudy_day' },
+            { temp: 58, condition: 'Rain', icon: 'rainy' }
+        ];
+        return weathers[Math.floor(Math.random() * weathers.length)];
     }
 
     /** Handle live feed SSE events */
@@ -268,7 +365,7 @@ export class FBHomeFeed extends FBElement {
         this._loading = true;
         this._error = null;
         try {
-            const resp = await api.portfolio.getFeed(
+            const resp = await mockFeedService.getFeed(
                 this._filterProjectId ?? undefined
             );
             this._greeting = resp.greeting;
@@ -303,21 +400,29 @@ export class FBHomeFeed extends FBElement {
         return groups;
     }
 
-    private _handleCardAction(e: CustomEvent<{ cardId: string; actionId: string; projectId: string }>) {
+    private async _handleCardAction(e: CustomEvent<{ cardId: string; actionId: string; projectId: string }>) {
         const { cardId, actionId, projectId } = e.detail;
 
         // Client-side navigation actions — no API call needed
         switch (actionId) {
             case 'view_briefing':
             case 'view_details':
-                this.emit('fb-navigate', { view: 'project', id: projectId });
+                this.emit('fb-navigate', { view: 'project', projectId });
                 return;
             case 'view_schedule':
-                this.emit('fb-navigate', { view: 'project-schedule', id: projectId });
+                this.emit('fb-navigate', { view: 'project-schedule', projectId });
+                return;
+            case 'review_budget':
+                this.emit('fb-navigate', { view: 'budget' });
                 return;
             case 'add_contacts':
                 this.emit('fb-navigate', { view: 'contacts' });
                 return;
+            case 'show_details': {
+                // Navigate to project detail view (shows project context + feed)
+                this.emit('fb-navigate', { view: 'project', projectId });
+                return;
+            }
             case 'tell_me_more': {
                 // Find the card to get full context
                 const card = this._cards.find((c) => c.id === cardId);
@@ -343,7 +448,7 @@ export class FBHomeFeed extends FBElement {
         // Dismiss — optimistic removal via dedicated endpoint
         if (actionId === 'dismiss') {
             this._cards = this._cards.filter((c) => c.id !== cardId);
-            api.portfolio.dismissCard(cardId).catch(() => {
+            mockFeedService.dismissCard(cardId).catch(() => {
                 this._loadFeed(); // Reload on failure
             });
             return;
@@ -352,26 +457,36 @@ export class FBHomeFeed extends FBElement {
         // Snooze — optimistic removal via dedicated endpoint
         if (actionId === 'snooze') {
             this._cards = this._cards.filter((c) => c.id !== cardId);
-            api.portfolio.snoozeCard(cardId, 24).catch(() => {
+            mockFeedService.snoozeCard(cardId, 24).catch(() => {
                 this._loadFeed();
             });
             return;
         }
 
         // All other actions — call executeAction and handle response
-        api.portfolio.executeAction(cardId, actionId).then((resp) => {
+        console.log('[FBHomeFeed] Executing action:', actionId, cardId);
+        try {
+            const resp = await mockFeedService.executeAction(cardId, actionId);
+            console.log('[FBHomeFeed] Action response:', resp);
+
             if (resp.effect === 'dismiss') {
                 this._cards = this._cards.filter((c) => c.id !== cardId);
             }
             if (resp.effect === 'navigate' && resp.navigate_to) {
+                console.log('[FBHomeFeed] Navigating to:', resp.navigate_to);
                 this.emit('fb-navigate', { path: resp.navigate_to });
             }
             if (resp.message) {
                 this.emit('fb-toast', { message: resp.message });
             }
-        }).catch(() => {
+        } catch (err) {
+            console.error('[FBHomeFeed] Action failed:', err);
             this.emit('fb-toast', { message: 'Action failed. Please try again.', type: 'error' });
-        });
+        }
+    }
+
+    private _handleCreateProject() {
+        this.emit('fb-navigate', { view: 'project-create' });
     }
 
     private _renderLoading() {
@@ -409,10 +524,6 @@ export class FBHomeFeed extends FBElement {
             `;
         }
 
-        // No projects: show full-screen empty state
-        if (this._cards.length === 0 && (!this._summary || this._summary.active_project_count === 0)) {
-            return html`<fb-empty-home></fb-empty-home>`;
-        }
 
         const groups = this._groupCards();
         const horizons: FeedCardHorizon[] = ['today', 'this_week', 'horizon'];
@@ -425,28 +536,52 @@ export class FBHomeFeed extends FBElement {
                 ></fb-greeting-banner>
 
                 ${this._cards.length === 0
-                    ? html`
-                          <div class="empty" role="status">
-                              <div class="empty-body">All clear. No items need your attention right now.</div>
+                ? html`
+                          <div class="empty-state-container" role="status">
+                              <div class="widget-clock">
+                                  ${this._currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                              <div class="widget-date">
+                                  ${this._currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                              </div>
+                              
+                              <div class="widget-weather">
+                                  <span class="material-symbols-outlined">${this._currentWeather?.icon}</span>
+                                  <span>San Francisco, ${this._currentWeather?.temp}°F</span>
+                              </div>
+
+                              <div class="widget-haiku">
+                                  <div class="haiku-text">${this._currentHaiku}</div>
+                                  <div class="haiku-meta">Daily Inspiration</div>
+                              </div>
+
+                              ${(!this._summary || this._summary.active_project_count === 0)
+                        ? html`
+                                    <button class="empty-cta" @click=${this._handleCreateProject}>
+                                        <span class="material-symbols-outlined">add</span>
+                                        Start First Project
+                                    </button>
+                                  `
+                        : nothing}
                           </div>
                       `
-                    : horizons.map((h) => {
-                          const cards = groups[h];
-                          if (!cards || cards.length === 0) return nothing;
-                          return html`
+                : horizons.map((h) => {
+                    const cards = groups[h];
+                    if (!cards || cards.length === 0) return nothing;
+                    return html`
                               <fb-feed-section
                                   horizon=${h}
                                   card-count=${cards.length}
                                   @fb-card-action=${this._handleCardAction}
                               >
                                   ${cards.map(
-                                      (card) => html`
+                        (card) => html`
                                           <fb-feed-card .card=${card} role="article"></fb-feed-card>
                                       `
-                                  )}
+                    )}
                               </fb-feed-section>
                           `;
-                      })}
+                })}
             </main>
         `;
     }

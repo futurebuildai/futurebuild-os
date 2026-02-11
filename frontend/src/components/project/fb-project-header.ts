@@ -237,25 +237,6 @@ export class FBProjectHeader extends FBElement {
         this.emit('fb-navigate', { view: 'home' });
     }
 
-    private _handleNav(tab: string) {
-        switch (tab) {
-            case 'schedule':
-                this.emit('fb-navigate', { view: 'project-schedule', id: this.projectId });
-                break;
-            case 'budget':
-                this.emit('fb-navigate', { view: 'project-budget', id: this.projectId });
-                break;
-            case 'chat':
-                this.emit('fb-navigate', { view: 'project-chat', id: this.projectId });
-                break;
-            case 'contacts':
-                this.emit('fb-navigate', { view: 'project-contacts', id: this.projectId });
-                break;
-            default:
-                this.emit('fb-navigate', { view: 'project', id: this.projectId });
-        }
-    }
-
     private _getStatusLabel(status: ProjectStatus): string {
         const labels: Record<ProjectStatus, string> = {
             planning: 'Planning',
@@ -301,52 +282,6 @@ export class FBProjectHeader extends FBElement {
                     ${this.completionDate ? html`
                         <span class="completion-date">${this._formatDate(this.completionDate)} completion</span>
                     ` : nothing}
-                </div>
-
-                <div class="nav-buttons">
-                    <button
-                        class="nav-btn ${this.activeTab === 'schedule' ? 'active' : ''}"
-                        @click=${() => this._handleNav('schedule')}
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                        Schedule
-                    </button>
-                    <button
-                        class="nav-btn ${this.activeTab === 'budget' ? 'active' : ''}"
-                        @click=${() => this._handleNav('budget')}
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="1" x2="12" y2="23"/>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                        </svg>
-                        Budget
-                    </button>
-                    <button
-                        class="nav-btn ${this.activeTab === 'chat' ? 'active' : ''}"
-                        @click=${() => this._handleNav('chat')}
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                        </svg>
-                        Chat
-                    </button>
-                    <button
-                        class="nav-btn ${this.activeTab === 'contacts' ? 'active' : ''}"
-                        @click=${() => this._handleNav('contacts')}
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                        Contacts
-                    </button>
                 </div>
             </div>
         `;
