@@ -19,11 +19,65 @@ export interface Forecast {
  */
 export interface Contact {
     id: string;
+    org_id: string;
     name: string;
-    company: string;
-    phone: string;
-    email: string;
+    company?: string;
+    phone?: string;
+    email?: string;
     role: UserRole;
+    contact_preference: 'SMS' | 'Email' | 'Both';
+    created_at: string;
+    // CRM fields — See FRONTEND_V2_SPEC.md §13
+    trades?: string[];
+    license_number?: string;
+    address_city?: string;
+    address_state?: string;
+    address_zip?: string;
+    website?: string;
+    notes?: string;
+    portal_enabled: boolean;
+    source: string;
+    last_contacted_at?: string;
+    avg_response_time_hours?: number;
+    on_time_rate?: number;
+    updated_at?: string;
+}
+
+/**
+ * CreateContactRequest for POST /api/v1/contacts.
+ */
+export interface CreateContactRequest {
+    name: string;
+    phone?: string;
+    email?: string;
+    company?: string;
+    role?: string;
+    contact_preference?: 'SMS' | 'Email' | 'Both';
+}
+
+/**
+ * CreateContactResponse includes dedup awareness.
+ */
+export interface CreateContactResponse {
+    contact: Contact;
+    matched: boolean;
+}
+
+/**
+ * BulkCreateContactsResponse from POST /api/v1/contacts/bulk.
+ */
+export interface BulkCreateContactsResponse {
+    created: Contact[];
+    duplicates: Contact[];
+}
+
+/**
+ * AssignmentRow from GET /api/v1/projects/:id/assignments.
+ */
+export interface AssignmentRow {
+    phase_code: string;
+    phase_name: string;
+    contact: Contact | null;
 }
 
 /**

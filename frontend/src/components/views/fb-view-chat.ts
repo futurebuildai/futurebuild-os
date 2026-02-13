@@ -16,6 +16,8 @@ import type { ChatMessage } from '../../store/types';
 
 import '../chat/fb-message-list';
 import '../chat/fb-input-bar';
+import '../chat/fb-chat-context-banner';
+import { type ChatCardContext } from '../../store/store';
 
 /**
  * Formats an ISO timestamp to a display time string (e.g., "2:30 PM").
@@ -108,6 +110,7 @@ export class FBViewChat extends FBViewElement {
     @state() private _projectId: string | null = null;
     @state() private _threadId: string | null = null;
     @state() private _isMobile = false;
+    @state() private _bannerContext: ChatCardContext | null = null;
 
     private _disposeEffects: (() => void)[] = [];
     private _loadAbortController: AbortController | null = null;
@@ -135,6 +138,17 @@ export class FBViewChat extends FBViewElement {
                     void this._loadHistory(this._projectId, threadId);
                 } else if (!threadId) {
                     this._threadId = null;
+                }
+            }),
+            // V2 Phase 5: Check for pending card context ("Tell me more")
+            effect(() => {
+                const ctx = store.chatCardContext$.value;
+                if (ctx && this._threadId && this._projectId) {
+                    this._bannerContext = ctx;
+                    // Clear pending context from store (banner persists locally)
+                    store.actions.setChatCardContext(null);
+                    // Auto-send the "Tell me more" prompt
+                    void this._autoSendContext(ctx);
                 }
             })
         );
@@ -238,6 +252,46 @@ export class FBViewChat extends FBViewElement {
         }
     }
 
+    private async _autoSendContext(ctx: ChatCardContext): Promise<void> {
+        if (!this._projectId || !this._threadId) return;
+
+        const prompt = `Tell me more about: "${ctx.headline}"`;
+        const createdAt = new Date().toISOString();
+        const optimisticId = `msg-${String(Date.now())}-${crypto.randomUUID()}`;
+
+        store.actions.addMessage({
+            id: optimisticId,
+            role: 'user',
+            content: prompt,
+            createdAt,
+            displayTime: formatDisplayTime(createdAt),
+        });
+
+        store.actions.setChatLoading(true);
+
+        try {
+            const response = await api.chat.send(this._projectId, this._threadId, prompt);
+            store.actions.removeMessage(optimisticId);
+            store.actions.addMessage({
+                id: response.id,
+                role: response.role,
+                content: response.content,
+                createdAt: response.created_at,
+                displayTime: formatDisplayTime(response.created_at),
+            });
+        } catch (err) {
+            store.actions.removeMessage(optimisticId);
+            const errorMsg = err instanceof Error ? err.message : 'Failed to send message.';
+            store.actions.setChatError(errorMsg);
+        } finally {
+            store.actions.setChatLoading(false);
+        }
+    }
+
+    private _dismissBanner(): void {
+        this._bannerContext = null;
+    }
+
     private _dismissError(): void {
         store.actions.setChatError(null);
     }
@@ -276,6 +330,15 @@ export class FBViewChat extends FBViewElement {
                         aria-label="Dismiss error"
                     >&times;</button>
                 </div>
+            ` : nothing}
+
+            ${this._bannerContext ? html`
+                <fb-chat-context-banner
+                    .headline=${this._bannerContext.headline}
+                    .consequence=${this._bannerContext.consequence ?? ''}
+                    .cardType=${this._bannerContext.cardType}
+                    @fb-banner-dismiss=${this._dismissBanner.bind(this)}
+                ></fb-chat-context-banner>
             ` : nothing}
 
             <fb-message-list></fb-message-list>

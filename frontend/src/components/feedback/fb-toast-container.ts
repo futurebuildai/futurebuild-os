@@ -41,12 +41,13 @@ export class FBToastContainer extends FBElement {
                 overflow: hidden;
             }
 
-            /* Mobile: Center at bottom, full width with padding */
+            /* Mobile: Center above mobile nav bar, full width with padding */
             @media (max-width: 768px) {
                 :host {
                     left: 16px;
                     right: 16px;
-                    bottom: 16px;
+                    /* 64px nav + safe area + 12px gap */
+                    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 12px);
                 }
 
                 fb-toast {

@@ -91,9 +91,9 @@ const _chatError$ = signal<string | null>(null);
 const _focusTasks$ = signal<FocusTask[]>([]);
 const _agentActivity$ = signal<AgentActivity[]>([]);
 
-// UI (Updated for 3-panel layout)
-const _leftPanelOpen$ = signal<boolean>(true);
-const _rightPanelOpen$ = signal<boolean>(true);
+// UI (V2: No left panel, right panel only shows when artifact active)
+const _leftPanelOpen$ = signal<boolean>(false);
+const _rightPanelOpen$ = signal<boolean>(false);
 const _theme$ = signal<Theme>('dark');
 const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
@@ -120,6 +120,20 @@ const _shadowModeEnabled$ = signal<boolean>(false);
 const _shadowActiveView$ = signal<'log' | 'docs'>('log');
 const _selectedDecisionId$ = signal<string | null>(null);
 const _selectedDocPath$ = signal<string | null>(null);
+
+// V2 Phase 5: Chat context from feed card "Tell me more" flow
+// See FRONTEND_V2_SPEC.md §7 Step 33
+export interface ChatCardContext {
+    cardId: string;
+    cardType: string;
+    headline: string;
+    body: string;
+    consequence: string;
+    projectId: string;
+    projectName: string;
+    taskId: string;
+}
+const _chatCardContext$ = signal<ChatCardContext | null>(null);
 
 // ============================================================================
 // Computed Values
@@ -279,7 +293,8 @@ const actions: StoreActions = {
             _threads$.value = _threads$.value.map((t) => {
                 if (t.id !== id) return t;
                 // Remove archivedAt by destructuring it out
-                const { archivedAt: _, ...rest } = t;
+                const { archivedAt: _removed, ...rest } = t;
+                void _removed; // Intentionally unused - destructuring to remove property
                 return rest as Thread;
             });
         } else {
@@ -557,6 +572,11 @@ const actions: StoreActions = {
         _completionReport$.value = report;
     },
 
+    // V2 Phase 5: Chat card context
+    setChatCardContext(ctx: ChatCardContext | null): void {
+        _chatCardContext$.value = ctx;
+    },
+
     // ---- Session Reset (Step 58.5: State Hygiene) ----
 
     resetSession(): void {
@@ -605,6 +625,9 @@ const actions: StoreActions = {
 
         // Completion
         _completionReport$.value = null;
+
+        // Chat card context
+        _chatCardContext$.value = null;
 
         // Shadow Mode (SHADOW_VIEWER_specs.md)
         _shadowModeEnabled$.value = false;
@@ -684,6 +707,9 @@ export const store = {
 
     // ---- Completion Report State (readonly) ----
     completionReport$: _completionReport$ as ReadonlySignal<CompletionReport | null>,
+
+    // ---- Chat Card Context (V2 Phase 5: "Tell me more") ----
+    chatCardContext$: _chatCardContext$ as ReadonlySignal<ChatCardContext | null>,
 
     // ---- Shadow Mode State (readonly, SHADOW_VIEWER_specs.md) ----
     shadowModeEnabled$: _shadowModeEnabled$ as ReadonlySignal<boolean>,

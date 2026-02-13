@@ -120,10 +120,14 @@
   --fb-radius-md: var(--md-sys-shape-corner-small);
   --fb-radius-lg: var(--md-sys-shape-corner-medium);
   --fb-radius-full: var(--md-sys-shape-corner-full);
-  --fb-font-family: var(--md-ref-typeface-plain);
-  
   /* Brand Gradient (Preserved) */
   --fb-dawn-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* Typography */
+    --fb-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --fb-font-headings: 'Outfit', 'Inter', system-ui, sans-serif;
+    --fb-text-base: 16px;
+    --fb-text-sm: 14px;
+    --fb-text-xs: 12px;
   
   /* Spacing */
   --fb-spacing-xs: 4px;

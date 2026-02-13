@@ -31,14 +31,16 @@ func NewPgProcurementRepository(db *pgxpool.Pool) *PgProcurementRepository {
 // Notification dampening is handled separately in LogNotification.
 func (r *PgProcurementRepository) StreamItems(ctx context.Context, process ItemProcessor) error {
 	query := `
-		SELECT 
+		SELECT
 			pi.id,
 			pi.name,
 			pi.lead_time_weeks,
 			pi.status,
 			pt.early_start,
 			pc.zip_code,
-			pi.project_task_id
+			pi.project_task_id,
+			p.id,
+			p.org_id
 		FROM procurement_items pi
 		JOIN project_tasks pt ON pi.project_task_id = pt.id
 		JOIN projects p ON pt.project_id = p.id
@@ -53,7 +55,7 @@ func (r *PgProcurementRepository) StreamItems(ctx context.Context, process ItemP
 
 	for rows.Next() {
 		var item procurementRow
-		if err := rows.Scan(&item.ID, &item.Name, &item.LeadTimeWeeks, &item.Status, &item.EarlyStart, &item.ZipCode, &item.ProjectTaskID); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.LeadTimeWeeks, &item.Status, &item.EarlyStart, &item.ZipCode, &item.ProjectTaskID, &item.ProjectID, &item.OrgID); err != nil {
 			return fmt.Errorf("scan row: %w", err)
 		}
 		if err := process(item); err != nil {

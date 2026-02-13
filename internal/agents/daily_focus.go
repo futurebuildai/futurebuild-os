@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
@@ -24,14 +26,15 @@ const MaxConcurrentProjects = 10
 // Critical Blocker A Remediation: Added geocoder and directory dependencies
 // P1 Scalability Fix: Uses streaming + worker pool for O(1) memory at scale
 type DailyFocusAgent struct {
-	projects  ProjectRepository // Abstraction for streaming (replaces *service.ProjectService)
-	schedule  *service.ScheduleService
-	weather   types.WeatherService
-	notifier  types.NotificationService
-	aiClient  ai.Client
-	clock     clock.Clock
-	geocoder  types.GeocodingService // Blocker A: Address → lat/long
-	directory types.DirectoryService // Blocker A: PM email lookup
+	projects   ProjectRepository // Abstraction for streaming (replaces *service.ProjectService)
+	schedule   *service.ScheduleService
+	weather    types.WeatherService
+	notifier   types.NotificationService
+	aiClient   ai.Client
+	clock      clock.Clock
+	geocoder   types.GeocodingService // Blocker A: Address → lat/long
+	directory  types.DirectoryService // Blocker A: PM email lookup
+	feedWriter FeedWriter             // V2: writes daily_briefing cards to portfolio feed
 }
 
 // NewDailyFocusAgent creates a new agent instance.
@@ -76,6 +79,12 @@ func NewDailyFocusAgentWithService(
 		NewPgProjectRepository(projectSvc),
 		schedule, weather, notifier, aiClient, clk, geocoder, directory,
 	)
+}
+
+// WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
+func (a *DailyFocusAgent) WithFeedWriter(fw FeedWriter) *DailyFocusAgent {
+	a.feedWriter = fw
+	return a
 }
 
 // Execute runs the daily briefing logic for all active projects.
@@ -210,7 +219,66 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 		slog.Warn("failed to send notification", "error", err)
 	}
 
+	// V2 Feed: Write daily_briefing card to portfolio feed
+	if a.feedWriter != nil {
+		a.writeDailyBriefingCard(ctx, p, briefing, tasks)
+	}
+
 	return nil
+}
+
+// writeDailyBriefingCard creates a daily_briefing feed card from the AI-generated briefing.
+func (a *DailyFocusAgent) writeDailyBriefingCard(ctx context.Context, p models.Project, briefing string, tasks []models.ProjectTask) {
+	headline := "Daily Briefing: " + p.Name
+	for _, line := range strings.Split(briefing, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			headline = trimmed
+			if len(headline) > 120 {
+				headline = headline[:117] + "..."
+			}
+			break
+		}
+	}
+
+	var critCount int
+	for _, t := range tasks {
+		if t.IsOnCriticalPath {
+			critCount++
+		}
+	}
+	var consequence *string
+	if critCount > 0 {
+		c := fmt.Sprintf("%d critical-path task(s) active today", critCount)
+		consequence = &c
+	}
+
+	agentSource := "DailyFocusAgent"
+	endOfDay := time.Date(
+		a.clock.Now().Year(), a.clock.Now().Month(), a.clock.Now().Day(),
+		23, 59, 59, 0, a.clock.Now().Location(),
+	)
+
+	card := &models.FeedCard{
+		OrgID:       p.OrgID,
+		ProjectID:   p.ID,
+		CardType:    models.FeedCardDailyBriefing,
+		Priority:    models.FeedCardPriorityNormal,
+		Headline:    headline,
+		Body:        briefing,
+		Consequence: consequence,
+		Horizon:     models.FeedCardHorizonToday,
+		AgentSource: &agentSource,
+		ExpiresAt:   &endOfDay,
+		Actions: []models.FeedCardAction{
+			{ID: "view_briefing", Label: "View Full Briefing", Style: "primary"},
+			{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+		},
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write daily briefing feed card", "project_id", p.ID, "error", err)
+	}
 }
 
 func (a *DailyFocusAgent) buildPrompt(p models.Project, w types.Forecast, tasks []models.ProjectTask) string {

@@ -31,6 +31,8 @@ type WorkerHandler struct {
 	githubService service.GitHubServicer
 	tribunalEngine *tribunal.ConsensusEngine
 	tribunalRepo   *tribunal.Repository
+	// V2 Phase 7: Passive drift detection (optional - initialized via WithDriftDetection)
+	driftAgent *agents.DriftDetectionAgent
 }
 
 func NewWorkerHandler(focusAgent *agents.DailyFocusAgent, procurementAgent *agents.ProcurementAgent, db *pgxpool.Pool, clk clock.Clock) *WorkerHandler {
@@ -58,6 +60,27 @@ func (h *WorkerHandler) WithPRReview(githubService service.GitHubServicer, engin
 	h.tribunalEngine = engine
 	h.tribunalRepo = repo
 	return h
+}
+
+// WithDriftDetection configures the handler for passive drift detection.
+// See FRONTEND_V2_SPEC.md §11.2
+func (h *WorkerHandler) WithDriftDetection(agent *agents.DriftDetectionAgent) *WorkerHandler {
+	h.driftAgent = agent
+	return h
+}
+
+// HandleDriftDetection executes the passive drift detection agent.
+func (h *WorkerHandler) HandleDriftDetection(ctx context.Context, task *asynq.Task) error {
+	if h.driftAgent == nil {
+		slog.Warn("drift detection handler not configured, skipping")
+		return nil
+	}
+	slog.Info("Handling Drift Detection Task...")
+	if err := h.driftAgent.Execute(ctx); err != nil {
+		return fmt.Errorf("drift detection agent failed: %w", err)
+	}
+	slog.Info("Drift Detection Task Completed Successfully.")
+	return nil
 }
 
 // HandleDailyBriefing executes the daily briefing agent logic.

@@ -55,6 +55,8 @@ type Server struct {
 	ThreadHandler        *handlers.ThreadHandler        // Thread support: conversation threads
 	CompletionHandler    *handlers.CompletionHandler    // Project Completion: complete + report
 	ReadinessHandler     *handlers.ReadinessHandler     // Integration readiness checks
+	FeedHandler          *handlers.FeedHandler          // V2: Portfolio feed endpoint
+	ContactHandler       *handlers.ContactHandler       // V2: Contact CRUD + assignments
 	AuthMiddleware       *middleware.AuthMiddleware
 	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
@@ -63,7 +65,7 @@ type Server struct {
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
 	projectService := service.NewProjectService(db)
 	threadService := service.NewThreadService(db)
-	projectHandler := handlers.NewProjectHandler(projectService, threadService)
+	projectHandler := handlers.NewProjectHandler(projectService, threadService) // feedService wired below via WithFeedService
 
 	// See PRODUCTION_PLAN.md Step 32
 	scheduleService := service.NewScheduleService(db)
@@ -162,13 +164,19 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
 	}
 
+	// V2: Portfolio feed service (created early for agent injection)
+	feedService := service.NewFeedService(db)
+
+	// Wire feedService into ProjectHandler for setup_team card generation
+	projectHandler.WithFeedService(feedService)
+
 	inboundProcessor := agents.NewInboundProcessor(
 		db,
 		directoryService, // Implements InboundContactLookup
 		adapters.NewScheduleServiceAdapter(scheduleService, db), // Implements InboundProgressUpdater
 		visionVerifier,
 		clock.RealClock{},
-	)
+	).WithFeedWriter(feedService) // V2 Feed: Write sub confirmation/delay cards
 	webhookHandler := handlers.NewWebhookHandler(inboundProcessor, cfg.WebhookSecret)
 
 	// Phase 12: Main app auth via Clerk; AuthHandler serves /auth/me only.
@@ -226,6 +234,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	if cfg.ClerkWebhookSecret != "" {
 		clerkWebhookHandler = handlers.NewClerkWebhookHandler(db, cfg.ClerkWebhookSecret)
 	}
+
+	// V2: Portfolio feed handler (feedService created earlier for agent injection)
+	feedHandler := handlers.NewFeedHandler(feedService)
+
+	// V2: Contact CRUD + project phase assignments
+	contactHandler := handlers.NewContactHandler(db)
 
 	// Project Completion: service + handler
 	completionService := service.NewCompletionService(db)
@@ -293,6 +307,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		ThreadHandler:        threadHandler,        // Thread support
 		CompletionHandler:    completionHandler,    // Project Completion
 		ReadinessHandler:     readinessHandler,     // Integration readiness checks
+		FeedHandler:          feedHandler,          // V2: Portfolio feed
+		ContactHandler:       contactHandler,       // V2: Contact CRUD + assignments
 		AuthMiddleware:       authMiddleware,
 		PortalRateLimiter:    portalRateLimiter,
 		PublicRateLimiter:    publicRateLimiter,
@@ -400,6 +416,26 @@ func (s *Server) routes() {
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/physics", s.ConfigHandler.UpdatePhysics)
 		})
 
+		// V2: Portfolio feed — aggregated feed cards across all projects
+		// See FRONTEND_V2_SPEC.md §5.1
+		r.Route("/portfolio", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/feed", s.FeedHandler.GetFeed)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/feed/stream", s.FeedHandler.StreamFeed)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/action", s.FeedHandler.ExecuteAction)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/dismiss", s.FeedHandler.DismissCard)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/feed/snooze", s.FeedHandler.SnoozeCard)
+		})
+
+		// V2: Contact directory CRUD — See FRONTEND_V2_SPEC.md §10.3
+		r.Route("/contacts", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.ContactHandler.ListContacts)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}", s.ContactHandler.GetContact)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/", s.ContactHandler.CreateContact)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/bulk", s.ContactHandler.BulkCreateContacts)
+		})
+
 		r.Route("/projects", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth) // L7 Security Fix: BOLA remediation
 			// Step 81: Scope-based RBAC — write operations require specific permissions
@@ -418,6 +454,13 @@ func (s *Server) routes() {
 			r.Route("/{id}/schedule", func(r chi.Router) {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.ScheduleHandler.GetSchedule)
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/recalculate", s.ScheduleHandler.RecalculateSchedule)
+			})
+
+			// V2: Phase contact assignment endpoints — See FRONTEND_V2_SPEC.md §10.3
+			r.Route("/{id}/assignments", func(r chi.Router) {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.ContactHandler.ListAssignments)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/", s.ContactHandler.CreateAssignment)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/bulk", s.ContactHandler.BulkCreateAssignments)
 			})
 
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32

@@ -32,10 +32,17 @@ func getAuthOrgID(r *http.Request) (uuid.UUID, error) {
 type ProjectHandler struct {
 	service       service.ProjectServicer
 	threadService service.ThreadServicer
+	feedService   *service.FeedService // V2: writes setup_team card on project creation
 }
 
 func NewProjectHandler(s service.ProjectServicer, ts service.ThreadServicer) *ProjectHandler {
 	return &ProjectHandler{service: s, threadService: ts}
+}
+
+// WithFeedService injects the feed service for post-creation card generation.
+func (h *ProjectHandler) WithFeedService(fs *service.FeedService) *ProjectHandler {
+	h.feedService = fs
+	return h
 }
 
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +87,30 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	// Auto-create General thread for the new project (non-fatal on error — lazy fallback exists)
 	if _, err := h.threadService.CreateGeneralThread(r.Context(), p.ID); err != nil {
 		slog.Error("project: failed to create General thread", "project_id", p.ID, "error", err)
+	}
+
+	// V2: Write a setup_team feed card prompting the builder to add contacts
+	// See FRONTEND_V2_SPEC.md §10.3.C
+	if h.feedService != nil {
+		setupCard := &models.FeedCard{
+			ID:        uuid.New(),
+			OrgID:     p.OrgID,
+			ProjectID: p.ID,
+			CardType:  models.FeedCardSetupTeam,
+			Priority:  models.FeedCardPriorityNormal,
+			Headline:  "Add your subs",
+			Body:      "Adding your subs lets me send them start confirmations, progress checks, and delay alerts automatically.",
+			Horizon:   models.FeedCardHorizonToday,
+			Actions: []models.FeedCardAction{
+				{ID: "add_contacts", Label: "Add contacts", Style: "primary"},
+				{ID: "dismiss", Label: "Later", Style: "secondary"},
+			},
+		}
+		agentSource := "system"
+		setupCard.AgentSource = &agentSource
+		if err := h.feedService.WriteCard(r.Context(), setupCard); err != nil {
+			slog.Error("project: failed to write setup_team card", "project_id", p.ID, "error", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

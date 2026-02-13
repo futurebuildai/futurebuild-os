@@ -55,9 +55,14 @@ export abstract class FBElement extends LitElement {
             box-sizing: inherit;
         }
 
-        /* Shared Skeleton Loading Styles */
+        /* Shared Skeleton Loading Styles — theme-aware surface colors */
         .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background: linear-gradient(
+                90deg,
+                var(--fb-bg-tertiary, #29292d) 25%,
+                var(--fb-bg-secondary, #1f1f23) 50%,
+                var(--fb-bg-tertiary, #29292d) 75%
+            );
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 4px;

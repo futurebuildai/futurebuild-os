@@ -5,8 +5,7 @@
  * This module exports all view components and provides a registry
  * for the router. Structured for future async loading support.
  *
- * L7 Note: Currently synchronous imports for simplicity.
- * Can be refactored to dynamic imports for code splitting.
+ * V2: fb-view-dashboard removed (replaced by fb-home-feed).
  */
 
 // ============================================================================
@@ -14,7 +13,6 @@
 // ============================================================================
 
 import './fb-view-login';
-import './fb-view-dashboard';
 import './fb-view-projects';
 import './fb-view-chat';
 import './fb-view-schedule';
@@ -23,7 +21,6 @@ import './fb-view-onboarding';
 
 // Re-export for convenience
 export { FBViewLogin } from './fb-view-login';
-export { FBViewDashboard } from './fb-view-dashboard';
 export { FBViewProjects } from './fb-view-projects';
 export { FBViewChat } from './fb-view-chat';
 export { FBViewSchedule } from './fb-view-schedule';
@@ -43,12 +40,8 @@ export type ViewLoader = () => Promise<CustomElementConstructor>;
 /**
  * View registry supporting async loading.
  * Currently returns sync-imported classes wrapped in Promise.resolve.
- *
- * To enable code splitting, replace with:
- * `dashboard: () => import('./fb-view-dashboard').then(m => m.FBViewDashboard)`
  */
 export const VIEW_REGISTRY = {
-    dashboard: () => import('./fb-view-dashboard').then((m) => m.FBViewDashboard),
     projects: () => import('./fb-view-projects').then((m) => m.FBViewProjects),
     chat: () => import('./fb-view-chat').then((m) => m.FBViewChat),
     schedule: () => import('./fb-view-schedule').then((m) => m.FBViewSchedule),

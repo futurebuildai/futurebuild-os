@@ -72,6 +72,8 @@ func main() {
 	// Critical Blocker A Remediation: Add geocoding and directory services
 	geocodingService := service.NewGeocodingService()
 	directoryService := service.NewDirectoryService(dbPool)
+	// V2 Feed: FeedService for agent card population
+	feedService := service.NewFeedService(dbPool)
 
 	// 6. Initialize Agents
 	// See PRODUCTION_PLAN.md Step 49: Using RealClock for production
@@ -86,13 +88,20 @@ func main() {
 		realClock,
 		geocodingService, // Critical Blocker A
 		directoryService, // Critical Blocker A
-	)
+	).WithFeedWriter(feedService) // V2 Feed: Write daily_briefing cards
 
 	// Procurement Agent for long-lead item monitoring
 	// See PRODUCTION_PLAN.md Step 46, 49
 	// Config Decoupling: Load ProcurementConfig from environment (defaults if not set)
 	procurementCfg := config.LoadProcurementConfigFromEnv()
-	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg)
+	procurementAgent := agents.NewProcurementAgentWithDB(dbPool, weatherService, realClock, procurementCfg).
+		WithFeedWriter(feedService) // V2 Feed: Write procurement cards
+
+	// V2 Phase 7: Passive drift detection agent
+	// See FRONTEND_V2_SPEC.md §11.2
+	driftRepo := agents.NewPgDriftRepository(dbPool)
+	driftAgent := agents.NewDriftDetectionAgent(driftRepo, realClock).
+		WithFeedWriter(feedService)
 
 	// 6.5 FutureShade Action Bridge: Initialize Skills Registry
 	// See specs/FUTURESHADE_AGENTS_SPEC.md Section 4
@@ -117,7 +126,8 @@ func main() {
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler
 	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock).
-		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig)
+		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig).
+		WithDriftDetection(driftAgent)
 
 	// 7.5 Automated PR Review: Initialize GitHub service and Tribunal integration
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -155,6 +165,12 @@ func main() {
 		log.Fatalf("could not register procurement check cron: %v", err)
 	}
 
+	// V2 Phase 7: Register Drift Detection at 07:00 AM UTC (after daily briefing)
+	// See FRONTEND_V2_SPEC.md §11.2
+	if _, err := scheduler.RegisterEntry("0 7 * * *", worker.NewDriftDetectionTask()); err != nil {
+		log.Fatalf("could not register drift detection cron: %v", err)
+	}
+
 	// 9. Initialize Worker Server (The Processor)
 	// L7 Config: Use configured priorities. Default to 10 concurrency if not set (though config loader sets default)
 	concurrency := 10
@@ -178,6 +194,8 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeSkillExecution, workerHandler.HandleSkillExecution)
 	// Automated PR Review: Register PR review handler
 	srv.RegisterHandlerFunc(worker.TypeReviewPR, workerHandler.HandleReviewPR)
+	// V2 Phase 7: Passive drift detection
+	srv.RegisterHandlerFunc(worker.TypeDriftDetection, workerHandler.HandleDriftDetection)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

@@ -400,6 +400,9 @@ export interface StoreActions {
     // Completion actions
     setCompletionReport(report: CompletionReport | null): void;
 
+    // V2 Phase 5: Chat card context ("Tell me more")
+    setChatCardContext(ctx: import('../store/store').ChatCardContext | null): void;
+
     // Session actions (Step 58.5: State Hygiene)
     resetSession(): void;
 }

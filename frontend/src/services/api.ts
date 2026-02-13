@@ -14,9 +14,10 @@
  */
 
 import { get, post, put, del } from './http';
-import type { GanttData, Contact, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
+import type { GanttData, Contact, CreateContactRequest, CreateContactResponse, BulkCreateContactsResponse, AssignmentRow, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
+import type { PortfolioFeedResponse, ActionResponse } from '../types/feed';
 
 // ============================================================================
 // Auth Types
@@ -416,22 +417,46 @@ export const api = {
 
     /**
      * Contact/Directory endpoints.
+     * See FRONTEND_V2_SPEC.md §10.3
      */
     contacts: {
-        /**
-         * List contacts for a project.
-         * @param projectId - Project UUID
-         */
-        list(projectId: string): Promise<Contact[]> {
-            return get<Contact[]>(`/projects/${projectId}/contacts`);
+        /** List all org contacts. Optional search filter. */
+        list(search?: string): Promise<Contact[]> {
+            const params = search ? `?search=${encodeURIComponent(search)}` : '';
+            return get<Contact[]>(`/contacts${params}`);
         },
 
-        /**
-         * Get a single contact.
-         * @param contactId - Contact UUID
-         */
+        /** Get a single contact by ID. */
         get(contactId: string): Promise<Contact> {
             return get<Contact>(`/contacts/${contactId}`);
+        },
+
+        /** Create a single contact with dedup check. */
+        create(contact: CreateContactRequest): Promise<CreateContactResponse> {
+            return post<CreateContactResponse>('/contacts', contact);
+        },
+
+        /** Bulk create contacts. */
+        bulkCreate(contacts: CreateContactRequest[]): Promise<BulkCreateContactsResponse> {
+            return post<BulkCreateContactsResponse>('/contacts/bulk', { contacts });
+        },
+
+        /** List phase assignments for a project (with assigned contacts). */
+        listAssignments(projectId: string): Promise<AssignmentRow[]> {
+            return get<AssignmentRow[]>(`/projects/${projectId}/assignments`);
+        },
+
+        /** Assign a contact to a project phase. */
+        createAssignment(projectId: string, contactId: string, wbsPhaseId: string): Promise<{ success: boolean }> {
+            return post<{ success: boolean }>(`/projects/${projectId}/assignments`, {
+                contact_id: contactId,
+                wbs_phase_id: wbsPhaseId,
+            });
+        },
+
+        /** Bulk assign contacts to project phases. */
+        bulkCreateAssignments(projectId: string, assignments: { contact_id: string; wbs_phase_id: string }[]): Promise<{ created: number }> {
+            return post<{ created: number }>(`/projects/${projectId}/assignments/bulk`, { assignments });
         },
     },
 
@@ -664,6 +689,61 @@ export const api = {
          */
         reject(id: string, reason?: string): Promise<InvoiceResponse> {
             return post<InvoiceResponse>(`/invoices/${id}/reject`, { reason: reason ?? '' });
+        },
+    },
+
+    /**
+     * Portfolio feed endpoints.
+     * See FRONTEND_V2_SPEC.md §5.1
+     */
+    portfolio: {
+        /**
+         * Get the portfolio feed with cards, summary, and project pills.
+         * @param projectId - Optional project filter
+         */
+        getFeed(projectId?: string): Promise<PortfolioFeedResponse> {
+            const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+            return get<PortfolioFeedResponse>(`/portfolio/feed${query}`);
+        },
+
+        /**
+         * Execute an action on a feed card.
+         * @param cardId - Feed card UUID
+         * @param actionId - Action identifier
+         * @param payload - Optional action data
+         */
+        executeAction(
+            cardId: string,
+            actionId: string,
+            payload?: Record<string, unknown>
+        ): Promise<ActionResponse> {
+            return post<ActionResponse>('/portfolio/feed/action', {
+                card_id: cardId,
+                action_id: actionId,
+                payload,
+            });
+        },
+
+        /**
+         * Dismiss a feed card.
+         * @param cardId - Feed card UUID
+         */
+        dismissCard(cardId: string): Promise<{ success: boolean }> {
+            return post<{ success: boolean }>('/portfolio/feed/dismiss', {
+                card_id: cardId,
+            });
+        },
+
+        /**
+         * Snooze a feed card.
+         * @param cardId - Feed card UUID
+         * @param hours - Snooze duration in hours
+         */
+        snoozeCard(cardId: string, hours: number): Promise<{ success: boolean }> {
+            return post<{ success: boolean }>('/portfolio/feed/snooze', {
+                card_id: cardId,
+                hours,
+            });
         },
     },
 

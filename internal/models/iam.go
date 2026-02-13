@@ -69,7 +69,7 @@ const (
 )
 
 // Contact represents the Global Address Book entry.
-// See DATA_SPINE_SPEC.md Section 2.3
+// See DATA_SPINE_SPEC.md Section 2.3, FRONTEND_V2_SPEC.md §13
 type Contact struct {
 	ID                uuid.UUID         `json:"id" db:"id"`
 	OrgID             uuid.UUID         `json:"org_id" db:"org_id" validate:"required"`
@@ -80,6 +80,21 @@ type Contact struct {
 	Role              UserRole          `json:"role" db:"role" validate:"required"`
 	ContactPreference ContactPreference `json:"contact_preference" db:"contact_preference"`
 	CreatedAt         time.Time         `json:"created_at" db:"created_at"`
+
+	// CRM fields — See FRONTEND_V2_SPEC.md §13.4
+	Trades               []string   `json:"trades" db:"trades"`
+	LicenseNumber        *string    `json:"license_number,omitempty" db:"license_number"`
+	AddressCity          *string    `json:"address_city,omitempty" db:"address_city"`
+	AddressState         *string    `json:"address_state,omitempty" db:"address_state"`
+	AddressZip           *string    `json:"address_zip,omitempty" db:"address_zip"`
+	Website              *string    `json:"website,omitempty" db:"website"`
+	Notes                *string    `json:"notes,omitempty" db:"notes"`
+	PortalEnabled        bool       `json:"portal_enabled" db:"portal_enabled"`
+	Source               string     `json:"source" db:"source"`
+	LastContactedAt      *time.Time `json:"last_contacted_at,omitempty" db:"last_contacted_at"`
+	AvgResponseTimeHours *float64   `json:"avg_response_time_hours,omitempty" db:"avg_response_time_hours"`
+	OnTimeRate           *float64   `json:"on_time_rate,omitempty" db:"on_time_rate"`
+	UpdatedAt            *time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }
 
 func (c *Contact) GetID() uuid.UUID    { return c.ID }

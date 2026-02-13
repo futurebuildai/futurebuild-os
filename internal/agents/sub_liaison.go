@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
@@ -29,10 +30,11 @@ var (
 // See PRODUCTION_PLAN.md Step 47
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 type SubLiaisonAgent struct {
-	db        *pgxpool.Pool
-	directory DirectoryService
-	notifier  NotificationService
-	clock     clock.Clock
+	db         *pgxpool.Pool
+	directory  DirectoryService
+	notifier   NotificationService
+	clock      clock.Clock
+	feedWriter FeedWriter // V2: writes sub_confirmation/sub_unconfirmed cards
 }
 
 // DirectoryService defines contact lookup operations.
@@ -57,6 +59,13 @@ func NewSubLiaisonAgent(db *pgxpool.Pool, directory DirectoryService, notifier N
 		notifier:  notifier,
 		clock:     clk,
 	}
+}
+
+// WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
+// If not set, no feed cards are written (backward compatible).
+func (a *SubLiaisonAgent) WithFeedWriter(fw FeedWriter) *SubLiaisonAgent {
+	a.feedWriter = fw
+	return a
 }
 
 // ScanAndNotify finds tasks starting within 72h and sends confirmation requests.
@@ -161,6 +170,12 @@ func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) 
 			"task_id", taskID,
 			"error", err,
 		)
+
+		// V2 Feed: Write setup_contacts card prompting builder to assign a contact
+		// See FRONTEND_V2_SPEC.md §10.3.C
+		if a.feedWriter != nil {
+			a.writeSetupContactsCard(ctx, task, phaseCode)
+		}
 		return nil
 	}
 
@@ -218,6 +233,11 @@ func (a *SubLiaisonAgent) ConfirmArrival(ctx context.Context, taskID uuid.UUID) 
 			"phase_code", phaseCode,
 			"log_id", logID,
 		)
+
+		// V2 Feed: Write sub_unconfirmed card (awaiting response)
+		if a.feedWriter != nil {
+			a.writeSubUnconfirmedCard(ctx, task, contact)
+		}
 	}
 
 	return nil
@@ -291,7 +311,161 @@ func (a *SubLiaisonAgent) HandleInboundMessage(ctx context.Context, sender, body
 		slog.Error("Failed to log inbound communication", "error", err)
 	}
 
+	// V2 Feed: Write confirmation or delay card based on response
+	if a.feedWriter != nil && taskID != nil {
+		task, taskErr := a.getTaskDetails(ctx, *taskID)
+		if taskErr == nil {
+			isConfirmation := strings.Contains(normalizedBody, "yes") ||
+				strings.Contains(normalizedBody, "confirm") ||
+				strings.Contains(normalizedBody, "done") ||
+				strings.Contains(normalizedBody, "complete")
+			isDelay := containsDelayIndicator(normalizedBody)
+
+			if isConfirmation {
+				a.writeSubConfirmationCard(ctx, task, contact, body)
+			} else if isDelay {
+				a.writeSubDelayCard(ctx, task, contact, body)
+			}
+		}
+	}
+
 	return nil
+}
+
+// --- Feed Card Writers ---
+
+// writeSubUnconfirmedCard creates a sub_unconfirmed card when a confirmation request is sent.
+func (a *SubLiaisonAgent) writeSubUnconfirmedCard(ctx context.Context, task *taskDetails, contact *types.Contact) {
+	agentSource := "SubLiaisonAgent"
+	card := &models.FeedCard{
+		OrgID:    task.OrgID,
+		ProjectID: task.ProjectID,
+		CardType: models.FeedCardSubUnconfirmed,
+		Priority: models.FeedCardPriorityNormal,
+		Headline: fmt.Sprintf("Awaiting confirmation from %s for %s", contact.Name, task.Name),
+		Body:     fmt.Sprintf("Confirmation request sent to %s (%s). Scheduled start: %s.", contact.Name, contact.Company, formatDate(task.EarlyStart)),
+		Horizon:  models.FeedCardHorizonThisWeek,
+		Deadline: task.EarlyStart,
+		AgentSource: &agentSource,
+		TaskID:   &task.ID,
+		Actions: []models.FeedCardAction{
+			{ID: "resend", Label: "Resend Request", Style: "primary"},
+			{ID: "call_sub", Label: "Call Sub", Style: "secondary"},
+			{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+		},
+	}
+
+	if task.EarlyStart != nil {
+		daysUntil := int(task.EarlyStart.Sub(a.clock.Now()).Hours() / 24)
+		if daysUntil <= 1 {
+			card.Priority = models.FeedCardPriorityUrgent
+			card.Horizon = models.FeedCardHorizonToday
+			c := "Task starts soon with no sub confirmation."
+			card.Consequence = &c
+		}
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write sub_unconfirmed feed card", "task_id", task.ID, "error", err)
+	}
+}
+
+// writeSubConfirmationCard creates a sub_confirmation card when a sub confirms arrival.
+func (a *SubLiaisonAgent) writeSubConfirmationCard(ctx context.Context, task *taskDetails, contact *types.Contact, body string) {
+	agentSource := "SubLiaisonAgent"
+	card := &models.FeedCard{
+		OrgID:    task.OrgID,
+		ProjectID: task.ProjectID,
+		CardType: models.FeedCardSubConfirmation,
+		Priority: models.FeedCardPriorityLow,
+		Headline: fmt.Sprintf("%s confirmed for %s", contact.Name, task.Name),
+		Body:     fmt.Sprintf("%s (%s) confirmed: \"%s\"", contact.Name, contact.Company, truncateString(body, 100)),
+		Horizon:  models.FeedCardHorizonToday,
+		AgentSource: &agentSource,
+		TaskID:   &task.ID,
+		Actions: []models.FeedCardAction{
+			{ID: "dismiss", Label: "Got It", Style: "primary"},
+		},
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write sub_confirmation feed card", "task_id", task.ID, "error", err)
+	}
+}
+
+// writeSubDelayCard creates a sub_unconfirmed card with elevated priority when a sub indicates a delay.
+func (a *SubLiaisonAgent) writeSubDelayCard(ctx context.Context, task *taskDetails, contact *types.Contact, body string) {
+	agentSource := "SubLiaisonAgent"
+	c := "Subcontractor indicated a potential delay. Review impact on schedule."
+	card := &models.FeedCard{
+		OrgID:       task.OrgID,
+		ProjectID:   task.ProjectID,
+		CardType:    models.FeedCardSubUnconfirmed,
+		Priority:    models.FeedCardPriorityUrgent,
+		Headline:    fmt.Sprintf("Delay reported by %s for %s", contact.Name, task.Name),
+		Body:        fmt.Sprintf("%s (%s) reported: \"%s\"", contact.Name, contact.Company, truncateString(body, 100)),
+		Consequence: &c,
+		Horizon:     models.FeedCardHorizonToday,
+		AgentSource: &agentSource,
+		TaskID:      &task.ID,
+		Actions: []models.FeedCardAction{
+			{ID: "view_schedule", Label: "View Schedule Impact", Style: "primary"},
+			{ID: "call_sub", Label: "Call Sub", Style: "secondary"},
+			{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+		},
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write sub delay feed card", "task_id", task.ID, "error", err)
+	}
+}
+
+// writeSetupContactsCard creates a setup_contacts card when a phase has no assigned contact
+// and a task in that phase is approaching. The card includes an inline form for quick assignment.
+// See FRONTEND_V2_SPEC.md §10.3.C
+func (a *SubLiaisonAgent) writeSetupContactsCard(ctx context.Context, task *taskDetails, phaseCode string) {
+	tradeName := phaseTradeNames[phaseCode]
+	if tradeName == "" {
+		tradeName = "Phase " + phaseCode
+	}
+
+	headline := fmt.Sprintf("No %s contact assigned", strings.ToLower(tradeName))
+	body := fmt.Sprintf("%s starts %s. I need a contact to send a start confirmation.", task.Name, formatDate(task.EarlyStart))
+
+	agentSource := "SubLiaisonAgent"
+	card := &models.FeedCard{
+		OrgID:       task.OrgID,
+		ProjectID:   task.ProjectID,
+		CardType:    models.FeedCardSetupContacts,
+		Priority:    models.FeedCardPriorityUrgent,
+		Headline:    headline,
+		Body:        body,
+		Horizon:     models.FeedCardHorizonToday,
+		Deadline:    task.EarlyStart,
+		AgentSource: &agentSource,
+		TaskID:      &task.ID,
+		Actions: []models.FeedCardAction{
+			{ID: "assign_contact", Label: "Save & Assign", Style: "primary"},
+			{ID: "dismiss", Label: "Skip this phase", Style: "secondary"},
+		},
+	}
+
+	if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+		slog.Error("failed to write setup_contacts feed card", "task_id", task.ID, "phase_code", phaseCode, "error", err)
+	}
+}
+
+// phaseTradeNames maps WBS phase codes to human-readable trade names.
+var phaseTradeNames = map[string]string{
+	"5":  "Permit & Site Prep",
+	"6":  "Foundation",
+	"7":  "Framing",
+	"8":  "Roofing & Exterior",
+	"9":  "Rough-Ins (MEP)",
+	"10": "Insulation & Drywall",
+	"11": "Finishes",
+	"12": "Final Inspections",
+	"13": "Punch List & Closeout",
 }
 
 // --- Private Helper Methods ---
