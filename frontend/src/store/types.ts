@@ -41,6 +41,26 @@ export interface AuthState {
 }
 
 // ============================================================================
+// Context State (Sprint 1.1: Context Spine)
+// ============================================================================
+
+/**
+ * Application scope — determines whether the UI shows global or project-scoped data.
+ * @see sprint-1-1-context-spine.md Step 1
+ */
+export type ContextScope = 'global' | 'project';
+
+/**
+ * Context state slice — single source of truth for UI scope.
+ * When scope is 'global', projectId must be null.
+ * When scope is 'project', projectId must be a valid project ID.
+ */
+export interface ContextState {
+    scope: ContextScope;
+    projectId: string | null;
+}
+
+// ============================================================================
 // Project State
 // ============================================================================
 
@@ -307,6 +327,8 @@ export interface PendingUpload {
  */
 export interface AppState {
     auth: AuthState;
+    /** Sprint 1.1: Application context scope (global vs project) */
+    context: ContextState;
     project: ProjectState;
     thread: ThreadState;
     chat: ChatState;
@@ -333,6 +355,10 @@ export interface StoreActions {
     logout(): void;
     setAuthLoading(loading: boolean): void;
     setAuthError(error: string | null): void;
+
+    // Context actions (Sprint 1.1: Context Spine)
+    setContext(scope: ContextScope, projectId: string | null): void;
+    clearContext(): void;
 
     // Project actions
     setProjects(projects: ProjectSummary[]): void;

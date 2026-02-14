@@ -451,6 +451,10 @@ export class FBAppShell extends FBElement {
     private _syncRoute(): void {
         this._route = matchRoute(window.location.pathname);
 
+        // Sprint 1.1 (Task 1.1.3): Parse ?project= query param for context hydration
+        const params = new URLSearchParams(window.location.search);
+        const queryProjectId = params.get('project');
+
         // Sync active project to store
         if (
             this._route.view === 'project' ||
@@ -460,11 +464,16 @@ export class FBAppShell extends FBElement {
             const projectId = (this._route as { projectId: string }).projectId;
             // Only update if changed to avoid loops/redundancy
             if (store.activeProjectId$.value !== projectId) {
-                store.actions.setActiveProject(projectId);
+                store.actions.setContext('project', projectId);
+            }
+        } else if (queryProjectId) {
+            // Non-project route but has ?project= query param — hydrate context
+            if (store.contextProjectId$.value !== queryProjectId) {
+                store.actions.setContext('project', queryProjectId);
             }
         } else {
-            if (store.activeProjectId$.value !== null) {
-                store.actions.setActiveProject(null);
+            if (store.contextScope$.value !== 'global') {
+                store.actions.clearContext();
             }
         }
     }

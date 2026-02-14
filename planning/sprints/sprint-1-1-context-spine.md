@@ -11,7 +11,7 @@
 
 **Goal:** Add a strict `ContextState` interface (`{ scope: 'global' | 'project', projectId: string | null }`) to the store and make it the single source of truth for UI scope.
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 #### Atomic Steps
 
@@ -98,7 +98,7 @@
 
 **Goal:** Create a new component that acts as the primary state dispatcher. Clicking "All" clears `projectId`; clicking a project sets it.
 
-**Status:** ⬜ Not Started
+**Status:** ⬜ Not Started (Sprint 1.2 scope — no new components this sprint)
 
 **Key Requirements:**
 - New file: `frontend/src/components/layout/fb-project-selector.ts`
@@ -114,7 +114,7 @@
 
 **Goal:** Reloading `/schedule?project=123` must hydrate the store correctly.
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Key Requirements:**
 - Modify `fb-app-shell.ts` → `_syncRoute()` to parse `?project=` query param

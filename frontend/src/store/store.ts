@@ -24,6 +24,8 @@ import type {
     FocusTask,
     ActionCard,
     PendingUpload,
+    ContextScope,
+    ContextState,
 } from './types';
 import type { CompletionReport } from '../types/models';
 import { setTokenGetter, setUnauthorizedHandler } from '../services/http';
@@ -99,6 +101,10 @@ const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
 const _activeProjectId$ = signal<string | null>(null);
 
+// Context state (Sprint 1.1: Context Spine)
+const _contextScope$ = signal<ContextScope>('global');
+const _contextProjectId$ = signal<string | null>(null);
+
 // Upload state (Step 56: Drag-and-Drop Ingestion)
 const _isDragging$ = signal<boolean>(false);
 const _pendingFiles$ = signal<PendingUpload[]>([]);
@@ -152,6 +158,14 @@ const _currentProject$ = computed(() => {
     if (!id) return null;
     return _projects$.value.find((p) => p.id === id) ?? null;
 });
+
+/**
+ * Computed: The full context state (Sprint 1.1).
+ */
+const _contextState$ = computed<ContextState>(() => ({
+    scope: _contextScope$.value,
+    projectId: _contextProjectId$.value,
+}));
 
 /**
  * Computed: The currently active thread.
@@ -225,9 +239,27 @@ const actions: StoreActions = {
         _projectLoading$.value = false;
     },
 
+    // ---- Context Actions (Sprint 1.1: Context Spine) ----
+
+    setContext(scope: ContextScope, projectId: string | null): void {
+        _contextScope$.value = scope;
+        _contextProjectId$.value = projectId;
+        // Sync the legacy activeProjectId for backward compat
+        _activeProjectId$.value = projectId;
+    },
+
+    clearContext(): void {
+        _contextScope$.value = 'global';
+        _contextProjectId$.value = null;
+        _activeProjectId$.value = null;
+    },
+
     selectProject(id: string | null): void {
         _currentProjectId$.value = id;
         _activeProjectId$.value = id;
+        // Sprint 1.1: Sync context state
+        _contextScope$.value = id ? 'project' : 'global';
+        _contextProjectId$.value = id;
         // Clear detail when switching projects
         if (_currentProjectDetail$.value?.id !== id) {
             _currentProjectDetail$.value = null;
@@ -413,6 +445,9 @@ const actions: StoreActions = {
 
     setActiveProject(projectId: string | null): void {
         _activeProjectId$.value = projectId;
+        // Sprint 1.1: Sync context state
+        _contextScope$.value = projectId ? 'project' : 'global';
+        _contextProjectId$.value = projectId;
         // Clear thread selection when switching projects
         _activeThreadId$.value = null;
         _messages$.value = [];
@@ -594,6 +629,10 @@ const actions: StoreActions = {
         _projectError$.value = null;
         _activeProjectId$.value = null;
 
+        // Context (Sprint 1.1)
+        _contextScope$.value = 'global';
+        _contextProjectId$.value = null;
+
         // Threads
         _threads$.value = [];
         _activeThreadId$.value = null;
@@ -688,6 +727,11 @@ export const store = {
     isMobile$: _isMobile$ as ReadonlySignal<boolean>,
     isTablet$: _isTablet$ as ReadonlySignal<boolean>,
     activeProjectId$: _activeProjectId$ as ReadonlySignal<string | null>,
+
+    // ---- Context State (readonly, Sprint 1.1) ----
+    contextScope$: _contextScope$ as ReadonlySignal<ContextScope>,
+    contextProjectId$: _contextProjectId$ as ReadonlySignal<string | null>,
+    contextState$: _contextState$,
 
     // ---- Global Computed ----
     isLoading$: _isLoading$,
