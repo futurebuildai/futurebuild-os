@@ -11,6 +11,7 @@ import { customElement, state, property } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { FBElement } from '../base/FBElement';
 import { store } from '../../store/store';
+import type { ContextScope } from '../../store/types';
 
 @customElement('fb-left-nav')
 export class FBLeftNav extends FBElement {
@@ -101,7 +102,24 @@ export class FBLeftNav extends FBElement {
             }
             
             .context-label {
-                display: none; /* Hide label in icon-only mode */
+                display: none; /* Hidden in icon-only mode; can be shown in expanded nav */
+            }
+
+            /* Context indicator dot */
+            .context-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                margin-top: 4px;
+                transition: background 0.2s ease;
+            }
+
+            .context-dot.global {
+                background: var(--fb-accent, #6366f1);
+            }
+
+            .context-dot.project {
+                background: #22c55e;
             }
 
             /* Logo styles */
@@ -251,6 +269,7 @@ export class FBLeftNav extends FBElement {
     ];
 
     @state() private _projectId: string | null = null;
+    @state() private _scope: ContextScope = 'global';
     @state() private _currentView = 'home';
     @property({ type: String, attribute: 'user-name' }) userName = '';
     @property({ type: String, attribute: 'user-role' }) userRole = '';
@@ -264,7 +283,9 @@ export class FBLeftNav extends FBElement {
 
         this._disposeEffects.push(
             effect(() => {
-                this._projectId = store.activeProjectId$.value;
+                const ctx = store.contextState$.value;
+                this._scope = ctx.scope;
+                this._projectId = ctx.projectId;
             })
         );
 
@@ -316,30 +337,17 @@ export class FBLeftNav extends FBElement {
     };
 
     private _navigate(view: string) {
-        // let path = '/'; // unused
         const pid = this._projectId;
 
-        switch (view) {
-            case 'feed':
-                break;
-            case 'schedule':
-                break;
-            case 'budget':
-                break;
-            case 'chat':
-                break;
-            case 'contacts':
-                break;
-        }
-
-        // Map to fb-app-shell expected views
-        if (pid) {
+        // Sprint 1.2: Branch on explicit scope, not projectId truthiness
+        if (this._scope === 'project' && pid) {
             switch (view) {
                 case 'feed': this.emit('fb-navigate', { view: 'project', projectId: pid }); break;
                 case 'schedule': this.emit('fb-navigate', { view: 'project-schedule', projectId: pid }); break;
                 case 'chat': this.emit('fb-navigate', { view: 'project-chat', projectId: pid }); break;
                 case 'budget': this.emit('fb-navigate', { view: 'project-budget', projectId: pid }); break;
                 case 'contacts': this.emit('fb-navigate', { view: 'project-contacts', projectId: pid }); break;
+                default: this.emit('fb-navigate', { view: 'project', projectId: pid });
             }
         } else {
             switch (view) {
@@ -397,14 +405,15 @@ export class FBLeftNav extends FBElement {
                         <path d="M50 50 L40 56 L40 68 L50 74 L60 68 L60 56 Z" fill="currentColor"/>
                     </svg>
                 </div>
+                <div class="context-dot ${this._scope}"></div>
             </div>
 
             <div class="nav-group">
                 <button 
                     class="nav-item ${this._currentView === 'feed' ? 'active' : ''}"
                     @click=${() => this._navigate('feed')}
-                    aria-label="Daily Focus"
-                    title="Daily Focus"
+                    aria-label=${this._scope === 'project' ? 'Project Focus' : 'Daily Focus'}
+                    title=${this._scope === 'project' ? 'Project Focus' : 'Daily Focus'}
                 >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -426,8 +435,8 @@ export class FBLeftNav extends FBElement {
                 <button 
                     class="nav-item ${this._currentView === 'schedule' ? 'active' : ''}"
                     @click=${() => this._navigate('schedule')}
-                    aria-label="Schedule"
-                    title="Schedule"
+                    aria-label=${this._scope === 'project' ? 'Project Schedule' : 'All Schedules'}
+                    title=${this._scope === 'project' ? 'Project Schedule' : 'All Schedules'}
                 >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -440,8 +449,8 @@ export class FBLeftNav extends FBElement {
                 <button 
                     class="nav-item ${this._currentView === 'budget' ? 'active' : ''}"
                     @click=${() => this._navigate('budget')}
-                    aria-label="Budget"
-                    title="Budget"
+                    aria-label=${this._scope === 'project' ? 'Project Budget' : 'Company Budget'}
+                    title=${this._scope === 'project' ? 'Project Budget' : 'Company Budget'}
                 >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="1" x2="12" y2="23"/>

@@ -21,8 +21,8 @@ The central architectural shift: moving from page-based to **Context-Based** nav
 | Epic | Sprint | Spec File | Status | Notes |
 |------|--------|-----------|--------|-------|
 | 1: Context Neural Network | 1.1: Global Store & Router State | [sprint-1-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-1-1-context-spine.md) | ✅ Complete | Done |
-| 1: Context Neural Network | 1.2: Adaptive Navigation | [sprint-1-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-1-2-adaptive-navigation.md) | 🟡 Spec Ready | Depends on 1.1 |
-| 2: Interrogator Gate | 2.1: Vision Pipeline | [sprint-2-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-2-1-vision-pipeline.md) | 🟡 Spec Ready | Can parallel with EPIC 1 |
+| 1: Context Neural Network | 1.2: Adaptive Navigation | [sprint-1-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-1-2-adaptive-navigation.md) | ✅ Complete | Done |
+| 2: Interrogator Gate | 2.1: Vision Pipeline | [sprint-2-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-2-1-vision-pipeline.md) | ✅ Complete | Can parallel with EPIC 1 |
 | 2: Interrogator Gate | 2.2: Interrogator Interface | [sprint-2-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-2-2-interrogator-interface.md) | 🟡 Spec Ready | Depends on 2.1 |
 | 2: Interrogator Gate | 2.3: Physics Trigger | [sprint-2-3](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-2-3-physics-trigger.md) | 🟡 Spec Ready | Depends on 2.2 |
 | 3: Intelligent Artifacts | 3.1: Invoice Diff View | [sprint-3-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-3-1-invoice-diff-view.md) | 🟡 Spec Ready | Depends on 2.1 |

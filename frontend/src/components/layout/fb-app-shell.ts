@@ -67,6 +67,7 @@ type Route =
     | { view: 'project'; projectId: string }
     | { view: 'project-chat'; projectId: string; threadId?: string }
     | { view: 'project-schedule'; projectId: string }
+    | { view: 'project-budget'; projectId: string }
     | { view: 'settings-profile' }
     | { view: 'settings-org' }
     | { view: 'settings-team' }
@@ -107,6 +108,12 @@ function matchRoute(path: string): Route {
     const scheduleMatch = path.match(/^\/project\/([^/]+)\/schedule$/);
     if (scheduleMatch) {
         return { view: 'project-schedule', projectId: scheduleMatch[1] ?? '' };
+    }
+
+    // /project/:id/budget (Sprint 1.2)
+    const budgetMatch = path.match(/^\/project\/([^/]+)\/budget$/);
+    if (budgetMatch) {
+        return { view: 'project-budget', projectId: budgetMatch[1] ?? '' };
     }
 
     // /project/:id
@@ -459,7 +466,8 @@ export class FBAppShell extends FBElement {
         if (
             this._route.view === 'project' ||
             this._route.view === 'project-chat' ||
-            this._route.view === 'project-schedule'
+            this._route.view === 'project-schedule' ||
+            this._route.view === 'project-budget'
         ) {
             const projectId = (this._route as { projectId: string }).projectId;
             // Only update if changed to avoid loops/redundancy
@@ -538,6 +546,9 @@ export class FBAppShell extends FBElement {
 
             case 'project-schedule':
                 if (projectId) this._navigate(`/project/${projectId}/schedule`);
+                break;
+            case 'project-budget':
+                if (projectId) this._navigate(`/project/${projectId}/budget`);
                 break;
             case 'settings-profile':
                 this._navigate('/settings/profile');
@@ -682,6 +693,21 @@ export class FBAppShell extends FBElement {
                         active-tab="schedule"
                     ></fb-project-header>
                     <fb-view-schedule></fb-view-schedule>
+                `;
+            }
+
+            case 'project-budget': {
+                const route = this._route as { projectId: string };
+                const project = this._projects.find((p) => p.id === route.projectId);
+                return html`
+                    <fb-project-header
+                        .projectId=${route.projectId}
+                        .name=${project?.name ?? 'Loading...'}
+                        .status=${(project?.status as any) ?? 'active'}
+                        .completion=${0}
+                        active-tab="budget"
+                    ></fb-project-header>
+                    <fb-view-budget></fb-view-budget>
                 `;
             }
 
