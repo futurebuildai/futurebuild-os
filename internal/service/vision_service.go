@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/prompts"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -29,6 +32,178 @@ func NewVisionService(client ai.Client) *VisionService {
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// confidenceWarningThreshold is the threshold below which a field is flagged
+// with a warning for user verification. Matches frontend's < 0.8 threshold
+// in onboarding-store.ts fieldsNeedingVerification.
+const confidenceWarningThreshold = 0.8
+
+// ParseDocument extracts structured construction data from uploaded plan files.
+// Sprint 2.1 Task 2.1.1: Standalone extraction endpoint for the Vision Pipeline.
+// Returns a VisionExtractionResponse with extracted values, ConfidenceReport, and long-lead items.
+func (s *VisionService) ParseDocument(ctx context.Context, fileBytes []byte, mimeType string) (*models.VisionExtractionResponse, error) {
+	prompt := prompts.BlueprintExtractionPrompt()
+
+	slog.Info("vision: parsing document",
+		"mime_type", mimeType,
+		"file_size", len(fileBytes),
+	)
+
+	// Create multimodal request with the uploaded file
+	req := ai.NewMultimodalRequest(ai.ModelTypeFlash, prompt, fileBytes, mimeType)
+	req.ReturnLogprobs = true
+
+	result, err := s.client.GenerateContent(ctx, req)
+	if err != nil {
+		slog.Error("vision: extraction failed", "error", err.Error())
+		return nil, fmt.Errorf("AI extraction failed: %w", err)
+	}
+
+	// Strip markdown code block wrappers if present
+	jsonText := strings.TrimSpace(result.Text)
+	jsonText = strings.TrimPrefix(jsonText, "```json")
+	jsonText = strings.TrimPrefix(jsonText, "```")
+	jsonText = strings.TrimSuffix(jsonText, "```")
+	jsonText = strings.TrimSpace(jsonText)
+
+	// Parse JSON response (same structure as BlueprintExtractionPrompt output)
+	var extraction struct {
+		Name           string  `json:"name"`
+		Address        string  `json:"address"`
+		SquareFootage  float64 `json:"square_footage"`
+		FoundationType string  `json:"foundation_type"`
+		Stories        int     `json:"stories"`
+		Bedrooms       int     `json:"bedrooms"`
+		Bathrooms      int     `json:"bathrooms"`
+		LongLeadItems  []struct {
+			Name     string `json:"name"`
+			Brand    string `json:"brand"`
+			Model    string `json:"model"`
+			Category string `json:"category"`
+			Notes    string `json:"notes"`
+		} `json:"long_lead_items"`
+		Confidence map[string]float64 `json:"confidence"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonText), &extraction); err != nil {
+		return nil, fmt.Errorf("failed to parse extraction result: %w", err)
+	}
+
+	// Build extracted values map (only non-empty fields)
+	values := make(map[string]any)
+	if extraction.Name != "" {
+		values["name"] = extraction.Name
+	}
+	if extraction.Address != "" {
+		values["address"] = extraction.Address
+	}
+	if extraction.SquareFootage > 0 {
+		values["square_footage"] = extraction.SquareFootage
+	}
+	if extraction.FoundationType != "" {
+		values["foundation_type"] = extraction.FoundationType
+	}
+	if extraction.Stories > 0 {
+		values["stories"] = extraction.Stories
+	}
+	if extraction.Bedrooms > 0 {
+		values["bedrooms"] = extraction.Bedrooms
+	}
+	if extraction.Bathrooms > 0 {
+		values["bathrooms"] = extraction.Bathrooms
+	}
+
+	// Compute ConfidenceReport
+	fieldConfidences := extraction.Confidence
+	if fieldConfidences == nil {
+		fieldConfidences = make(map[string]float64)
+	}
+
+	var warnings []string
+	var suggestedQuestions []string
+
+	// Generate warnings and questions for low-confidence or missing fields
+	priorityFields := models.GetPriorityFields()
+	for _, pf := range priorityFields {
+		conf, hasConf := fieldConfidences[pf.Field]
+		_, hasValue := values[pf.Field]
+
+		if !hasValue {
+			warnings = append(warnings, fmt.Sprintf("Field '%s' could not be extracted from the document", pf.Field))
+			suggestedQuestions = append(suggestedQuestions, pf.Question)
+		} else if hasConf && conf < confidenceWarningThreshold {
+			warnings = append(warnings, fmt.Sprintf("Field '%s' has low confidence (%.0f%%)", pf.Field, conf*100))
+			suggestedQuestions = append(suggestedQuestions, pf.Question)
+		}
+	}
+
+	// Calculate overall confidence
+	overallConfidence := 0.0
+	if len(fieldConfidences) > 0 {
+		sum := 0.0
+		for _, c := range fieldConfidences {
+			sum += c
+		}
+		overallConfidence = sum / float64(len(fieldConfidences))
+	}
+
+	// Enrich long-lead items with lead time estimates
+	var longLeadItems []models.LongLeadItem
+	if len(extraction.LongLeadItems) > 0 {
+		leadTimes := models.KnownBrandLeadTimes()
+		for _, item := range extraction.LongLeadItems {
+			leadWeeks := estimateLeadTimeForVision(item.Brand, item.Category, leadTimes)
+			longLeadItems = append(longLeadItems, models.LongLeadItem{
+				Name:               item.Name,
+				Brand:              item.Brand,
+				Model:              item.Model,
+				Category:           item.Category,
+				EstimatedLeadWeeks: leadWeeks,
+				Notes:              item.Notes,
+			})
+		}
+	}
+
+	slog.Info("vision: extraction completed",
+		"extracted_fields", len(values),
+		"overall_confidence", overallConfidence,
+		"warnings", len(warnings),
+		"long_lead_items", len(longLeadItems),
+	)
+
+	return &models.VisionExtractionResponse{
+		ExtractedValues: values,
+		ConfidenceReport: models.ConfidenceReport{
+			OverallConfidence:  overallConfidence,
+			FieldConfidences:   fieldConfidences,
+			Warnings:           warnings,
+			SuggestedQuestions: suggestedQuestions,
+		},
+		LongLeadItems: longLeadItems,
+		RawText:       result.Text,
+	}, nil
+}
+
+// estimateLeadTimeForVision determines lead time for vision-extracted items.
+func estimateLeadTimeForVision(brand, category string, leadTimes map[string]int) int {
+	brandLower := strings.ToLower(strings.TrimSpace(brand))
+	if weeks, ok := leadTimes[brandLower]; ok {
+		return weeks
+	}
+	for key, weeks := range leadTimes {
+		if strings.Contains(brandLower, key) || strings.Contains(key, brandLower) {
+			return weeks
+		}
+	}
+	categoryDefaults := map[string]int{
+		"windows": 8, "doors": 6, "hvac": 4,
+		"appliances": 6, "millwork": 8, "finishes": 4,
+	}
+	if weeks, ok := categoryDefaults[strings.ToLower(category)]; ok {
+		return weeks
+	}
+	return 4
 }
 
 const visionPromptTemplate = `

@@ -10,7 +10,7 @@
 
 ### Task 2.1.1: Verify VisionService Parses Uploaded Plans
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - Backend: [vision_service.md](file:///home/colton/Desktop/FutureBuild_HQ/XUI/backend/shadow/internal/service/vision_service.md) — placeholder stub, no Go implementation found
@@ -48,7 +48,7 @@
 
 ### Task 2.1.2: Enhance DocumentHandler to Return `ConfidenceReport`
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [document_handler.md](file:///home/colton/Desktop/FutureBuild_HQ/XUI/backend/shadow/internal/api/handlers/document_handler.md) — placeholder stub

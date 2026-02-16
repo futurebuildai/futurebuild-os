@@ -63,6 +63,25 @@ type ExtractionResult struct {
 	LongLeadItems []LongLeadItem     `json:"long_lead_items,omitempty"`
 }
 
+// ConfidenceReport provides per-field confidence data so the frontend
+// can badge low-confidence fields for user verification.
+// Sprint 2.1 Task 2.1.2: Interrogator Gate — Onboarding Intelligence.
+type ConfidenceReport struct {
+	OverallConfidence  float64            `json:"overall_confidence"`
+	FieldConfidences   map[string]float64 `json:"field_confidences"`
+	Warnings           []string           `json:"warnings"`
+	SuggestedQuestions []string           `json:"suggested_questions"`
+}
+
+// VisionExtractionResponse is returned by the standalone POST /api/v1/vision/extract endpoint.
+// It wraps extracted values with a full ConfidenceReport for the frontend.
+type VisionExtractionResponse struct {
+	ExtractedValues  map[string]any   `json:"extracted_values"`
+	ConfidenceReport ConfidenceReport `json:"confidence_report"`
+	LongLeadItems    []LongLeadItem   `json:"long_lead_items,omitempty"`
+	RawText          string           `json:"raw_text,omitempty"`
+}
+
 // PhysicsFieldPriority defines extraction priority.
 // P0 = critical, P1 = important, P2 = helpful
 type PhysicsFieldPriority struct {

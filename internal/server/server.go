@@ -31,35 +31,36 @@ type Server struct {
 	DB     *pgxpool.Pool
 	Cfg    *config.Config
 
-	ProjectHandler  *handlers.ProjectHandler
-	TaskHandler     *handlers.TaskHandler
-	AuthHandler     *handlers.AuthHandler
-	DocumentHandler *handlers.DocumentHandler
-	ChatHandler       *handlers.ChatHandler       // See PRODUCTION_PLAN.md Step 43.5
-	WebhookHandler    *handlers.WebhookHandler    // See PRODUCTION_PLAN.md Step 48
-	FutureShadeHandler *handlers.FutureShadeHandler // See FUTURESHADE_INIT_specs.md
-	TribunalHandler    *handlers.TribunalHandler    // See SHADOW_VIEWER_specs.md
-	ShadowHandler      *handlers.ShadowHandler      // See SHADOW_VIEWER_specs.md
-	InviteHandler        *handlers.InviteHandler        // See LAUNCH_STRATEGY.md Task B2
-	UserHandler          *handlers.UserHandler          // See LAUNCH_PLAN.md User Profile Endpoint
+	ProjectHandler         *handlers.ProjectHandler
+	TaskHandler            *handlers.TaskHandler
+	AuthHandler            *handlers.AuthHandler
+	DocumentHandler        *handlers.DocumentHandler
+	ChatHandler            *handlers.ChatHandler            // See PRODUCTION_PLAN.md Step 43.5
+	WebhookHandler         *handlers.WebhookHandler         // See PRODUCTION_PLAN.md Step 48
+	FutureShadeHandler     *handlers.FutureShadeHandler     // See FUTURESHADE_INIT_specs.md
+	TribunalHandler        *handlers.TribunalHandler        // See SHADOW_VIEWER_specs.md
+	ShadowHandler          *handlers.ShadowHandler          // See SHADOW_VIEWER_specs.md
+	InviteHandler          *handlers.InviteHandler          // See LAUNCH_STRATEGY.md Task B2
+	UserHandler            *handlers.UserHandler            // See LAUNCH_PLAN.md User Profile Endpoint
 	PortalHandler          *handlers.PortalHandler          // See LAUNCH_PLAN.md P2: Field Portal
 	PortalAuthHandler      *handlers.PortalAuthHandler      // Phase 12: Portal magic-link auth (separate from Clerk)
 	PortalDashboardHandler *handlers.PortalDashboardHandler // Portal Dashboard API: authenticated contact endpoints
-	GitHubWebhookHandler *handlers.GitHubWebhookHandler // See docs/AUTOMATED_PR_REVIEW_PRD.md
-	ClerkWebhookHandler  *handlers.ClerkWebhookHandler  // See PHASE_12_PRD.md Step 80
-	OnboardingHandler    *handlers.OnboardingHandler    // See PHASE_11_PRD.md Step 75: The Interrogator Agent
-	InvoiceHandler       *handlers.InvoiceHandler       // See PHASE_13_PRD.md Step 82: Interactive Invoice
-	AssetHandler         *handlers.AssetHandler         // See STEP_84_FIELD_FEEDBACK.md: Vision status
-	ConfigHandler        *handlers.ConfigHandler        // See STEP_87_CONFIG_PERSISTENCE.md: Physics settings
-	ScheduleHandler      *handlers.ScheduleHandler      // Phase 14: Gantt schedule data endpoint
-	ThreadHandler        *handlers.ThreadHandler        // Thread support: conversation threads
-	CompletionHandler    *handlers.CompletionHandler    // Project Completion: complete + report
-	ReadinessHandler     *handlers.ReadinessHandler     // Integration readiness checks
-	FeedHandler          *handlers.FeedHandler          // V2: Portfolio feed endpoint
-	ContactHandler       *handlers.ContactHandler       // V2: Contact CRUD + assignments
-	AuthMiddleware       *middleware.AuthMiddleware
-	PortalRateLimiter    *middleware.IPRateLimiter       // Phase 12: Rate limiter for portal auth endpoints
-	PublicRateLimiter    *middleware.IPRateLimiter       // L7: Rate limiter for public invite/portal action endpoints
+	GitHubWebhookHandler   *handlers.GitHubWebhookHandler   // See docs/AUTOMATED_PR_REVIEW_PRD.md
+	ClerkWebhookHandler    *handlers.ClerkWebhookHandler    // See PHASE_12_PRD.md Step 80
+	OnboardingHandler      *handlers.OnboardingHandler      // See PHASE_11_PRD.md Step 75: The Interrogator Agent
+	InvoiceHandler         *handlers.InvoiceHandler         // See PHASE_13_PRD.md Step 82: Interactive Invoice
+	AssetHandler           *handlers.AssetHandler           // See STEP_84_FIELD_FEEDBACK.md: Vision status
+	ConfigHandler          *handlers.ConfigHandler          // See STEP_87_CONFIG_PERSISTENCE.md: Physics settings
+	ScheduleHandler        *handlers.ScheduleHandler        // Phase 14: Gantt schedule data endpoint
+	ThreadHandler          *handlers.ThreadHandler          // Thread support: conversation threads
+	CompletionHandler      *handlers.CompletionHandler      // Project Completion: complete + report
+	ReadinessHandler       *handlers.ReadinessHandler       // Integration readiness checks
+	FeedHandler            *handlers.FeedHandler            // V2: Portfolio feed endpoint
+	ContactHandler         *handlers.ContactHandler         // V2: Contact CRUD + assignments
+	VisionHandler          *handlers.VisionHandler          // Sprint 2.1: Vision Pipeline extract endpoint
+	AuthMiddleware         *middleware.AuthMiddleware
+	PortalRateLimiter      *middleware.IPRateLimiter // Phase 12: Rate limiter for portal auth endpoints
+	PublicRateLimiter      *middleware.IPRateLimiter // L7: Rate limiter for public invite/portal action endpoints
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -159,9 +160,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// VisionService is optional - pass nil if AI client not configured
 	// Technical Debt Remediation (P2): Uses adapters package for cleaner separation
 	var visionVerifier agents.InboundVisionVerifier
+	var visionHandler *handlers.VisionHandler
 	if aiClient != nil {
 		visionService := service.NewVisionService(aiClient)
 		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
+		visionHandler = handlers.NewVisionHandler(visionService, db) // Sprint 2.1: Vision Pipeline
 	}
 
 	// V2: Portfolio feed service (created early for agent injection)
@@ -265,7 +268,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 			readiness.NewResendProbe(cfg.ResendAPIKey),
 			readiness.NewTwilioProbe(cfg.TwilioAccountSID, cfg.TwilioAuthToken),
 		)
-	// default: no notification probes for console mode
+		// default: no notification probes for console mode
 	}
 
 	readinessService := readiness.NewService(15*time.Second, readinessCheckers...)
@@ -280,38 +283,39 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	}
 
 	s := &Server{
-		Router:          chi.NewRouter(),
-		DB:              db,
-		Cfg:             cfg,
-		ProjectHandler:  projectHandler,
-		TaskHandler:     taskHandler,
-		AuthHandler:     authHandler,
-		DocumentHandler: documentHandler,
-		ChatHandler:        chatHandler,        // See PRODUCTION_PLAN.md Step 43.5
-		WebhookHandler:     webhookHandler,     // See PRODUCTION_PLAN.md Step 48
-		FutureShadeHandler: futureShadeHandler, // See FUTURESHADE_INIT_specs.md
-		TribunalHandler:    tribunalHandler,    // See SHADOW_VIEWER_specs.md
-		ShadowHandler:      shadowHandler,      // See SHADOW_VIEWER_specs.md
-		InviteHandler:        inviteHandler,        // See LAUNCH_STRATEGY.md Task B2
-		UserHandler:          userHandler,          // See LAUNCH_PLAN.md User Profile Endpoint
+		Router:                 chi.NewRouter(),
+		DB:                     db,
+		Cfg:                    cfg,
+		ProjectHandler:         projectHandler,
+		TaskHandler:            taskHandler,
+		AuthHandler:            authHandler,
+		DocumentHandler:        documentHandler,
+		ChatHandler:            chatHandler,            // See PRODUCTION_PLAN.md Step 43.5
+		WebhookHandler:         webhookHandler,         // See PRODUCTION_PLAN.md Step 48
+		FutureShadeHandler:     futureShadeHandler,     // See FUTURESHADE_INIT_specs.md
+		TribunalHandler:        tribunalHandler,        // See SHADOW_VIEWER_specs.md
+		ShadowHandler:          shadowHandler,          // See SHADOW_VIEWER_specs.md
+		InviteHandler:          inviteHandler,          // See LAUNCH_STRATEGY.md Task B2
+		UserHandler:            userHandler,            // See LAUNCH_PLAN.md User Profile Endpoint
 		PortalHandler:          portalHandler,          // See LAUNCH_PLAN.md P2: Field Portal
 		PortalAuthHandler:      portalAuthHandler,      // Phase 12: Portal magic-link auth
 		PortalDashboardHandler: portalDashboardHandler, // Portal Dashboard API
-		GitHubWebhookHandler: githubWebhookHandler, // See docs/AUTOMATED_PR_REVIEW_PRD.md
-		ClerkWebhookHandler:  clerkWebhookHandler,  // See PHASE_12_PRD.md Step 80
-		OnboardingHandler:    onboardingHandler,    // See PHASE_11_PRD.md Step 75
-		InvoiceHandler:       invoiceHandler,       // See PHASE_13_PRD.md Step 82
-		AssetHandler:         assetHandler,         // See STEP_84_FIELD_FEEDBACK.md
-		ConfigHandler:        configHandler,        // See STEP_87_CONFIG_PERSISTENCE.md
-		ScheduleHandler:      scheduleHandler,      // Phase 14: Gantt schedule data
-		ThreadHandler:        threadHandler,        // Thread support
-		CompletionHandler:    completionHandler,    // Project Completion
-		ReadinessHandler:     readinessHandler,     // Integration readiness checks
-		FeedHandler:          feedHandler,          // V2: Portfolio feed
-		ContactHandler:       contactHandler,       // V2: Contact CRUD + assignments
-		AuthMiddleware:       authMiddleware,
-		PortalRateLimiter:    portalRateLimiter,
-		PublicRateLimiter:    publicRateLimiter,
+		GitHubWebhookHandler:   githubWebhookHandler,   // See docs/AUTOMATED_PR_REVIEW_PRD.md
+		ClerkWebhookHandler:    clerkWebhookHandler,    // See PHASE_12_PRD.md Step 80
+		OnboardingHandler:      onboardingHandler,      // See PHASE_11_PRD.md Step 75
+		InvoiceHandler:         invoiceHandler,         // See PHASE_13_PRD.md Step 82
+		AssetHandler:           assetHandler,           // See STEP_84_FIELD_FEEDBACK.md
+		ConfigHandler:          configHandler,          // See STEP_87_CONFIG_PERSISTENCE.md
+		ScheduleHandler:        scheduleHandler,        // Phase 14: Gantt schedule data
+		ThreadHandler:          threadHandler,          // Thread support
+		CompletionHandler:      completionHandler,      // Project Completion
+		ReadinessHandler:       readinessHandler,       // Integration readiness checks
+		FeedHandler:            feedHandler,            // V2: Portfolio feed
+		ContactHandler:         contactHandler,         // V2: Contact CRUD + assignments
+		VisionHandler:          visionHandler,          // Sprint 2.1: Vision Pipeline extract
+		AuthMiddleware:         authMiddleware,
+		PortalRateLimiter:      portalRateLimiter,
+		PublicRateLimiter:      publicRateLimiter,
 	}
 
 	s.routes()
@@ -337,7 +341,7 @@ func (s *Server) routes() {
 		// Public endpoints for accepting invitations (L7: rate-limited)
 		r.Route("/invites", func(r chi.Router) {
 			r.Use(middleware.RateLimit(s.PublicRateLimiter))
-			r.Get("/info", s.InviteHandler.GetInviteInfo) // Public: get invite info by token
+			r.Get("/info", s.InviteHandler.GetInviteInfo)   // Public: get invite info by token
 			r.Post("/accept", s.InviteHandler.AcceptInvite) // Public: accept invite and create account
 		})
 
@@ -485,6 +489,10 @@ func (s *Server) routes() {
 		r.Route("/vision", func(r chi.Router) {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/status/{id}", s.AssetHandler.GetVisionStatus)
+			// Sprint 2.1: Vision Pipeline — standalone document extraction
+			if s.VisionHandler != nil {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeDocumentWrite)).Post("/extract", s.VisionHandler.ExtractDocument)
+			}
 		})
 
 		// See PHASE_13_PRD.md Steps 82-83: Invoice CRUD + Approval
