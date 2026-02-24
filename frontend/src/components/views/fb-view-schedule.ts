@@ -331,7 +331,7 @@ export class FBViewSchedule extends FBViewElement {
         super.connectedCallback();
         this._disposeEffects.push(
             effect(() => {
-                const pid = store.activeProjectId$.value;
+                const pid = store.contextProjectId$.value;
                 if (pid && pid !== this._projectId) {
                     this._projectId = pid;
                     void this._loadSchedule(pid);

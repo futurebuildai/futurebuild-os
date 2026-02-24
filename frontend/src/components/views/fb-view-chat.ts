@@ -129,7 +129,7 @@ export class FBViewChat extends FBViewElement {
                 this._isMobile = store.isMobile$.value;
             }),
             effect(() => {
-                this._projectId = store.activeProjectId$.value;
+                this._projectId = store.contextProjectId$.value;
             }),
             effect(() => {
                 const threadId = store.activeThreadId$.value;

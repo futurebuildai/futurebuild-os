@@ -178,7 +178,7 @@ export class FBMobileNav extends FBElement {
 
         // Determine the actual path based on active project context
         let path = defaultPath;
-        const activeProject = store.activeProjectId$.value;
+        const activeProject = store.contextProjectId$.value;
         if (tabId === 'projects' && activeProject) {
             path = `/project/${activeProject}`;
         } else if (tabId === 'chat' && activeProject) {
@@ -209,8 +209,8 @@ export class FBMobileNav extends FBElement {
         return html`
             <nav aria-label="Mobile navigation" role="navigation">
                 ${TABS.map((tab) => {
-                    const isActive = tab.match(this._activePath);
-                    return html`
+            const isActive = tab.match(this._activePath);
+            return html`
                         <button
                             class="tab ${isActive ? 'active' : ''}"
                             @click=${(): void => { this._navigate(tab.id, tab.path); }}
@@ -225,7 +225,7 @@ export class FBMobileNav extends FBElement {
                             <span class="tab-label">${tab.label}</span>
                         </button>
                     `;
-                })}
+        })}
             </nav>
         `;
     }

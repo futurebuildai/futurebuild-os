@@ -212,6 +212,9 @@ const actions: StoreActions = {
         _user$.value = null;
         _token$.value = null;
         _activeProjectId$.value = null;
+        // Sprint 1.1: Reset context on logout
+        _contextScope$.value = 'global';
+        _contextProjectId$.value = null;
         _activeThreadId$.value = null;
         _currentProjectDetail$.value = null;
         _messages$.value = [];
@@ -242,6 +245,16 @@ const actions: StoreActions = {
     // ---- Context Actions (Sprint 1.1: Context Spine) ----
 
     setContext(scope: ContextScope, projectId: string | null): void {
+        // Invariant: global scope must have null projectId
+        if (scope === 'global' && projectId !== null) {
+            console.warn('[Store] setContext: global scope should have null projectId, auto-correcting');
+            projectId = null;
+        }
+        // Invariant: project scope must have a valid projectId
+        if (scope === 'project' && !projectId) {
+            console.warn('[Store] setContext: project scope requires a projectId, rejecting');
+            return;
+        }
         _contextScope$.value = scope;
         _contextProjectId$.value = projectId;
         // Sync the legacy activeProjectId for backward compat

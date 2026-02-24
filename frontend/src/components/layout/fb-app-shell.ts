@@ -471,7 +471,7 @@ export class FBAppShell extends FBElement {
         ) {
             const projectId = (this._route as { projectId: string }).projectId;
             // Only update if changed to avoid loops/redundancy
-            if (store.activeProjectId$.value !== projectId) {
+            if (store.contextProjectId$.value !== projectId) {
                 store.actions.setContext('project', projectId);
             }
         } else if (queryProjectId) {
@@ -771,7 +771,7 @@ export class FBAppShell extends FBElement {
             <div class="app-grid">
                 <fb-top-bar
                     .projects=${this._projects}
-                    .activeFilter=${store.activeProjectId$.value}
+                    .activeFilter=${store.contextProjectId$.value}
                     user-name=${this._userName}
                     user-role=${this._userRole}
                     @fb-filter-change=${this._handleFilterChange}
