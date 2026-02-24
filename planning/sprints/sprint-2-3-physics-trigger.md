@@ -10,7 +10,7 @@
 
 ### Task 2.3.1: Implement the Interrogator Gate
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Concept:** The "Generate Schedule" button is disabled until `InterrogatorAgent` returns `status: SATISFIED`. This creates the "Expert Partner" feel — the AI validates that it has enough information before committing.
 
@@ -51,7 +51,7 @@
 
 ### Task 2.3.2: Connect ScheduleService to CPM Engine
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - Backend: [cpm.md](file:///home/colton/Desktop/FutureBuild_HQ/XUI/backend/shadow/internal/physics/cpm.md) — placeholder stub, no Go implementation

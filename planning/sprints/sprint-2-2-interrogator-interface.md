@@ -10,7 +10,7 @@
 
 ### Task 2.2.1: Implement the "Split Screen" Wizard
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Target File:** `frontend/src/components/features/onboarding/fb-engine-calibration.ts` [NEW]
 
@@ -64,7 +64,7 @@
 
 ### Task 2.2.2: Wire "Answer" Input to InterrogatorService
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - Backend [interrogator_service.md](file:///home/colton/Desktop/FutureBuild_HQ/XUI/backend/shadow/internal/service/interrogator_service.md) documents the flow:

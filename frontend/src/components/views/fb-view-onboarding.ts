@@ -12,6 +12,7 @@
 import { html, css, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
+import { SignalWatcher } from '@lit-labs/preact-signals';
 import { FBViewElement } from '../base/FBViewElement';
 import { api } from '../../services/api';
 import type { CreateProjectRequest } from '../../services/api';
@@ -20,14 +21,17 @@ import type { ProjectSummary } from '../../store/types';
 import {
     onboardingValues,
     resetOnboarding,
+    uploadedPdfUrl,
+    hasDocumentUploaded,
 } from '../../store/onboarding-store';
 
 import '../features/onboarding/fb-onboarding-chat';
 import '../features/onboarding/fb-onboarding-steps';
 import '../features/onboarding/fb-engine-calibration';
+import '../features/onboarding/fb-interrogator-wizard';
 
 @customElement('fb-view-onboarding')
-export class FBViewOnboarding extends FBViewElement {
+export class FBViewOnboarding extends SignalWatcher(FBViewElement) {
     static override styles = [
         FBViewElement.styles,
         css`
@@ -90,6 +94,11 @@ export class FBViewOnboarding extends FBViewElement {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
+                overflow: hidden;
+            }
+
+            fb-interrogator-wizard {
+                flex: 1;
                 overflow: hidden;
             }
         `
@@ -205,6 +214,8 @@ export class FBViewOnboarding extends FBViewElement {
             `;
         }
 
+        const showWizard = hasDocumentUploaded.value && uploadedPdfUrl.value;
+
         return html`
             <div class="wizard-header">
                 <span class="wizard-title">New Project</span>
@@ -221,11 +232,17 @@ export class FBViewOnboarding extends FBViewElement {
             </div>
             <fb-onboarding-steps></fb-onboarding-steps>
             <div class="wizard-body">
-                <div class="panel-chat">
-                    <fb-onboarding-chat
+                ${showWizard ? html`
+                    <fb-interrogator-wizard
                         @project-created=${(e: CustomEvent<{ projectId: string }>): void => { void this._handleProjectCreated(e); }}
-                    ></fb-onboarding-chat>
-                </div>
+                    ></fb-interrogator-wizard>
+                ` : html`
+                    <div class="panel-chat">
+                        <fb-onboarding-chat
+                            @project-created=${(e: CustomEvent<{ projectId: string }>): void => { void this._handleProjectCreated(e); }}
+                        ></fb-onboarding-chat>
+                    </div>
+                `}
             </div>
         `;
     }

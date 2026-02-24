@@ -23,7 +23,8 @@
         "@types/dompurify": "^3.0.5",
         "dompurify": "^3.3.1",
         "lit": "^3.1.2",
-        "marked": "^17.0.1"
+        "marked": "^17.0.1",
+        "pdfjs-dist": "^5.4.624"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",

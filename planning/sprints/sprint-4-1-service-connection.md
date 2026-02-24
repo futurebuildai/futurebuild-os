@@ -10,7 +10,7 @@
 
 ### Task 4.1.1: Delete `mock-financial-service.ts`
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [mock-financial-service.ts](file:///home/colton/Desktop/FutureBuild_HQ/XUI/frontend/src/services/mock-financial-service.ts) — provides `FinancialSummary` with static data
@@ -27,7 +27,7 @@
 
 ### Task 4.1.2: Wire `fb-view-budget.ts` to Backend Financial Handler
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - `fb-view-budget.ts` calls `mockFinancialService.getSummary('p1')` (hardcoded project ID)
@@ -86,7 +86,7 @@
 
 ### Task 4.1.3: Dynamic "Budget vs. Actual" from Approved Invoices
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Concept:** The "Total Spend" number must be derived from the sum of approved invoices in the database, not hardcoded.
 

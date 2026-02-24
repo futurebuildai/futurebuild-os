@@ -14,6 +14,7 @@
  */
 
 import { get, post, put, del } from './http';
+import type { CorrectionEvent } from '../types/corrections';
 import type { GanttData, Contact, CreateContactRequest, CreateContactResponse, BulkCreateContactsResponse, AssignmentRow, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
@@ -126,6 +127,8 @@ export interface OnboardProcessResponse {
     clarifying_question?: string;
     ready_to_create: boolean;
     next_priority_field?: string;
+    /** Interrogator gate status. Controls when schedule generation is allowed. */
+    status?: 'gathering' | 'clarifying' | 'satisfied' | 'error';
 }
 
 // ============================================================================
@@ -373,6 +376,15 @@ export const api = {
          */
         recalculate(projectId: string): Promise<GanttData> {
             return post<GanttData>(`/projects/${projectId}/schedule/recalculate`);
+        },
+
+        /**
+         * Generate a new schedule from Interrogator extraction data.
+         * Triggers CPM calculation on the backend.
+         * @param projectId - Project UUID
+         */
+        generate(projectId: string): Promise<GanttData> {
+            return post<GanttData>(`/projects/${projectId}/schedule/generate`);
         },
     },
 
@@ -769,6 +781,43 @@ export const api = {
             return get<CompletionReport>(`/projects/${projectId}/completion-report`);
         },
     },
+
+    /**
+     * Correction event endpoints (Sprint 3.2: Interactive Learning).
+     * Captures user corrections to AI-extracted artifact fields for model improvement.
+     */
+    corrections: {
+        /**
+         * Batch submit correction events. Fire-and-forget — callers should
+         * not block on this and should catch errors silently.
+         * @param events - Array of correction events to log
+         */
+        submit(events: CorrectionEvent[]): Promise<void> {
+            return post<void>('/corrections', { events });
+        },
+    },
+
+    /**
+     * Financial summary endpoints (Sprint 4.1: Service Connection).
+     * Replaces mock-financial-service.ts with live backend API.
+     * Spend is derived from SUM(total_cents) of approved invoices.
+     */
+    financials: {
+        /**
+         * Get financial summary for a specific project.
+         * @param projectId - Project UUID
+         */
+        getSummary(projectId: string): Promise<FinancialSummary> {
+            return get<FinancialSummary>(`/projects/${projectId}/financials/summary`);
+        },
+
+        /**
+         * Get global financial summary aggregated across all projects.
+         */
+        getGlobalSummary(): Promise<FinancialSummary> {
+            return get<FinancialSummary>('/financials/summary');
+        },
+    },
 } as const;
 
 // ============================================================================
@@ -894,6 +943,35 @@ export interface UpdatePhysicsRequest {
     speed_multiplier: number;
     work_days: number[];
     apply_to_existing?: boolean;
+}
+
+// ============================================================================
+// Financial Types (Sprint 4.1: Service Connection)
+// ============================================================================
+
+/**
+ * Category-level financial summary.
+ * Matches Go FinancialCategorySummary.
+ */
+export interface FinancialCategorySummary {
+    name: string;
+    budget: number;
+    spend: number;
+    status: 'on_track' | 'at_risk' | 'over_budget';
+}
+
+/**
+ * Financial summary response.
+ * Matches Go FinancialSummary. Spend is derived from SUM of approved invoices.
+ * See Sprint 4.1 Task 4.1.3.
+ */
+export interface FinancialSummary {
+    project_id?: string;
+    budget_total: number;
+    spend_total: number;
+    variance: number;
+    last_updated: string;
+    categories: FinancialCategorySummary[];
 }
 
 // ============================================================================

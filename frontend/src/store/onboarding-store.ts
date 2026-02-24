@@ -13,6 +13,12 @@ import type { CreateProjectRequest, LongLeadItem } from '../services/api';
 // Types
 // ============================================================================
 
+/**
+ * Interrogator gate status. The "Generate Schedule" button is gated
+ * behind the AI returning 'satisfied'.
+ */
+export type InterrogatorStatus = 'gathering' | 'clarifying' | 'satisfied' | 'error';
+
 export interface OnboardingMessage {
     id: string;
     role: 'user' | 'assistant' | 'system';
@@ -28,6 +34,21 @@ export interface ExtractionCard {
 }
 
 export type FieldSource = 'user' | 'ai' | 'default';
+
+/**
+ * Bounding box for PDF extraction zone overlay.
+ * Coordinates are normalized (0-1) relative to the page dimensions.
+ */
+export interface BoundingBox {
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label?: string;
+    field?: string;
+    confidence?: number;
+}
 
 /**
  * Onboarding stages for horizontal progress bar.
@@ -80,6 +101,34 @@ export const extractedProcurement = signal<LongLeadItem[]>([]);
  * Whether a document has been uploaded in this session.
  */
 export const hasDocumentUploaded = signal<boolean>(false);
+
+/**
+ * Bounding box highlights for the PDF viewer overlay.
+ * Updated when AI references specific document regions.
+ */
+export const pdfHighlights = signal<BoundingBox[]>([]);
+
+/**
+ * Object URL of the uploaded PDF for the split-screen viewer.
+ */
+export const uploadedPdfUrl = signal<string>('');
+
+/**
+ * Whether the AI has determined enough data for schedule generation.
+ * Driven by the `ready_to_create` flag from POST /api/v1/agent/onboard.
+ * @deprecated Prefer `interrogatorStatus` for gate logic.
+ */
+export const readyToCreate = signal<boolean>(false);
+
+/**
+ * Interrogator gate status signal.
+ * Controls the "Generate Schedule" button state.
+ *  - 'gathering' → collecting initial project data
+ *  - 'clarifying' → AI has follow-up questions
+ *  - 'satisfied' → gate open, schedule generation allowed
+ *  - 'error' → validation failed
+ */
+export const interrogatorStatus = signal<InterrogatorStatus>('gathering');
 
 // ============================================================================
 // Computed Values
@@ -229,6 +278,10 @@ export function resetOnboarding(): void {
     recentlyUpdatedFields.value = new Set();
     extractedProcurement.value = [];
     hasDocumentUploaded.value = false;
+    pdfHighlights.value = [];
+    uploadedPdfUrl.value = '';
+    readyToCreate.value = false;
+    interrogatorStatus.value = 'gathering';
 }
 
 /**
@@ -243,4 +296,32 @@ export function setExtractedProcurement(items: LongLeadItem[]): void {
  */
 export function markDocumentUploaded(): void {
     hasDocumentUploaded.value = true;
+}
+
+/**
+ * Update PDF bounding box highlights for the split-screen viewer.
+ */
+export function updateHighlights(boxes: BoundingBox[]): void {
+    pdfHighlights.value = boxes;
+}
+
+/**
+ * Set the uploaded PDF's object URL for the viewer.
+ */
+export function setUploadedPdfUrl(url: string): void {
+    uploadedPdfUrl.value = url;
+}
+
+/**
+ * Set the ready-to-create flag from the AI response.
+ */
+export function setReadyToCreate(ready: boolean): void {
+    readyToCreate.value = ready;
+}
+
+/**
+ * Set the interrogator gate status from the AI response.
+ */
+export function setInterrogatorStatus(status: InterrogatorStatus): void {
+    interrogatorStatus.value = status;
 }

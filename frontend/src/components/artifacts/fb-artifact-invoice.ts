@@ -1,10 +1,15 @@
 import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
-import { InvoiceArtifactData } from '../../types/artifacts';
+import { InvoiceArtifactData, InvoiceFieldConfidence } from '../../types/artifacts';
 import { InvoiceStatus } from '../../types/enums';
 import { api } from '../../services/api';
+import type { CorrectionEvent } from '../../types/corrections';
 import './fb-artifact-actions'; // Register <fb-artifact-actions>
+import './fb-field-provenance'; // Register <fb-field-provenance>
+
+/** Confidence threshold — fields below this are highlighted (Sprint 3.1) */
+const CONFIDENCE_THRESHOLD = 0.85;
 
 /**
  * Draft line item for local editing state.
@@ -260,6 +265,54 @@ export class FBArtifactInvoice extends FBElement {
                 font-size: 11px;
                 margin-top: 4px;
             }
+
+            /* ── Sprint 3.1: Confidence Highlighting ── */
+            .field--low-confidence {
+                background: rgba(245, 158, 11, 0.08);
+                border-left: 3px solid #f59e0b;
+                position: relative;
+            }
+
+            .confidence-badge {
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: #f59e0b;
+                color: white;
+                font-size: 10px;
+                font-weight: 600;
+                padding: 2px 6px;
+                border-radius: 8px;
+                line-height: 1;
+                pointer-events: none;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                z-index: 1;
+            }
+
+            .ai-verify-label {
+                display: block;
+                color: #d97706;
+                font-size: 10px;
+                margin-top: 2px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+
+            .header-field {
+                position: relative;
+            }
+
+            .provenance-anchor {
+                position: relative;
+            }
+
+            .provenance-container {
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                margin-bottom: 8px;
+                z-index: 1000;
+            }
         `
     ];
 
@@ -285,6 +338,18 @@ export class FBArtifactInvoice extends FBElement {
 
     @state()
     private _saveError = '';
+
+    /** Currently hovered field key for provenance tooltip (Sprint 3.1) */
+    @state()
+    private _activeProvenanceField = '';
+
+    /**
+     * Sprint 3.2: Snapshot of confidence data at edit-mode entry.
+     * Preserved because _resetFieldConfidence() mutates live confidences
+     * to source:'manual' during editing, which would cause
+     * _buildCorrectionEvents() to skip corrected fields.
+     */
+    private _originalConfidenceMap = new Map<string, InvoiceFieldConfidence>();
 
     /**
      * Formats cents (string or number) to USD currency.
@@ -323,6 +388,9 @@ export class FBArtifactInvoice extends FBElement {
         }));
         this._isEditing = true;
         this._saveError = '';
+
+        // Sprint 3.2: Snapshot confidence data before edits mutate it
+        this._originalConfidenceMap = new Map(this._confidenceMap);
     }
 
     /** Cancel edit — discard draft changes */
@@ -330,6 +398,7 @@ export class FBArtifactInvoice extends FBElement {
         this._isEditing = false;
         this._draftItems = [];
         this._saveError = '';
+        this._originalConfidenceMap.clear(); // Sprint 3.2
     }
 
     /** Update a field on a draft line item and recalculate */
@@ -359,6 +428,9 @@ export class FBArtifactInvoice extends FBElement {
 
         items[index] = item;
         this._draftItems = items;
+
+        // Sprint 3.1: Reset confidence on manual edit — mark as manual 1.0
+        this._resetFieldConfidence(index, field);
     }
 
     /** Add a new empty line item */
@@ -428,6 +500,9 @@ export class FBArtifactInvoice extends FBElement {
         this._isSaving = true;
         this._saveError = '';
 
+        // Sprint 3.2: Capture corrections BEFORE save mutates this.data
+        const corrections = this._buildCorrectionEvents();
+
         try {
             const response = await api.invoices.update(this.data.id, {
                 items: this._draftItems.map(item => ({
@@ -454,6 +529,13 @@ export class FBArtifactInvoice extends FBElement {
 
             // Notify parent of successful save
             this.emit('invoice-updated', { invoiceId: this.data.id });
+
+            // Sprint 3.2: Fire-and-forget correction submission
+            if (corrections.length > 0) {
+                api.corrections.submit(corrections).catch((err: unknown) => {
+                    console.warn('[Sprint 3.2] Correction submission failed:', err);
+                });
+            }
         } catch (err: unknown) {
             if (err instanceof Error) {
                 this._saveError = err.message;
@@ -501,7 +583,7 @@ export class FBArtifactInvoice extends FBElement {
                 <div>${this._renderStatusBadge()}</div>
                 <div>
                     ${this._isEditing
-                        ? html`
+                ? html`
                             <div class="edit-actions">
                                 <button
                                     class="btn btn--cancel"
@@ -515,15 +597,15 @@ export class FBArtifactInvoice extends FBElement {
                                 >${this._isSaving ? 'Saving...' : 'Save'}</button>
                             </div>
                         `
-                        : this._isEditable
-                            ? html`
+                : this._isEditable
+                    ? html`
                                 <button
                                     class="btn btn--edit"
                                     @click=${this._enterEditMode}
                                 >Edit Invoice</button>
                             `
-                            : nothing
-                    }
+                    : nothing
+            }
                 </div>
             </div>
             ${this._saveError
@@ -533,22 +615,50 @@ export class FBArtifactInvoice extends FBElement {
         `;
     }
 
-    private _renderViewRow(item: { description: string; quantity: number; unit_price_cents: string | number; total_cents: string | number }): TemplateResult {
+    private _renderViewRow(item: { description: string; quantity: number; unit_price_cents: string | number; total_cents: string | number }, index: number): TemplateResult {
+        const descKey = `line_items[${index}].description`;
+        const qtyKey = `line_items[${index}].quantity`;
+        const priceKey = `line_items[${index}].unit_price_cents`;
+        const totalKey = `line_items[${index}].total_cents`;
+
         return html`
             <tr>
-                <td class="col-desc">${item.description}</td>
-                <td class="col-qty">${String(item.quantity)}</td>
-                <td class="col-price">${this._formatCurrency(item.unit_price_cents)}</td>
-                <td class="col-total">${this._formatCurrency(item.total_cents)}</td>
+                <td class="col-desc ${this._fieldClass(descKey)}"
+                    @mouseenter=${() => { this._showProvenance(descKey); }}
+                    @mouseleave=${() => { this._hideProvenance(); }}
+                    @focusin=${() => { this._showProvenance(descKey); }}
+                    @focusout=${() => { this._hideProvenance(); }}
+                    tabindex="0"
+                >
+                    ${item.description}
+                    ${this._renderBadge(descKey)}
+                    ${this._renderProvenancePopover(descKey)}
+                </td>
+                <td class="col-qty ${this._fieldClass(qtyKey)}">${String(item.quantity)}${this._renderBadge(qtyKey)}</td>
+                <td class="col-price ${this._fieldClass(priceKey)}"
+                    @mouseenter=${() => { this._showProvenance(priceKey); }}
+                    @mouseleave=${() => { this._hideProvenance(); }}
+                    @focusin=${() => { this._showProvenance(priceKey); }}
+                    @focusout=${() => { this._hideProvenance(); }}
+                    tabindex="0"
+                >
+                    ${this._formatCurrency(item.unit_price_cents)}
+                    ${this._renderBadge(priceKey)}
+                    ${this._renderProvenancePopover(priceKey)}
+                </td>
+                <td class="col-total ${this._fieldClass(totalKey)}">${this._formatCurrency(item.total_cents)}${this._renderBadge(totalKey)}</td>
                 ${this._isEditing ? html`<td class="col-actions"></td>` : nothing}
             </tr>
         `;
     }
 
     private _renderEditRow(item: DraftLineItem, index: number): TemplateResult {
+        const descKey = `line_items[${index}].description`;
+        const priceKey = `line_items[${index}].unit_price_cents`;
+
         return html`
             <tr>
-                <td class="col-desc">
+                <td class="col-desc ${this._fieldClass(descKey)}">
                     <input
                         class="edit-input"
                         type="text"
@@ -557,6 +667,7 @@ export class FBArtifactInvoice extends FBElement {
                         placeholder="Description"
                         maxlength="500"
                     />
+                    ${this._isLowConfidence(descKey) ? html`<span class="ai-verify-label">⚠ AI extracted — verify</span>` : nothing}
                 </td>
                 <td class="col-qty">
                     <input
@@ -568,7 +679,7 @@ export class FBArtifactInvoice extends FBElement {
                         step="0.01"
                     />
                 </td>
-                <td class="col-price">
+                <td class="col-price ${this._fieldClass(priceKey)}">
                     <input
                         class="edit-input"
                         type="number"
@@ -577,6 +688,7 @@ export class FBArtifactInvoice extends FBElement {
                         min="0"
                         step="0.01"
                     />
+                    ${this._isLowConfidence(priceKey) ? html`<span class="ai-verify-label">⚠ AI extracted — verify</span>` : nothing}
                 </td>
                 <td class="col-total">${this._formatCurrency(item.totalCents)}</td>
                 <td class="col-actions">
@@ -592,6 +704,170 @@ export class FBArtifactInvoice extends FBElement {
         `;
     }
 
+    // ── Sprint 3.1: Confidence Helpers ──────────────────────────────────
+
+    /** Build a Map from fieldConfidences for O(1) lookup */
+    private get _confidenceMap(): Map<string, InvoiceFieldConfidence> {
+        const map = new Map<string, InvoiceFieldConfidence>();
+        if (this.data?.fieldConfidences) {
+            for (const fc of this.data.fieldConfidences) {
+                map.set(fc.field, fc);
+            }
+        }
+        return map;
+    }
+
+    /** Check if a field is below the confidence threshold */
+    private _isLowConfidence(fieldKey: string): boolean {
+        const fc = this._confidenceMap.get(fieldKey);
+        return fc !== undefined && fc.score < CONFIDENCE_THRESHOLD;
+    }
+
+    /** Return CSS class for low-confidence fields */
+    private _fieldClass(fieldKey: string): string {
+        return this._isLowConfidence(fieldKey) ? 'field--low-confidence provenance-anchor' : '';
+    }
+
+    /** Render a small confidence badge on low-confidence fields */
+    private _renderBadge(fieldKey: string): TemplateResult | typeof nothing {
+        const fc = this._confidenceMap.get(fieldKey);
+        if (!fc || fc.score >= CONFIDENCE_THRESHOLD) return nothing;
+        return html`<span class="confidence-badge">${Math.round(fc.score * 100)}%</span>`;
+    }
+
+    /** Show provenance tooltip for a field */
+    private _showProvenance(fieldKey: string): void {
+        if (this._isLowConfidence(fieldKey)) {
+            this._activeProvenanceField = fieldKey;
+        }
+    }
+
+    /** Hide provenance tooltip */
+    private _hideProvenance(): void {
+        this._activeProvenanceField = '';
+    }
+
+    /** Render the provenance popover if this field is active */
+    private _renderProvenancePopover(fieldKey: string): TemplateResult | typeof nothing {
+        if (this._activeProvenanceField !== fieldKey) return nothing;
+        const fc = this._confidenceMap.get(fieldKey);
+        if (!fc) return nothing;
+
+        // Extract human-readable field name from key
+        const readableName = fieldKey.replace(/line_items\[\d+\]\./, '').replace(/_/g, ' ');
+
+        return html`
+            <div class="provenance-container">
+                <fb-field-provenance
+                    .fieldName=${readableName}
+                    .confidence=${fc.score}
+                    .boundingBox=${fc.boundingBox}
+                    .source=${fc.source ?? 'vision_extraction'}
+                ></fb-field-provenance>
+            </div>
+        `;
+    }
+
+    /** Reset confidence to manual 1.0 when user edits a field (Sprint 3.1) */
+    private _resetFieldConfidence(index: number, field: keyof DraftLineItem): void {
+        if (!this.data?.fieldConfidences) return;
+
+        // Map DraftLineItem field names to confidence field keys
+        const fieldKeyMap: Record<string, string> = {
+            description: `line_items[${index}].description`,
+            quantity: `line_items[${index}].quantity`,
+            unitPriceCents: `line_items[${index}].unit_price_cents`,
+            totalCents: `line_items[${index}].total_cents`,
+        };
+        const confidenceKey = fieldKeyMap[field];
+        if (!confidenceKey) return;
+
+        // Replace the confidence entry with manual 1.0
+        this.data = {
+            ...this.data,
+            fieldConfidences: this.data.fieldConfidences.map(fc =>
+                fc.field === confidenceKey
+                    ? { ...fc, score: 1.0, source: 'manual' as const }
+                    : fc
+            ),
+        };
+    }
+
+    // ── Sprint 3.2: Correction Event Builder ────────────────────────────
+
+    /**
+     * Build CorrectionEvents by comparing draft items against the original
+     * AI-extracted values. Only produces events for fields that:
+     * 1. Were AI-sourced (have a fieldConfidence entry with source !== 'manual')
+     * 2. Actually changed (old !== new)
+     * 3. Have a corresponding original row (new rows are skipped)
+     */
+    private _buildCorrectionEvents(): CorrectionEvent[] {
+        if (!this.data?.line_items || !this.data.fieldConfidences) return [];
+
+        const events: CorrectionEvent[] = [];
+        const now = new Date().toISOString();
+
+        for (const [i, draft] of this._draftItems.entries()) {
+            const original = this.data.line_items[i];
+            if (!original) continue; // New row added by user — skip
+
+            // Fields to compare: draft key → confidence path → original accessor
+            const comparisons: Array<{
+                draftKey: keyof DraftLineItem;
+                path: string;
+                getOriginal: () => unknown;
+            }> = [
+                    {
+                        draftKey: 'description',
+                        path: `line_items[${String(i)}].description`,
+                        getOriginal: () => original.description,
+                    },
+                    {
+                        draftKey: 'quantity',
+                        path: `line_items[${String(i)}].quantity`,
+                        getOriginal: () => original.quantity,
+                    },
+                    {
+                        draftKey: 'unitPriceCents',
+                        path: `line_items[${String(i)}].unit_price_cents`,
+                        getOriginal: () => {
+                            const v = original.unit_price_cents;
+                            return typeof v === 'string' ? parseInt(v, 10) : v;
+                        },
+                    },
+                ];
+
+            for (const { draftKey, path, getOriginal } of comparisons) {
+                // Use the ORIGINAL snapshot, not live _confidenceMap
+                // (which has been mutated to 'manual' by _resetFieldConfidence)
+                const fc = this._originalConfidenceMap.get(path);
+                // Skip fields that aren't AI-sourced
+                if (!fc || fc.source === 'manual') continue;
+
+                const oldVal = getOriginal();
+                const newVal = draft[draftKey];
+                // Skip unchanged fields
+                if (oldVal === newVal) continue;
+
+                events.push({
+                    artifactId: this.data.id ?? '',
+                    artifactType: 'invoice',
+                    fieldPath: path,
+                    oldValue: oldVal,
+                    newValue: newVal,
+                    originalConfidence: fc.score,
+                    timestamp: now,
+                    userId: 'current', // Backend resolves from JWT
+                });
+            }
+        }
+
+        return events;
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────
+
     override render(): TemplateResult {
         if (!this.data) return this._renderSkeleton();
 
@@ -604,12 +880,36 @@ export class FBArtifactInvoice extends FBElement {
 
                 <div class="header">
                     <div class="vendor-info">
-                        <h2>${this.data.vendor}</h2>
+                        <h2 class="header-field ${this._fieldClass('vendor')}"
+                            @mouseenter=${() => { this._showProvenance('vendor'); }}
+                            @mouseleave=${() => { this._hideProvenance(); }}
+                            tabindex="0"
+                        >
+                            ${this.data.vendor}
+                            ${this._renderBadge('vendor')}
+                            ${this._renderProvenancePopover('vendor')}
+                        </h2>
                         <div>${this.data.address || ''}</div>
                     </div>
                     <div class="invoice-meta">
-                        <div class="meta-row"><span class="label">Invoice #:</span> ${this.data.invoice_number}</div>
-                        <div class="meta-row"><span class="label">Date:</span> ${new Date(this.data.date).toLocaleDateString()}</div>
+                        <div class="meta-row header-field ${this._fieldClass('invoice_number')}"
+                            @mouseenter=${() => { this._showProvenance('invoice_number'); }}
+                            @mouseleave=${() => { this._hideProvenance(); }}
+                            tabindex="0"
+                        >
+                            <span class="label">Invoice #:</span> ${this.data.invoice_number}
+                            ${this._renderBadge('invoice_number')}
+                            ${this._renderProvenancePopover('invoice_number')}
+                        </div>
+                        <div class="meta-row header-field ${this._fieldClass('date')}"
+                            @mouseenter=${() => { this._showProvenance('date'); }}
+                            @mouseleave=${() => { this._hideProvenance(); }}
+                            tabindex="0"
+                        >
+                            <span class="label">Date:</span> ${new Date(this.data.date).toLocaleDateString()}
+                            ${this._renderBadge('date')}
+                            ${this._renderProvenancePopover('date')}
+                        </div>
                     </div>
                 </div>
 
@@ -625,18 +925,18 @@ export class FBArtifactInvoice extends FBElement {
                     </thead>
                     <tbody>
                         ${this._isEditing
-                            ? this._draftItems.map((item, i) => this._renderEditRow(item, i))
-                            : this.data.line_items.map(item => this._renderViewRow(item))
-                        }
+                ? this._draftItems.map((item, i) => this._renderEditRow(item, i))
+                : this.data.line_items.map((item, i) => this._renderViewRow(item, i))
+            }
                     </tbody>
                 </table>
 
                 ${this._isEditing
-                    ? html`
+                ? html`
                         <button class="btn btn--add" @click=${this._addItem}>+ Add Item</button>
                     `
-                    : nothing
-                }
+                : nothing
+            }
 
                 <div class="total-section">
                     <div class="total-box">

@@ -1,8 +1,10 @@
 
 import { html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { effect } from '@preact/signals-core';
 import { FBViewElement } from '../base/FBViewElement';
-import { mockFinancialService, FinancialSummary } from '../../services/mock-financial-service';
+import { api, type FinancialSummary } from '../../services/api';
+import { store } from '../../store/store';
 
 @customElement('fb-view-budget')
 export class FBViewBudget extends FBViewElement {
@@ -104,15 +106,53 @@ export class FBViewBudget extends FBViewElement {
             .status-on_track { background: rgba(16, 185, 129, 0.1); color: #10b981; }
             .status-at_risk { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
             .status-over_budget { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+            .error-state {
+                text-align: center;
+                padding: 48px 16px;
+                color: var(--fb-text-secondary, #a0a0b0);
+            }
+
+            .error-state button {
+                margin-top: 16px;
+                padding: 8px 20px;
+                border-radius: 8px;
+                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #1a1a2e);
+                color: var(--fb-text-primary, #e0e0e0);
+                cursor: pointer;
+                font-size: 14px;
+            }
+
+            .error-state button:hover {
+                background: var(--fb-surface-2, #252540);
+            }
         `
     ];
 
     @state() private _data: FinancialSummary | null = null;
     @state() private _loading = true;
+    @state() private _error: string | null = null;
+
+    /** Dispose function for the contextState$ subscription. */
+    private _disposeContextEffect: (() => void) | null = null;
 
     override connectedCallback() {
         super.connectedCallback();
-        this._loadData();
+
+        // Subscribe to context changes — reload data when scope or project changes
+        this._disposeContextEffect = effect(() => {
+            // Access signal value to subscribe
+            const _ctx = store.contextState$.value;
+            void _ctx;
+            this._loadData();
+        });
+    }
+
+    override disconnectedCallback() {
+        super.disconnectedCallback();
+        this._disposeContextEffect?.();
+        this._disposeContextEffect = null;
     }
 
     override onViewActive(): void {
@@ -121,10 +161,17 @@ export class FBViewBudget extends FBViewElement {
 
     private async _loadData() {
         this._loading = true;
+        this._error = null;
         try {
-            this._data = await mockFinancialService.getSummary('p1');
+            const ctx = store.contextState$.value;
+            if (ctx.scope === 'project' && ctx.projectId) {
+                this._data = await api.financials.getSummary(ctx.projectId);
+            } else {
+                this._data = await api.financials.getGlobalSummary();
+            }
         } catch (err) {
-            console.error('[FBViewBudget] Failed to load data:', err);
+            console.error('[FBViewBudget] Failed to load financial data:', err);
+            this._error = err instanceof Error ? err.message : 'Failed to load budget data';
             this._data = null;
         } finally {
             this._loading = false;
@@ -141,7 +188,13 @@ export class FBViewBudget extends FBViewElement {
 
     override render() {
         if (this._loading) return html`<div>Loading budget data...</div>`;
-        if (!this._data) return html`<div>Error loading data</div>`;
+        if (this._error) return html`
+            <div class="error-state">
+                <div>${this._error}</div>
+                <button @click=${() => this._loadData()}>Retry</button>
+            </div>
+        `;
+        if (!this._data) return html`<div class="error-state">No budget data available</div>`;
 
         return html`
             <div class="header">

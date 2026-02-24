@@ -10,7 +10,7 @@
 
 ### Task 3.1.1: Update `fb-artifact-invoice.ts` to Accept ConfidenceScores
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [fb-artifact-invoice.ts](file:///home/colton/Desktop/FutureBuild_HQ/XUI/frontend/src/components/artifacts/fb-artifact-invoice.ts) (666 lines)
@@ -49,7 +49,7 @@
 
 ### Task 3.1.2: Implement "Yellow Highlighting" for Low-Confidence Fields
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Threshold:** Fields with confidence < 85% (0.85) get highlighted.
 
@@ -86,7 +86,7 @@
 
 ### Task 3.1.3: Add "Hover Explanations" (Source Bounding Boxes)
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Concept:** Hovering over a field shows a tooltip explaining where in the PDF the value came from, using bounding boxes from VisionService.
 

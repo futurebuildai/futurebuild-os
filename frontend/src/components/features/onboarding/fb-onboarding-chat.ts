@@ -25,6 +25,8 @@ import {
     applyAIExtraction,
     setExtractedProcurement,
     markDocumentUploaded,
+    setUploadedPdfUrl,
+    setReadyToCreate,
     type OnboardingMessage
 } from '../../../store/onboarding-store';
 import type { FBOnboardingDropzone } from './fb-onboarding-dropzone';
@@ -518,6 +520,17 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
             });
 
             dropzone?.setComplete();
+
+            // If the uploaded file is a PDF, set the URL for the split-screen viewer
+            if (file.type === 'application/pdf') {
+                const pdfObjectUrl = URL.createObjectURL(file);
+                setUploadedPdfUrl(pdfObjectUrl);
+            }
+
+            // Track ready state
+            if (response.ready_to_create) {
+                setReadyToCreate(true);
+            }
 
         } catch (err) {
             console.error('[FBOnboardingChat] File upload failed:', err);

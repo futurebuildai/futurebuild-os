@@ -12,8 +12,9 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { store, type ChatCardContext } from '../../store/store';
 import { feedSSE } from '../../services/feed-sse';
-import { mockFeedService } from '../../services/mock-feed-service'; // Use mock service
+import { api } from '../../services/api';
 import type { FeedCard, FeedSSEEvent, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
+import { effect } from '@preact/signals-core';
 import './fb-feed-section';
 import './fb-greeting-banner';
 import './fb-empty-home';
@@ -92,6 +93,44 @@ export class FBHomeFeed extends FBElement {
             .loading-card {
                 height: 120px;
                 border-radius: 12px;
+            }
+
+            /* Sprint 5.1: Slide-in animation for new cards */
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-12px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            fb-feed-card.new-card {
+                animation: slideIn 0.35s ease-out;
+            }
+
+            /* Sprint 5.1: SSE connection status indicator */
+            .connection-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 11px;
+                color: var(--fb-text-tertiary, #707080);
+                margin-bottom: 16px;
+            }
+
+            .status-dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: #ef4444;
+                transition: background 0.3s ease;
+            }
+
+            .status-dot.connected {
+                background: #22c55e;
             }
 
             .empty {
@@ -254,9 +293,13 @@ export class FBHomeFeed extends FBElement {
     @state() private _currentTime = new Date();
     @state() private _currentHaiku = this._getRandomHaiku();
     @state() private _currentWeather = this._getMockWeather();
+    @state() private _sseConnected = false;
 
     private _unsubSSE: (() => void) | null = null;
+    private _unsubStatus: (() => void) | null = null;
+    private _unsubContext: (() => void) | null = null;
     private _timer: number | null = null;
+    private _newCardIds: Set<string> = new Set();
 
     override connectedCallback() {
         super.connectedCallback();
@@ -272,6 +315,21 @@ export class FBHomeFeed extends FBElement {
         // Subscribe to SSE feed stream for live updates
         this._unsubSSE = feedSSE.subscribe(this._handleSSEEvent);
         feedSSE.connect();
+
+        // Sprint 5.1: Subscribe to SSE connection status changes
+        this._unsubStatus = feedSSE.onStatusChange((connected) => {
+            this._sseConnected = connected;
+        });
+
+        // Sprint 5.1: React to contextState$ changes for scope-aware filtering
+        this._unsubContext = effect(() => {
+            const ctx = store.contextState$.value;
+            const newFilter = ctx.scope === 'project' ? ctx.projectId : null;
+            if (newFilter !== this._filterProjectId) {
+                this._filterProjectId = newFilter;
+                this._loadFeed();
+            }
+        });
 
         // Clock timer
         this._timer = window.setInterval(() => {
@@ -296,6 +354,14 @@ export class FBHomeFeed extends FBElement {
         if (this._unsubSSE) {
             this._unsubSSE();
             this._unsubSSE = null;
+        }
+        if (this._unsubStatus) {
+            this._unsubStatus();
+            this._unsubStatus = null;
+        }
+        if (this._unsubContext) {
+            this._unsubContext();
+            this._unsubContext = null;
         }
         feedSSE.disconnect();
         if (this._timer) {
@@ -332,6 +398,8 @@ export class FBHomeFeed extends FBElement {
             case 'card_added': {
                 // Apply project filter if active
                 if (this._filterProjectId && event.card.project_id !== this._filterProjectId) return;
+                // Sprint 5.1: Track new cards for slide-in animation
+                this._newCardIds.add(event.card.id);
                 // Insert sorted by priority (lower = higher priority)
                 const cards = [...this._cards];
                 const idx = cards.findIndex((c) => c.priority > event.card.priority);
@@ -341,6 +409,10 @@ export class FBHomeFeed extends FBElement {
                     cards.splice(idx, 0, event.card);
                 }
                 this._cards = cards;
+                // Clear animation class after animation completes
+                setTimeout(() => {
+                    this._newCardIds.delete(event.card.id);
+                }, 400);
                 break;
             }
             case 'card_updated': {
@@ -365,7 +437,7 @@ export class FBHomeFeed extends FBElement {
         this._loading = true;
         this._error = null;
         try {
-            const resp = await mockFeedService.getFeed(
+            const resp = await api.portfolio.getFeed(
                 this._filterProjectId ?? undefined
             );
             this._greeting = resp.greeting;
@@ -448,7 +520,7 @@ export class FBHomeFeed extends FBElement {
         // Dismiss — optimistic removal via dedicated endpoint
         if (actionId === 'dismiss') {
             this._cards = this._cards.filter((c) => c.id !== cardId);
-            mockFeedService.dismissCard(cardId).catch(() => {
+            api.portfolio.dismissCard(cardId).catch(() => {
                 this._loadFeed(); // Reload on failure
             });
             return;
@@ -457,7 +529,7 @@ export class FBHomeFeed extends FBElement {
         // Snooze — optimistic removal via dedicated endpoint
         if (actionId === 'snooze') {
             this._cards = this._cards.filter((c) => c.id !== cardId);
-            mockFeedService.snoozeCard(cardId, 24).catch(() => {
+            api.portfolio.snoozeCard(cardId, 24).catch(() => {
                 this._loadFeed();
             });
             return;
@@ -466,7 +538,7 @@ export class FBHomeFeed extends FBElement {
         // All other actions — call executeAction and handle response
         console.log('[FBHomeFeed] Executing action:', actionId, cardId);
         try {
-            const resp = await mockFeedService.executeAction(cardId, actionId);
+            const resp = await api.portfolio.executeAction(cardId, actionId);
             console.log('[FBHomeFeed] Action response:', resp);
 
             if (resp.effect === 'dismiss') {
@@ -535,6 +607,12 @@ export class FBHomeFeed extends FBElement {
                     .summary=${this._summary}
                 ></fb-greeting-banner>
 
+                <!-- Sprint 5.1: SSE connection status indicator -->
+                <div class="connection-status">
+                    <span class="status-dot ${this._sseConnected ? 'connected' : ''}"></span>
+                    ${this._sseConnected ? 'Live' : 'Connecting...'}
+                </div>
+
                 ${this._cards.length === 0
                 ? html`
                           <div class="empty-state-container" role="status">
@@ -576,7 +654,11 @@ export class FBHomeFeed extends FBElement {
                               >
                                   ${cards.map(
                         (card) => html`
-                                          <fb-feed-card .card=${card} role="article"></fb-feed-card>
+                                          <fb-feed-card
+                                              .card=${card}
+                                              class=${this._newCardIds.has(card.id) ? 'new-card' : ''}
+                                              role="article"
+                                          ></fb-feed-card>
                                       `
                     )}
                               </fb-feed-section>

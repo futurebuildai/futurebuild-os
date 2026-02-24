@@ -10,7 +10,7 @@
 
 ### Task 5.1.1: Backend — Create `FeedAggregator` Service
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Concept:** A centralized service that subscribes to events from Inspector, Gopher, and Strategist agents, then produces unified feed cards.
 
@@ -65,7 +65,7 @@
 
 ### Task 5.1.2: Frontend — Implement `FeedSSE` Push Updates
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [feed-sse.ts](file:///home/colton/Desktop/FutureBuild_HQ/XUI/frontend/src/services/feed-sse.ts) — SSE client already exists with `connect()`, `subscribe()`, `disconnect()`, `_scheduleReconnect()`

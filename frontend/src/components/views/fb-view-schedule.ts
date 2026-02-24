@@ -352,15 +352,9 @@ export class FBViewSchedule extends FBViewElement {
         try {
             this._data = await api.schedule.get(projectId);
         } catch (err) {
-            console.warn('[FBViewSchedule] Failed to load schedule from API, falling back to mock service', err);
-            try {
-                // Fallback to mock service
-                const { mockScheduleService } = await import('../../services/mock-schedule-service');
-                this._data = await mockScheduleService.get(projectId);
-            } catch (mockErr) {
-                this._data = null;
-                this._error = err instanceof Error ? err.message : 'Failed to load schedule';
-            }
+            console.error('[FBViewSchedule] Failed to load schedule:', err);
+            this._data = null;
+            this._error = err instanceof Error ? err.message : 'Failed to load schedule';
         } finally {
             this._loading = false;
         }

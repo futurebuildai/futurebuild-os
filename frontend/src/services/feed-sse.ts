@@ -15,6 +15,7 @@ import type { FeedCard, FeedSSEEvent } from '../types/feed';
 // ============================================================================
 
 type FeedSSEHandler = (event: FeedSSEEvent) => void;
+type StatusChangeHandler = (connected: boolean) => void;
 
 // ============================================================================
 // FeedSSEService
@@ -27,6 +28,7 @@ const BASE_RECONNECT_DELAY = 2_000; // 2s initial
 class FeedSSEService {
     private _eventSource: EventSource | null = null;
     private _handlers: Set<FeedSSEHandler> = new Set();
+    private _statusHandlers: Set<StatusChangeHandler> = new Set();
     private _reconnectAttempt = 0;
     private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private _connected = false;
@@ -43,6 +45,19 @@ class FeedSSEService {
     }
 
     /**
+     * Register a handler for connection status changes.
+     * @returns Unsubscribe function
+     */
+    onStatusChange(handler: StatusChangeHandler): () => void {
+        this._statusHandlers.add(handler);
+        // Immediately fire current status
+        handler(this._connected);
+        return () => {
+            this._statusHandlers.delete(handler);
+        };
+    }
+
+    /**
      * Connect to the SSE stream.
      * Safe to call multiple times — will no-op if already connected.
      */
@@ -53,7 +68,7 @@ class FeedSSEService {
             this._eventSource = new EventSource(SSE_ENDPOINT);
 
             this._eventSource.onopen = () => {
-                this._connected = true;
+                this._setConnected(true);
                 this._reconnectAttempt = 0;
             };
 
@@ -71,7 +86,7 @@ class FeedSSEService {
             });
 
             this._eventSource.onerror = () => {
-                this._connected = false;
+                this._setConnected(false);
                 this._cleanup();
                 this._scheduleReconnect();
             };
@@ -98,6 +113,18 @@ class FeedSSEService {
     }
 
     // ---- Private ----
+
+    private _setConnected(value: boolean): void {
+        if (this._connected === value) return;
+        this._connected = value;
+        for (const handler of this._statusHandlers) {
+            try {
+                handler(value);
+            } catch (err) {
+                console.error('[FeedSSE] Status handler error', err);
+            }
+        }
+    }
 
     private _cleanup(): void {
         if (this._eventSource) {

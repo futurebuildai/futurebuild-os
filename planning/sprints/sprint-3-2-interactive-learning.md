@@ -10,7 +10,7 @@
 
 ### Task 3.2.1: Send CorrectionEvent on User Edits
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [fb-artifact-invoice.ts](file:///home/colton/Desktop/FutureBuild_HQ/XUI/frontend/src/components/artifacts/fb-artifact-invoice.ts) has `_updateItem()`, `_save()` — edit and save workflow already exists
@@ -55,7 +55,7 @@
 
 ### Task 3.2.2: Backend — Log Corrections to `audit_wal`
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Current State:**
 - [audit_wal.md](file:///home/colton/Desktop/FutureBuild_HQ/XUI/backend/shadow/internal/chat/audit_wal.md) — placeholder stub, no Go implementation

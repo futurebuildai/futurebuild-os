@@ -11,7 +11,40 @@ import { InvoiceExtraction, GanttData } from './models';
 import { InvoiceStatus } from './enums';
 
 // ============================================================================
-// Invoice Artifact
+// Invoice Artifact — Confidence Scoring (Sprint 3.1)
+// ============================================================================
+
+/**
+ * Bounding box referencing a region in the source PDF.
+ * Coordinates are normalized (0–1) relative to page dimensions.
+ * Uses w/h naming to match VisionService output format.
+ */
+export interface InvoiceFieldBoundingBox {
+    page: number;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+/**
+ * Per-field confidence metadata from AI extraction.
+ * Enables "diff view" highlighting on invoice artifacts.
+ * See Sprint 3.1 — Task 3.1.1.
+ */
+export interface InvoiceFieldConfidence {
+    /** Dot-notation field path, e.g. "vendor", "line_items[0].description" */
+    field: string;
+    /** Confidence score 0.0–1.0 */
+    score: number;
+    /** Extraction source */
+    source?: 'vision_extraction' | 'manual';
+    /** PDF region where this value was extracted from */
+    boundingBox?: InvoiceFieldBoundingBox;
+}
+
+// ============================================================================
+// Invoice Artifact Data
 // ============================================================================
 
 /**
@@ -32,6 +65,8 @@ export interface InvoiceArtifactData extends InvoiceExtraction {
     rejected_by_id?: string;
     rejected_at?: string;
     rejection_reason?: string;
+    /** Per-field confidence scores from AI extraction (Sprint 3.1) */
+    fieldConfidences?: InvoiceFieldConfidence[];
 }
 
 // ============================================================================
