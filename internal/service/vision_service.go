@@ -10,11 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/audit"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/prompts"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // VisionService implements AI-powered site photo analysis.
@@ -22,15 +25,17 @@ import (
 type VisionService struct {
 	client     ai.Client
 	httpClient *http.Client
+	logger     audit.AgentLogger
 }
 
 // NewVisionService creates a new VisionService.
-func NewVisionService(client ai.Client) *VisionService {
+func NewVisionService(client ai.Client, logger audit.AgentLogger) *VisionService {
 	return &VisionService{
 		client: client,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		logger: logger,
 	}
 }
 
@@ -43,6 +48,13 @@ const confidenceWarningThreshold = 0.8
 // Sprint 2.1 Task 2.1.1: Standalone extraction endpoint for the Vision Pipeline.
 // Returns a VisionExtractionResponse with extracted values, ConfidenceReport, and long-lead items.
 func (s *VisionService) ParseDocument(ctx context.Context, fileBytes []byte, mimeType string) (*models.VisionExtractionResponse, error) {
+	startTime := time.Now()
+
+	tracer := otel.Tracer("futurebuild.vision")
+	ctx, span := tracer.Start(ctx, "Vision.ParseDocument")
+	defer span.End()
+	span.SetAttributes(attribute.String("mime.type", mimeType))
+
 	prompt := prompts.BlueprintExtractionPrompt()
 
 	slog.Info("vision: parsing document",
@@ -172,6 +184,22 @@ func (s *VisionService) ParseDocument(ctx context.Context, fileBytes []byte, mim
 		"long_lead_items", len(longLeadItems),
 	)
 
+	if s.logger != nil {
+		_ = s.logger.LogDecision(context.Background(), audit.AgentDecisionEntry{
+			Timestamp:    time.Now(),
+			Agent:        "VisionAgent",
+			Action:       "ParseDocument",
+			InputSummary: fmt.Sprintf("Blueprint (size: %d, mime: %s)", len(fileBytes), mimeType),
+			Decision:     fmt.Sprintf("Extracted %d fields and %d long-lead items", len(values), len(longLeadItems)),
+			Confidence:   overallConfidence,
+			Model:        string(ai.ModelTypeFlash),
+			LatencyMS:    time.Since(startTime).Milliseconds(),
+			ProjectID:    "", // typically project creation happens after extraction
+			UserID:       "", // from context if available, otherwise blank
+			TraceID:      span.SpanContext().TraceID().String(),
+		})
+	}
+
 	return &models.VisionExtractionResponse{
 		ExtractedValues: values,
 		ConfidenceReport: models.ConfidenceReport{
@@ -267,6 +295,17 @@ func (s *VisionService) VerifyTask(ctx context.Context, imageURL string, taskDes
 // This satisfies the "Database is State" requirement from DATA_SPINE_SPEC.md.
 // See PRODUCTION_PLAN.md Step 40
 func (s *VisionService) VerifyAndPersistTask(ctx context.Context, db DBExecutor, taskID, projectID, orgID uuid.UUID, imageURL string, taskDescription string) (bool, float64, error) {
+	startTime := time.Now()
+
+	tracer := otel.Tracer("futurebuild.vision")
+	ctx, span := tracer.Start(ctx, "Vision.VerifyAndPersistTask")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("project.id", projectID.String()),
+		attribute.String("task.id", taskID.String()),
+		attribute.String("org.id", orgID.String()),
+	)
+
 	// 1. Call AI Verification
 	isVerified, confidence, err := s.VerifyTask(ctx, imageURL, taskDescription)
 	if err != nil {
@@ -295,6 +334,26 @@ func (s *VisionService) VerifyAndPersistTask(ctx context.Context, db DBExecutor,
 	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return false, 0, fmt.Errorf("task not found or access denied (multi-tenancy violation)")
+	}
+
+	if s.logger != nil {
+		decision := "Task verified as false"
+		if isVerified {
+			decision = "Task verified as true"
+		}
+		_ = s.logger.LogDecision(context.Background(), audit.AgentDecisionEntry{
+			Timestamp:    time.Now(),
+			Agent:        "VisionAgent",
+			Action:       "VerifyTask",
+			InputSummary: fmt.Sprintf("Photo upload vs task: %s", taskDescription),
+			Decision:     decision,
+			Confidence:   confidence,
+			Model:        string(ai.ModelTypeFlash),
+			LatencyMS:    time.Since(startTime).Milliseconds(),
+			ProjectID:    projectID.String(),
+			UserID:       "",
+			TraceID:      span.SpanContext().TraceID().String(),
+		})
 	}
 
 	return isVerified, confidence, nil

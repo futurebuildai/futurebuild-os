@@ -61,6 +61,7 @@ export interface FeedCard {
     engine_data?: Record<string, unknown>;
     agent_source?: string;
     task_id?: string;
+    tags?: string[]; // Added for priority scoring logic
     created_at: string;
     expires_at?: string;
     // Denormalized from JOIN

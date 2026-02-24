@@ -10,7 +10,7 @@
 
 ### Task 5.2.1: Implement Priority Logic
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Priority Tiers:**
 
@@ -61,7 +61,7 @@
 
 ### Task 5.2.2: Visual Polish — Traffic Light Coloring
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 **Atomic Steps:**
 

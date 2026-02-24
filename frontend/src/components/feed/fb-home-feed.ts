@@ -14,6 +14,7 @@ import { store, type ChatCardContext } from '../../store/store';
 import { feedSSE } from '../../services/feed-sse';
 import { api } from '../../services/api';
 import type { FeedCard, FeedSSEEvent, PortfolioSummary, FeedCardHorizon } from '../../types/feed';
+import { scorePriority, type FeedPriority } from '../../utils/feed-priority';
 import { effect } from '@preact/signals-core';
 import './fb-feed-section';
 import './fb-greeting-banner';
@@ -93,6 +94,84 @@ export class FBHomeFeed extends FBElement {
             .loading-card {
                 height: 120px;
                 border-radius: 12px;
+            }
+
+            .feed-controls {
+                margin-bottom: 24px;
+            }
+
+            .summary-bar {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 12px 16px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid var(--fb-border, #2a2a3e);
+                border-radius: 8px;
+                margin-bottom: 16px;
+                overflow-x: auto;
+            }
+
+            .summary-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--fb-text-secondary, #a0a0b0);
+                cursor: pointer;
+                transition: color 0.15s ease;
+                white-space: nowrap;
+            }
+
+            .summary-item:hover, .summary-item.active {
+                color: var(--fb-text-primary, #e0e0e0);
+            }
+
+            .summary-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+            }
+
+            .summary-dot.critical { background: #ef4444; }
+            .summary-dot.urgent { background: #f59e0b; }
+            .summary-dot.routine { background: #10b981; }
+
+            .summary-count {
+                font-weight: 700;
+                color: var(--fb-text-primary, #e0e0e0);
+            }
+
+            .filter-tabs {
+                display: flex;
+                gap: 8px;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+
+            .filter-tab {
+                padding: 6px 14px;
+                border-radius: 16px;
+                background: transparent;
+                border: 1px solid var(--fb-border, #2a2a3e);
+                color: var(--fb-text-secondary, #a0a0b0);
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                white-space: nowrap;
+            }
+
+            .filter-tab:hover {
+                border-color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-primary, #e0e0e0);
+            }
+
+            .filter-tab.active {
+                background: var(--fb-surface-2, #2a2a3e);
+                color: var(--fb-text-primary, #e0e0e0);
+                border-color: var(--fb-surface-2, #2a2a3e);
             }
 
             /* Sprint 5.1: Slide-in animation for new cards */
@@ -290,6 +369,7 @@ export class FBHomeFeed extends FBElement {
     @state() private _loading = true;
     @state() private _error: string | null = null;
     @state() private _filterProjectId: string | null = null;
+    @state() private _priorityFilter: 'all' | FeedPriority = 'all';
     @state() private _currentTime = new Date();
     @state() private _currentHaiku = this._getRandomHaiku();
     @state() private _currentWeather = this._getMockWeather();
@@ -400,9 +480,10 @@ export class FBHomeFeed extends FBElement {
                 if (this._filterProjectId && event.card.project_id !== this._filterProjectId) return;
                 // Sprint 5.1: Track new cards for slide-in animation
                 this._newCardIds.add(event.card.id);
-                // Insert sorted by priority (lower = higher priority)
+                // Insert sorted by priority score (higher score = higher priority)
                 const cards = [...this._cards];
-                const idx = cards.findIndex((c) => c.priority > event.card.priority);
+                const newScore = scorePriority(event.card).score;
+                const idx = cards.findIndex((c) => scorePriority(c).score < newScore);
                 if (idx === -1) {
                     cards.push(event.card);
                 } else {
@@ -461,14 +542,31 @@ export class FBHomeFeed extends FBElement {
         this._loadFeed();
     }
 
+    private _setPriorityFilter(filter: 'all' | FeedPriority) {
+        this._priorityFilter = filter;
+    }
+
+    private _getFilteredCards(): FeedCard[] {
+        if (this._priorityFilter === 'all') return this._cards;
+        return this._cards.filter((c) => scorePriority(c).priority === this._priorityFilter);
+    }
+
     private _groupCards(): GroupedCards {
         const groups: GroupedCards = { today: [], this_week: [], horizon: [] };
-        for (const card of this._cards) {
+        const filtered = this._getFilteredCards();
+        for (const card of filtered) {
             const bucket = groups[card.horizon];
             if (bucket) {
                 bucket.push(card);
             }
         }
+
+        // Sort each horizon group by priority score descending
+        const horizons: FeedCardHorizon[] = ['today', 'this_week', 'horizon'];
+        for (const h of horizons) {
+            groups[h].sort((a, b) => scorePriority(b).score - scorePriority(a).score);
+        }
+
         return groups;
     }
 
@@ -571,6 +669,43 @@ export class FBHomeFeed extends FBElement {
         `;
     }
 
+    private _renderFeedControls() {
+        if (this._cards.length === 0) return nothing;
+
+        let critical = 0, urgent = 0, routine = 0;
+        for (const c of this._cards) {
+            const p = scorePriority(c).priority;
+            if (p === 'critical') critical++;
+            else if (p === 'urgent') urgent++;
+            else routine++;
+        }
+
+        return html`
+            <div class="feed-controls">
+                <div class="summary-bar">
+                    <div class="summary-item ${this._priorityFilter === 'critical' ? 'active' : ''}" @click=${() => this._setPriorityFilter('critical')}>
+                        <span class="summary-dot critical"></span>
+                        <span class="summary-count">${critical}</span> Critical
+                    </div>
+                    <div class="summary-item ${this._priorityFilter === 'urgent' ? 'active' : ''}" @click=${() => this._setPriorityFilter('urgent')}>
+                        <span class="summary-dot urgent"></span>
+                        <span class="summary-count">${urgent}</span> Action Needed
+                    </div>
+                    <div class="summary-item ${this._priorityFilter === 'routine' ? 'active' : ''}" @click=${() => this._setPriorityFilter('routine')}>
+                        <span class="summary-dot routine"></span>
+                        <span class="summary-count">${routine}</span> Updates
+                    </div>
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab ${this._priorityFilter === 'all' ? 'active' : ''}" @click=${() => this._setPriorityFilter('all')}>All</button>
+                    <button class="filter-tab ${this._priorityFilter === 'critical' ? 'active' : ''}" @click=${() => this._setPriorityFilter('critical')}>Critical</button>
+                    <button class="filter-tab ${this._priorityFilter === 'urgent' ? 'active' : ''}" @click=${() => this._setPriorityFilter('urgent')}>Action Needed</button>
+                    <button class="filter-tab ${this._priorityFilter === 'routine' ? 'active' : ''}" @click=${() => this._setPriorityFilter('routine')}>Updates</button>
+                </div>
+            </div>
+        `;
+    }
+
     // _renderEmpty replaced by fb-empty-home component
 
     override render() {
@@ -612,6 +747,12 @@ export class FBHomeFeed extends FBElement {
                     <span class="status-dot ${this._sseConnected ? 'connected' : ''}"></span>
                     ${this._sseConnected ? 'Live' : 'Connecting...'}
                 </div>
+
+                ${this._renderFeedControls()}
+
+                ${this._cards.length > 0 && this._getFilteredCards().length === 0
+                ? html`<div class="empty">No cards match the selected priority filter.</div>`
+                : nothing}
 
                 ${this._cards.length === 0
                 ? html`

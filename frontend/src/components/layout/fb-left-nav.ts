@@ -446,6 +446,7 @@ export class FBLeftNav extends FBElement {
                     </svg>
                 </button>
 
+                ${this.userRole !== 'Subcontractor' && this.userRole !== 'Viewer' ? html`
                 <button 
                     class="nav-item ${this._currentView === 'budget' ? 'active' : ''}"
                     @click=${() => this._navigate('budget')}
@@ -457,6 +458,8 @@ export class FBLeftNav extends FBElement {
                         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                     </svg>
                 </button>
+                ` : nothing}
+
 
                 <button 
                     class="nav-item ${this._currentView === 'contacts' ? 'active' : ''}"

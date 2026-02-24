@@ -216,6 +216,7 @@ export class FBPanelRight extends FBElement {
     @state() private _activeScope: 'project' | 'thread' = 'thread';
     @state() private _artifacts: ArtifactRef[] = [];
     @state() private _artifactData: Record<string, ArtifactData> = {};
+    @state() private _userRole = '';
 
     private _disposeEffects: (() => void)[] = [];
 
@@ -245,6 +246,12 @@ export class FBPanelRight extends FBElement {
                         this._artifacts = [newRef, ...this._artifacts];
                     }
                 }
+            })
+        );
+
+        this._disposeEffects.push(
+            effect(() => {
+                this._userRole = store.user$.value?.role ?? '';
             })
         );
 
@@ -381,7 +388,9 @@ export class FBPanelRight extends FBElement {
             case 'budget':
                 return html`<fb-artifact-budget .data=${data as ArtifactData}></fb-artifact-budget>`;
             case 'invoice':
-                return html`<fb-artifact-invoice .data=${data as ArtifactData}></fb-artifact-invoice>`;
+                const canApprove = this._userRole === 'Admin' || this._userRole === 'PM';
+                const canEdit = this._userRole === 'Admin' || this._userRole === 'PM' || this._userRole === 'Builder';
+                return html`<fb-artifact-invoice .data=${data as ArtifactData} .canApprove=${canApprove} .canEdit=${canEdit}></fb-artifact-invoice>`;
             default:
                 return html`<div class="placeholder">Preview not available for ${artifact.type}</div>`;
         }

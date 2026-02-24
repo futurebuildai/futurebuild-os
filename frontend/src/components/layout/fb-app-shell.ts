@@ -734,11 +734,19 @@ export class FBAppShell extends FBElement {
             return html`<div class="loading-screen">Loading...</div>`;
         }
 
+        // Budget route protection (RBAC check)
+        if ((this._route.view === 'budget' || this._route.view === 'project-budget') && this._isAuthenticated) {
+            if (this._userRole === 'Subcontractor' || this._userRole === 'Viewer') {
+                setTimeout(() => this._navigate('/'), 0);
+                return html`<div class="loading-screen">Redirecting...</div>`;
+            }
+        }
+
         // Admin route
         if (this._route.view === 'admin' && this._isAuthenticated) {
-            if (!this._isPlatformAdmin) {
-                window.history.replaceState({}, '', '/');
-                return html`<div class="loading-screen"></div>`;
+            if (!this._isPlatformAdmin && this._userRole !== 'Admin') {
+                setTimeout(() => this._navigate('/'), 0);
+                return html`<div class="loading-screen">Redirecting...</div>`;
             }
             return html`
                 <fb-admin-shell></fb-admin-shell>

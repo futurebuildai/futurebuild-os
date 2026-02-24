@@ -12,21 +12,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colton/futurebuild/internal/audit"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/prompts"
 	"github.com/colton/futurebuild/pkg/ai"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // InterrogatorService implements the onboarding agent that extracts project data
 // from user conversations and documents.
 type InterrogatorService struct {
 	aiClient ai.Client
+	logger   audit.AgentLogger
 }
 
 // NewInterrogatorService creates a new interrogator service.
-func NewInterrogatorService(aiClient ai.Client) *InterrogatorService {
+func NewInterrogatorService(aiClient ai.Client, logger audit.AgentLogger) *InterrogatorService {
 	return &InterrogatorService{
 		aiClient: aiClient,
+		logger:   logger,
 	}
 }
 
@@ -36,7 +41,19 @@ func (s *InterrogatorService) ProcessMessage(
 	userID, tenantID string,
 	req *models.OnboardRequest,
 ) (*models.OnboardResponse, error) {
+	startTime := time.Now()
+
+	tracer := otel.Tracer("futurebuild.interrogator")
+	ctx, span := tracer.Start(ctx, "Interrogator.ProcessMessage")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("user.id", userID),
+		attribute.String("tenant.id", tenantID),
+		attribute.String("session.id", req.SessionID),
+	)
+
 	// L7: Structured logging for observability
+
 	slog.Info("onboarding_message_received",
 		"user_id", userID,
 		"tenant_id", tenantID,
@@ -138,6 +155,38 @@ func (s *InterrogatorService) ProcessMessage(
 		"next_field", resp.NextPriorityField,
 	)
 
+	if s.logger != nil {
+		decision := "Processed user message"
+		if resp.ReadyToCreate {
+			decision = "Ready to create project"
+		}
+
+		inputSummary := "Natural Language Message"
+		if req.Message != "" {
+			inputSummary = fmt.Sprintf("Message: %s", truncateString(req.Message, 100))
+		}
+		if req.DocumentURL != "" || len(req.DocumentData) > 0 {
+			inputSummary = "Uploaded blueprint"
+			if req.Message != "" {
+				inputSummary += fmt.Sprintf(" + Message: %s", truncateString(req.Message, 100))
+			}
+		}
+
+		_ = s.logger.LogDecision(context.Background(), audit.AgentDecisionEntry{
+			Timestamp:    time.Now(),
+			Agent:        "Interrogator",
+			Action:       "ProcessMessage",
+			InputSummary: inputSummary,
+			Decision:     decision,
+			Confidence:   avgConfidence,
+			Model:        string(ai.ModelTypeFlash),
+			LatencyMS:    time.Since(startTime).Milliseconds(),
+			ProjectID:    "", // No project exists yet during onboarding
+			UserID:       userID,
+			TraceID:      span.SpanContext().TraceID().String(),
+		})
+	}
+
 	return resp, nil
 }
 
@@ -177,13 +226,13 @@ func (s *InterrogatorService) extractFromDocument(
 	// Parse JSON response from Gemini
 	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
 	var extraction struct {
-		Name           string             `json:"name"`
-		Address        string             `json:"address"`
-		SquareFootage  float64            `json:"square_footage"`
-		FoundationType string             `json:"foundation_type"`
-		Stories        int                `json:"stories"`
-		Bedrooms       int                `json:"bedrooms"`
-		Bathrooms      int                `json:"bathrooms"`
+		Name           string  `json:"name"`
+		Address        string  `json:"address"`
+		SquareFootage  float64 `json:"square_footage"`
+		FoundationType string  `json:"foundation_type"`
+		Stories        int     `json:"stories"`
+		Bedrooms       int     `json:"bedrooms"`
+		Bathrooms      int     `json:"bathrooms"`
 		LongLeadItems  []struct {
 			Name     string `json:"name"`
 			Brand    string `json:"brand"`
@@ -265,13 +314,13 @@ func (s *InterrogatorService) extractFromBytes(
 	// Parse JSON response from Gemini (same structure as extractFromDocument)
 	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
 	var extraction struct {
-		Name           string             `json:"name"`
-		Address        string             `json:"address"`
-		SquareFootage  float64            `json:"square_footage"`
-		FoundationType string             `json:"foundation_type"`
-		Stories        int                `json:"stories"`
-		Bedrooms       int                `json:"bedrooms"`
-		Bathrooms      int                `json:"bathrooms"`
+		Name           string  `json:"name"`
+		Address        string  `json:"address"`
+		SquareFootage  float64 `json:"square_footage"`
+		FoundationType string  `json:"foundation_type"`
+		Stories        int     `json:"stories"`
+		Bedrooms       int     `json:"bedrooms"`
+		Bathrooms      int     `json:"bathrooms"`
 		LongLeadItems  []struct {
 			Name     string `json:"name"`
 			Brand    string `json:"brand"`
@@ -660,9 +709,9 @@ func estimateLeadTime(brand, category string, leadTimes map[string]int) int {
 // categoryToWBS maps long-lead item categories to their typical WBS codes.
 func categoryToWBS(category string) string {
 	mapping := map[string]string{
-		"windows":    "8.1", // Exterior Trim & Windows
-		"doors":      "8.2", // Exterior Doors
-		"hvac":       "9.1", // HVAC Rough-In
+		"windows":    "8.1",  // Exterior Trim & Windows
+		"doors":      "8.2",  // Exterior Doors
+		"hvac":       "9.1",  // HVAC Rough-In
 		"appliances": "14.1", // Appliance Installation
 		"millwork":   "13.1", // Interior Trim & Doors
 		"finishes":   "12.1", // Interior Paint

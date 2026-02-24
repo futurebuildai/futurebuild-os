@@ -19,7 +19,31 @@ import (
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
+
+// initTracer initializes the OpenTelemetry setup
+func initTracer(ctx context.Context) (*sdktrace.TracerProvider, error) {
+	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			"https://opentelemetry.io/schemas/1.24.0",
+			attribute.String("service.name", "futurebuild-api"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	return tp, nil
+}
 
 func main() {
 	readinessCheck := flag.Bool("readiness-check", false, "Run integration readiness checks and exit")
@@ -47,6 +71,18 @@ func main() {
 	defer errormon.Get().Flush()
 
 	ctx := context.Background()
+
+	// Initialize OpenTelemetry
+	tp, err := initTracer(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize OpenTelemetry: %v", err)
+	} else {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("Error shutting down tracer provider: %v", err)
+			}
+		}()
+	}
 
 	// Initialize Vertex AI Client
 	modelIDs := map[ai.ModelType]string{

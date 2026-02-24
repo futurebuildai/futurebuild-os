@@ -159,6 +159,7 @@ export class FBArtifactModal extends FBElement {
     ];
 
     @state() private _artifact: ArtifactPayload | null = null;
+    @state() private _userRole = '';
 
     private _disposeEffect: (() => void) | null = null;
 
@@ -167,6 +168,7 @@ export class FBArtifactModal extends FBElement {
 
         this._disposeEffect = effect(() => {
             this._artifact = store.popoutArtifact$.value;
+            this._userRole = store.user$.value?.role ?? '';
         });
 
         // Listen for Escape key
@@ -219,7 +221,9 @@ export class FBArtifactModal extends FBElement {
             case 'budget':
                 return html`<fb-artifact-budget .data=${data}></fb-artifact-budget>`;
             case 'invoice':
-                return html`<fb-artifact-invoice .data=${data}></fb-artifact-invoice>`;
+                const canApprove = this._userRole === 'Admin' || this._userRole === 'PM';
+                const canEdit = this._userRole === 'Admin' || this._userRole === 'PM' || this._userRole === 'Builder';
+                return html`<fb-artifact-invoice .data=${data} .canApprove=${canApprove} .canEdit=${canEdit}></fb-artifact-invoice>`;
             default:
                 return html`
                     <div class="error-message">

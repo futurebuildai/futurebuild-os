@@ -141,6 +141,7 @@ export async function request<T>(
     const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        traceparent: generateTraceparent(),
         ...headers,
     };
 
@@ -284,4 +285,24 @@ export function del<T>(
     options?: Omit<RequestOptions, 'method' | 'body'>
 ): Promise<T> {
     return request<T>(endpoint, { ...options, method: 'DELETE' });
+}
+
+// ============================================================================
+// Distributed Tracing (OpenTelemetry)
+// ============================================================================
+
+/**
+ * Generates a W3C Trace Context W3C traceparent header.
+ * Format: 00-{trace-id}-{span-id}-{trace-flags}
+ */
+function generateTraceparent(): string {
+    const traceId = generateHex(32);
+    const spanId = generateHex(16);
+    return `00-${traceId}-${spanId}-01`;
+}
+
+function generateHex(len: number): string {
+    const arr = new Uint8Array(len / 2);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, dec => dec.toString(16).padStart(2, '0')).join('');
 }

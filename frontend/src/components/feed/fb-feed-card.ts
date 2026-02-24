@@ -8,6 +8,7 @@
 import { html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { scorePriority } from '../../utils/feed-priority';
 import type { FeedCard, FeedCardType } from '../../types/feed';
 import './fb-contact-inline-add';
 
@@ -33,13 +34,6 @@ const CARD_ICONS: Partial<Record<FeedCardType, string>> = {
     welcome: '\uD83D\uDC4B',       // 👋
 };
 
-const PRIORITY_COLORS: Record<number, string> = {
-    0: '#ef4444', // critical — red
-    1: '#f97316', // urgent — orange
-    2: '#6366f1', // normal — indigo
-    3: '#6b7280', // low — gray
-};
-
 @customElement('fb-feed-card')
 export class FBFeedCard extends FBElement {
     static override styles = [
@@ -57,6 +51,20 @@ export class FBFeedCard extends FBElement {
                 transition: border-color 0.15s ease, box-shadow 0.15s ease;
             }
 
+            :host([priority="critical"]) .card {
+                border-left: 4px solid #ef4444;
+                border-color: #ef4444;
+                background: linear-gradient(90deg, rgba(239,68,68,0.05) 0%, var(--fb-surface-1, #1a1a2e) 15%);
+            }
+            :host([priority="urgent"]) .card {
+                border-left: 4px solid #f59e0b;
+                border-color: #f59e0b;
+                background: linear-gradient(90deg, rgba(245,158,11,0.05) 0%, var(--fb-surface-1, #1a1a2e) 15%);
+            }
+            :host([priority="routine"]) .card {
+                border-left: 4px solid #10b981;
+            }
+
             .card:hover {
                 border-color: var(--fb-border-hover, #3a3a5e);
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -69,12 +77,44 @@ export class FBFeedCard extends FBElement {
                 margin-bottom: 8px;
             }
 
-            .priority-dot {
+            .priority-badge {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 4px; /* align with headline */
+                flex-shrink: 0;
+            }
+            .priority-badge .dot, .priority-badge .pulse-dot {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                margin-top: 6px;
-                flex-shrink: 0;
+            }
+            .priority-badge.critical .pulse-dot {
+                background: #ef4444;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                animation: pulse 2s infinite;
+            }
+            .priority-badge.urgent .dot {
+                background: #f59e0b;
+            }
+            .priority-badge.routine .dot {
+                background: #10b981;
+            }
+            .badge-text {
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+            .priority-badge.critical .badge-text {
+                color: #ef4444;
+            }
+            .priority-badge.urgent .badge-text {
+                color: #f59e0b;
+            }
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+                70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
             }
 
             .icon {
@@ -217,6 +257,13 @@ export class FBFeedCard extends FBElement {
 
     @property({ type: Object }) card!: FeedCard;
 
+    override willUpdate(changedProperties: Map<string, unknown>) {
+        super.willUpdate(changedProperties);
+        if (changedProperties.has('card') && this.card) {
+            this.setAttribute('priority', scorePriority(this.card).priority);
+        }
+    }
+
     private _handleAction(actionId: string) {
         this.emit('fb-card-action', {
             cardId: this.card.id,
@@ -247,16 +294,40 @@ export class FBFeedCard extends FBElement {
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
+    private _renderPriorityBadge() {
+        const priority = scorePriority(this.card).priority;
+        if (priority === 'critical') {
+            return html`
+                <div class="priority-badge critical">
+                    <span class="pulse-dot"></span>
+                    <span class="badge-text">CRITICAL</span>
+                </div>
+            `;
+        } else if (priority === 'urgent') {
+            return html`
+                <div class="priority-badge urgent">
+                    <span class="dot"></span>
+                    <span class="badge-text">NEEDS ATTENTION</span>
+                </div>
+            `;
+        } else {
+            return html`
+                <div class="priority-badge routine">
+                    <span class="dot"></span>
+                </div>
+            `;
+        }
+    }
+
     override render() {
         if (!this.card) return nothing;
 
-        const priorityColor = PRIORITY_COLORS[this.card.priority] ?? PRIORITY_COLORS[2]!;
         const icon = CARD_ICONS[this.card.card_type] ?? '\u2022'; // bullet fallback
 
         return html`
             <div class="card">
                 <div class="header">
-                    <span class="priority-dot" style="background: ${priorityColor}"></span>
+                    ${this._renderPriorityBadge()}
                     <span class="icon">${icon}</span>
                     <div class="title-area">
                         <div class="headline">${this.card.headline}</div>

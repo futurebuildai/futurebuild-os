@@ -8,6 +8,7 @@ import (
 	"github.com/colton/futurebuild/internal/adapters"
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/api/handlers"
+	"github.com/colton/futurebuild/internal/audit"
 	"github.com/colton/futurebuild/internal/auth"
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
@@ -23,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
 
@@ -162,7 +164,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	var visionVerifier agents.InboundVisionVerifier
 	var visionHandler *handlers.VisionHandler
 	if aiClient != nil {
-		visionService := service.NewVisionService(aiClient)
+		agentLogger := audit.NewPgxAgentLogger(db)
+		visionService := service.NewVisionService(aiClient, agentLogger)
 		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
 		visionHandler = handlers.NewVisionHandler(visionService, db) // Sprint 2.1: Vision Pipeline
 	}
@@ -278,7 +281,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
 	var onboardingHandler *handlers.OnboardingHandler
 	if aiClient != nil {
-		interrogatorService := service.NewInterrogatorService(aiClient)
+		// Instantiate the PgxAgentLogger for the AI agents
+		agentLogger := audit.NewPgxAgentLogger(db)
+
+		interrogatorService := service.NewInterrogatorService(aiClient, agentLogger)
 		onboardingHandler = handlers.NewOnboardingHandler(interrogatorService)
 	}
 
@@ -326,6 +332,9 @@ func (s *Server) routes() {
 	s.Router.Use(chiMiddleware.Logger)
 	s.Router.Use(chiMiddleware.Recoverer)
 	s.Router.Use(securityHeaders)
+	s.Router.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(next, "futurebuild-api")
+	})
 
 	s.Router.Get("/health", s.HandleHealth)
 
@@ -528,7 +537,7 @@ func (s *Server) routes() {
 			// FUTURE: Add rate limiter when agent abuse detected
 			// r.Use(middleware.RateLimit(s.AgentRateLimiter))
 			if s.OnboardingHandler != nil {
-				r.Post("/onboard", s.OnboardingHandler.HandleOnboard)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/onboard", s.OnboardingHandler.HandleOnboard)
 			}
 		})
 

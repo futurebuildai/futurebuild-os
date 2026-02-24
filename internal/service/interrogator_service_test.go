@@ -35,7 +35,7 @@ func (m *MockAIClient) Close() error {
 // Test Suite 1: SSRF Protection
 
 func TestDownloadImage_BlocksFileScheme(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 	ctx := context.Background()
 
 	_, _, err := svc.downloadImage(ctx, "file:///etc/passwd")
@@ -44,7 +44,7 @@ func TestDownloadImage_BlocksFileScheme(t *testing.T) {
 }
 
 func TestDownloadImage_BlocksFTPScheme(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 	ctx := context.Background()
 
 	_, _, err := svc.downloadImage(ctx, "ftp://example.com/file.jpg")
@@ -53,7 +53,7 @@ func TestDownloadImage_BlocksFTPScheme(t *testing.T) {
 }
 
 func TestDownloadImage_BlocksPrivateIPs(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -77,7 +77,7 @@ func TestDownloadImage_BlocksPrivateIPs(t *testing.T) {
 }
 
 func TestDownloadImage_BlocksAWSMetadata(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 	ctx := context.Background()
 
 	_, _, err := svc.downloadImage(ctx, "http://169.254.169.254/latest/meta-data")
@@ -129,7 +129,7 @@ func TestDownloadImage_Success(t *testing.T) {
 // Test Suite 3: Business Logic
 
 func TestGetNextQuestion_ReturnsNameFirst(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	// Empty state should ask for name (P0)
 	field, question := svc.getNextQuestion(map[string]any{})
@@ -138,7 +138,7 @@ func TestGetNextQuestion_ReturnsNameFirst(t *testing.T) {
 }
 
 func TestGetNextQuestion_SkipsPopulatedFields(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	// If name is present, should ask for address (next P0)
 	state := map[string]any{"name": "Smith Residence"}
@@ -148,7 +148,7 @@ func TestGetNextQuestion_SkipsPopulatedFields(t *testing.T) {
 }
 
 func TestGetNextQuestion_ReturnsEmptyWhenComplete(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	// All fields populated (must match models.GetPriorityFields())
 	state := map[string]any{
@@ -169,7 +169,7 @@ func TestGetNextQuestion_ReturnsEmptyWhenComplete(t *testing.T) {
 }
 
 func TestGetNextQuestion_FollowsPriorityMatrix(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	// P0 fields: name, address, start_date, square_footage, foundation_type
 	state1 := map[string]any{}
@@ -192,7 +192,7 @@ func TestGetNextQuestion_FollowsPriorityMatrix(t *testing.T) {
 }
 
 func TestCheckReadyToCreate_RequiresNameAndAddress(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	state := map[string]any{
 		"name":    "Smith Residence",
@@ -203,7 +203,7 @@ func TestCheckReadyToCreate_RequiresNameAndAddress(t *testing.T) {
 }
 
 func TestCheckReadyToCreate_FalseWhenMissingName(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	state := map[string]any{
 		"address": "123 Main St, Austin, TX",
@@ -213,7 +213,7 @@ func TestCheckReadyToCreate_FalseWhenMissingName(t *testing.T) {
 }
 
 func TestCheckReadyToCreate_FalseWhenMissingAddress(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	state := map[string]any{
 		"name": "Smith Residence",
@@ -223,7 +223,7 @@ func TestCheckReadyToCreate_FalseWhenMissingAddress(t *testing.T) {
 }
 
 func TestMergeStates_NewValuesWin(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	current := map[string]any{
 		"name": "Old Name",
@@ -240,7 +240,7 @@ func TestMergeStates_NewValuesWin(t *testing.T) {
 }
 
 func TestMergeStates_PreservesUnchangedFields(t *testing.T) {
-	svc := NewInterrogatorService(&MockAIClient{})
+	svc := NewInterrogatorService(&MockAIClient{}, nil)
 
 	current := map[string]any{
 		"name":    "Smith Residence",
@@ -264,7 +264,7 @@ func TestProcessMessage_HandlesAIFailure(t *testing.T) {
 			return ai.GenerateResponse{}, fmt.Errorf("AI service unavailable")
 		},
 	}
-	svc := NewInterrogatorService(mockClient)
+	svc := NewInterrogatorService(mockClient, nil)
 
 	req := &models.OnboardRequest{
 		SessionID:    "test",
@@ -287,7 +287,7 @@ func TestProcessMessage_HandlesInvalidJSON(t *testing.T) {
 			return ai.GenerateResponse{Text: "invalid json {{"}, nil
 		},
 	}
-	svc := NewInterrogatorService(mockClient)
+	svc := NewInterrogatorService(mockClient, nil)
 
 	req := &models.OnboardRequest{
 		SessionID:    "test",
@@ -311,7 +311,7 @@ func TestExtractFromDocument_SetsTimestamp(t *testing.T) {
 
 func TestExtractFromDocument_HandlesDownloadFailure(t *testing.T) {
 	mockClient := &MockAIClient{}
-	svc := NewInterrogatorService(mockClient)
+	svc := NewInterrogatorService(mockClient, nil)
 
 	// Try to download from non-existent server
 	_, err := svc.extractFromDocument(context.Background(), "http://nonexistent-domain-12345.com/image.jpg")

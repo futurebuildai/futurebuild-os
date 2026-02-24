@@ -29,9 +29,9 @@ The central architectural shift: moving from page-based to **Context-Based** nav
 | 3: Intelligent Artifacts | 3.2: Interactive Learning | [sprint-3-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-3-2-interactive-learning.md) | ✅ Complete | CorrectionEvent capture, audit WAL spec |
 | 4: Real-Time Financials | 4.1: Service Connection | [sprint-4-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-4-1-service-connection.md) | ✅ Complete | Mock deleted, API wired, shadow specs done |
 | 5: Reactive Command Center | 5.1: Agent Feed Aggregation | [sprint-5-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-5-1-agent-feed-aggregation.md) | ✅ Complete | Shadow specs + frontend SSE wiring done |
-| 5: Reactive Command Center | 5.2: Daily Focus Algorithm | [sprint-5-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-5-2-daily-focus-algorithm.md) | 🟡 Spec Ready | Depends on 5.1 |
+| 5: Reactive Command Center | 5.2: Daily Focus Algorithm | [sprint-5-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-5-2-daily-focus-algorithm.md) | ✅ Complete | Priority sorting, traffic light styles, and dashboard summary filters complete |
 | 6: Production Hardening | 6.1: Security & RBAC | [sprint-6-1](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-6-1-security-rbac.md) | 🟡 Spec Ready | Can parallel |
-| 6: Production Hardening | 6.2: Observability | [sprint-6-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-6-2-observability.md) | 🟡 Spec Ready | Depends on 3.2 |
+| 6: Production Hardening | 6.2: Observability | [sprint-6-2](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-6-2-observability.md) | ✅ Complete | Depends on 3.2 |
 | 6: Production Hardening | 6.3: Error Handling | [sprint-6-3](file:///home/colton/Desktop/FutureBuild_HQ/XUI/planning/sprints/sprint-6-3-error-handling.md) | 🟡 Spec Ready | Can parallel |
 
 ---
