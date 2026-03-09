@@ -86,8 +86,12 @@ func (s *InterrogatorService) ProcessMessage(
 		}
 
 		if err != nil {
-			resp.Reply = "I couldn't read that file. Could you try a clearer scan or describe the project?"
-			return resp, nil
+			slog.Warn("document_extraction_failed", "error", err)
+			return &models.OnboardResponse{
+				SessionID:     req.SessionID,
+				Reply:         "manual_mode",
+				ReadyToCreate: false,
+			}, nil
 		}
 
 		// Merge extracted values into response
@@ -112,6 +116,8 @@ func (s *InterrogatorService) ProcessMessage(
 				"message", req.Message,
 				"session_id", req.SessionID,
 			)
+			// Return a normal response, but with no *new* extracted values
+			// so the flow continues and asks the clarifying question again.
 		} else if extraction != nil {
 			slog.Info("message_parsing_success",
 				"extracted_fields", len(extraction.Values),

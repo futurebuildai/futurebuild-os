@@ -10,6 +10,7 @@
 import { html, css, TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { FBElement } from './FBElement';
+import { store } from '../../store/store';
 
 @customElement('fb-error-boundary')
 export class FBErrorBoundary extends FBElement {
@@ -52,6 +53,20 @@ export class FBErrorBoundary extends FBElement {
                 color: var(--fb-text-muted);
                 max-width: 300px;
                 word-break: break-word;
+                margin-bottom: var(--fb-spacing-md);
+            }
+
+            .error-actions button {
+                background: var(--fb-bg-secondary);
+                border: 1px solid var(--fb-border);
+                color: var(--fb-text-primary);
+                padding: var(--fb-spacing-xs) var(--fb-spacing-md);
+                border-radius: var(--fb-radius-sm);
+                cursor: pointer;
+                font-size: var(--fb-text-xs);
+            }
+            .error-actions button:hover {
+                background: var(--fb-bg-tertiary);
             }
         `,
     ];
@@ -69,13 +84,47 @@ export class FBErrorBoundary extends FBElement {
     @property({ type: String, attribute: 'error-message' })
     errorMessage = 'An error occurred';
 
+    /**
+     * Expected category to dynamically select icon, title, and actions.
+     */
+    @property({ type: String, attribute: 'error-category' })
+    errorCategory: 'network' | 'auth' | 'data' | 'ai' | 'unknown' = 'unknown';
+
+    private _handleRetry() {
+        this.dispatchEvent(new CustomEvent('fb-retry', { bubbles: true, composed: true }));
+    }
+
+    private _handleLogin() {
+        store.actions.logout();
+        window.location.href = '/login';
+    }
+
     override render(): TemplateResult {
         if (this.hasError) {
+            let icon = '⚠️';
+            let title = 'Data Error';
+            let action = html`<button @click=${this._handleRetry}>Retry</button>`;
+
+            if (this.errorCategory === 'network') {
+                icon = '📡';
+                title = 'Network Error';
+                action = html`<button @click=${this._handleRetry}>Retry Connection</button>`;
+            } else if (this.errorCategory === 'auth') {
+                icon = '🔒';
+                title = 'Authentication Error';
+                action = html`<button @click=${this._handleLogin}>Log In</button>`;
+            } else if (this.errorCategory === 'ai') {
+                icon = '🤖';
+                title = 'AI Service Unavailable';
+                action = html`<button @click=${this._handleRetry}>Retry AI Request</button>`;
+            }
+
             return html`
                 <div class="error-fallback" role="alert" aria-live="polite">
-                    <span class="error-icon">⚠️</span>
-                    <span class="error-title">Data Error</span>
+                    <span class="error-icon">${icon}</span>
+                    <span class="error-title">${title}</span>
                     <span class="error-message">${this.errorMessage}</span>
+                    <div class="error-actions">${action}</div>
                 </div>
             `;
         }

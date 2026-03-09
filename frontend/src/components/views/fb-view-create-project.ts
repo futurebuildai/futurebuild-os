@@ -1,6 +1,8 @@
 import { html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import { api } from '../../services/api';
+import { notify } from '../../store/notifications';
 
 @customElement('fb-view-create-project')
 export class FBViewCreateProject extends FBElement {
@@ -172,6 +174,62 @@ export class FBViewCreateProject extends FBElement {
     @state() private _description = '';
     @state() private _files: File[] = [];
     @state() private _dragover = false;
+    @state() private _isExtracting = false;
+    @state() private _extractionError = '';
+
+    private async _processFiles(newFiles: File[]) {
+        if (newFiles.length === 0) return;
+
+        // Add all files visually
+        this._files = [...this._files, ...newFiles];
+
+        // Take the first valid file to extract (usually a plan set)
+        const fileToExtract = newFiles[0];
+        if (!fileToExtract) return;
+
+        this._isExtracting = true;
+        this._extractionError = '';
+
+        try {
+            const resp = await api.vision.extract(fileToExtract);
+
+            // Map extracted values to our form state
+            if (resp && resp.extracted_values) {
+                const values = resp.extracted_values as Record<string, string>;
+
+                // Map common fields that might be returned
+                if (values.name || values.project_name) {
+                    this._name = values.name || values.project_name || this._name;
+                }
+
+                if (values.client || values.client_name || values.owner) {
+                    this._client = values.client || values.client_name || values.owner || this._client;
+                }
+
+                // Build a description from other useful extracted values
+                const descLines = [];
+                if (values.address) descLines.push(`Address: ${values.address}`);
+                if (values.square_footage) descLines.push(`Square Footage: ${values.square_footage}`);
+                if (values.bedrooms) descLines.push(`Bedrooms: ${values.bedrooms}`);
+                if (values.bathrooms) descLines.push(`Bathrooms: ${values.bathrooms}`);
+
+                if (descLines.length > 0) {
+                    this._description = this._description
+                        ? `${this._description}\n\nExtracted Details:\n${descLines.join('\n')}`
+                        : `Extracted Details:\n${descLines.join('\n')}`;
+                }
+
+                // Add success toast
+                notify.success('Project details extracted from plan set.');
+            }
+        } catch (err: any) {
+            console.error('Extraction failed:', err);
+            this._extractionError = err.message || 'Failed to extract data from document.';
+            notify.error(this._extractionError);
+        } finally {
+            this._isExtracting = false;
+        }
+    }
 
     private _handleSubmit(e: Event) {
         e.preventDefault();
@@ -201,7 +259,7 @@ export class FBViewCreateProject extends FBElement {
         e.preventDefault();
         this._dragover = false;
         if (e.dataTransfer?.files) {
-            this._files = [...this._files, ...Array.from(e.dataTransfer.files)];
+            void this._processFiles(Array.from(e.dataTransfer.files));
         }
     }
 
@@ -209,10 +267,10 @@ export class FBViewCreateProject extends FBElement {
         const input = document.createElement('input');
         input.type = 'file';
         input.multiple = true;
-        input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt';
+        input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp';
         input.addEventListener('change', () => {
             if (input.files) {
-                this._files = [...this._files, ...Array.from(input.files)];
+                void this._processFiles(Array.from(input.files));
             }
         });
         input.click();
@@ -245,6 +303,11 @@ export class FBViewCreateProject extends FBElement {
                 <div class="drop-hint">
                     PDF, Word, Excel, or CSV — plans, specs, budgets, schedules
                 </div>
+                ${this._isExtracting ? html`
+                    <div style="margin-top: 16px; color: var(--fb-accent); font-weight: 500; font-size: 14px;">
+                        ✨ Extracting project data...
+                    </div>
+                ` : nothing}
             </div>
 
             ${this._files.length > 0 ? html`

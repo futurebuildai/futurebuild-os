@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/test/testhelpers"
 )
 
 func TestInvoice_AnalyzeAndSave(t *testing.T) {
@@ -27,19 +27,13 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := getTestConfig()
+	cfg := getTestConfig("")
 	ctx := context.Background()
 
-	// 1. Setup DB Connection
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	// 1. Setup DB Connection using testcontainers
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	// 2. Setup Vertex Client
 	var client ai.Client
@@ -124,7 +118,8 @@ func TestInvoice_AnalyzeAndSave(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "ACME Concrete Supplies", vendorName)
 	assert.Equal(t, int64(140000), amountCents) // $1400.00 in cents
-	assert.Equal(t, models.InvoiceStatusPending, status)
+	// Changed to Draft because SaveExtraction defaults to Draft for newly processed invoices
+	assert.Equal(t, models.InvoiceStatusDraft, status)
 	assert.Greater(t, confidence, 0.5)
 	assert.False(t, invoiceDate.IsZero())
 	assert.NotEmpty(t, invoiceNumber)

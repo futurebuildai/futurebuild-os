@@ -8,6 +8,9 @@
         "id": {
           "type": "string"
         },
+        "org_id": {
+          "type": "string"
+        },
         "name": {
           "type": "string"
         },
@@ -22,15 +25,70 @@
         },
         "role": {
           "$ref": "#/definitions/UserRole"
+        },
+        "contact_preference": {
+          "type": "string",
+          "enum": [
+            "SMS",
+            "Email",
+            "Both"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "trades": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "license_number": {
+          "type": "string"
+        },
+        "address_city": {
+          "type": "string"
+        },
+        "address_state": {
+          "type": "string"
+        },
+        "address_zip": {
+          "type": "string"
+        },
+        "website": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "portal_enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "last_contacted_at": {
+          "type": "string"
+        },
+        "avg_response_time_hours": {
+          "type": "number"
+        },
+        "on_time_rate": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
         }
       },
       "required": [
         "id",
+        "org_id",
         "name",
-        "company",
-        "phone",
-        "email",
-        "role"
+        "role",
+        "contact_preference",
+        "created_at",
+        "portal_enabled",
+        "source"
       ],
       "additionalProperties": false,
       "description": "Contact represents a shared contact model. See API_AND_TYPES_SPEC.md Section 4.1"
@@ -40,6 +98,8 @@
       "enum": [
         "Admin",
         "Builder",
+        "PM",
+        "Viewer",
         "Client",
         "Subcontractor"
       ],

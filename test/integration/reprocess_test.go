@@ -11,9 +11,10 @@ import (
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/colton/futurebuild/test/testhelpers"
 )
 
 func TestDocument_Reprocess(t *testing.T) {
@@ -24,17 +25,11 @@ func TestDocument_Reprocess(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := getTestConfig()
+	cfg := getTestConfig("")
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	// 1. Setup Services (Mock Client for consistent AI response)
 	mockClient := &MockVertexClient{}

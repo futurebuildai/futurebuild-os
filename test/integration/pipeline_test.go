@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
+	"github.com/colton/futurebuild/test/testhelpers"
 )
 
 // noOpClient is defined in chat_test.go (same package)
@@ -32,18 +32,11 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	}
 
 	// 1. Setup DB Connection
-	cfg := getTestConfig()
+	cfg := getTestConfig("")
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// Verify database is reachable
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	// 2. Setup Service (with no-op client as we won't call AI)
 	invoiceService := service.NewInvoiceService(db, &noOpClient{}, cfg)
@@ -136,7 +129,7 @@ func TestPipeline_MockIngestion(t *testing.T) {
 	assert.Equal(t, "6.1.2", detectedWBSCode)
 	assert.Equal(t, 0.95, confidence)
 	assert.False(t, isHumanReviewRequired, "Should not require review for high confidence")
-	assert.Equal(t, models.InvoiceStatus("Pending"), status) // Default status
+	assert.Equal(t, models.InvoiceStatusDraft, status) // Default status
 
 	// Deep check line items
 	var lineItems models.LineItems

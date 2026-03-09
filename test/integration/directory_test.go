@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/types"
+	"github.com/colton/futurebuild/test/testhelpers"
 )
 
 func TestDirectory_GetContactForPhase(t *testing.T) {
@@ -22,17 +22,10 @@ func TestDirectory_GetContactForPhase(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := getTestConfig()
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	directoryService := service.NewDirectoryService(db)
 

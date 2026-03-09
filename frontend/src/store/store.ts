@@ -100,6 +100,7 @@ const _theme$ = signal<Theme>('dark');
 const _isMobile$ = signal<boolean>(false);
 const _isTablet$ = signal<boolean>(false);
 const _activeProjectId$ = signal<string | null>(null);
+const _aiAvailable$ = signal<boolean>(true); // default true, checked by fb-app-shell
 
 // Context state (Sprint 1.1: Context Spine)
 const _contextScope$ = signal<ContextScope>('global');
@@ -473,6 +474,10 @@ const actions: StoreActions = {
         _messages$.value = thread?.messages ?? [];
     },
 
+    setAIAvailable(available: boolean): void {
+        _aiAvailable$.value = available;
+    },
+
     // ---- Upload Actions (Step 56: Drag-and-Drop Ingestion) ----
 
     setDragging(isDragging: boolean): void {
@@ -740,6 +745,7 @@ export const store = {
     isMobile$: _isMobile$ as ReadonlySignal<boolean>,
     isTablet$: _isTablet$ as ReadonlySignal<boolean>,
     activeProjectId$: _activeProjectId$ as ReadonlySignal<string | null>,
+    aiAvailable$: _aiAvailable$ as ReadonlySignal<boolean>,
 
     // ---- Context State (readonly, Sprint 1.1) ----
     contextScope$: _contextScope$ as ReadonlySignal<ContextScope>,

@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/test/testhelpers"
 )
 
 // TestRag_IngestAndSearch verifies the RAG pipeline end-to-end.
@@ -27,20 +27,13 @@ func TestRag_IngestAndSearch(t *testing.T) {
 		t.Skip("Skipping integration test in CI environment")
 	}
 
-	cfg := getTestConfig()
+	cfg := getTestConfig("")
 	ctx := context.Background()
 
 	// 1. Setup DB Connection
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// ping to ensure connected
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	// 2. Setup Vertex Client
 	// Build map for model IDs

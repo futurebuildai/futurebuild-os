@@ -25,6 +25,7 @@ import { clerkService } from '../../services/clerk';
 import { isPlatformAdmin } from '../../services/platform-admin';
 import type { ProjectPill } from '../../types/feed';
 import { api } from '../../services/api';
+import { errorReporter } from '../../services/error-reporter';
 
 // V2 Components
 import './fb-top-bar';
@@ -310,6 +311,16 @@ export class FBAppShell extends FBElement {
     override connectedCallback(): void {
         super.connectedCallback();
 
+        // Sprint 6.3: Initialize global error boundary interceptors
+        errorReporter.init();
+        errorReporter.addListener((error) => {
+            const detail = { message: `[${error.category.toUpperCase()}] ${error.message}`, type: 'error' };
+            window.dispatchEvent(new CustomEvent('fb-toast', { detail, bubbles: true, composed: true }));
+        });
+
+        // Sprint 6.3: Check AI Health on boot
+        void this._checkAIHealth();
+
         void this._initClerkAndStore();
 
         // Drag-and-drop
@@ -446,6 +457,21 @@ export class FBAppShell extends FBElement {
             const { mockFeedService } = await import('../../services/mock-feed-service');
             const resp = await mockFeedService.getFeed();
             this._projects = resp.projects;
+        }
+    }
+
+    private async _checkAIHealth(): Promise<void> {
+        try {
+            const resp = await fetch('/api/v1/health/ai');
+            if (resp.ok) {
+                const data = await resp.json();
+                store.actions.setAIAvailable(data.status === 'healthy');
+            } else {
+                store.actions.setAIAvailable(false);
+            }
+        } catch (err) {
+            console.warn('[FBAppShell] Failed to check AI health:', err);
+            store.actions.setAIAvailable(false);
         }
     }
 
@@ -736,6 +762,14 @@ export class FBAppShell extends FBElement {
 
         // Budget route protection (RBAC check)
         if ((this._route.view === 'budget' || this._route.view === 'project-budget') && this._isAuthenticated) {
+            if (this._userRole === 'Subcontractor' || this._userRole === 'Viewer') {
+                setTimeout(() => this._navigate('/'), 0);
+                return html`<div class="loading-screen">Redirecting...</div>`;
+            }
+        }
+
+        // Create Project & Settings route protection (RBAC check)
+        if ((this._route.view === 'project-create' || this._route.view.startsWith('settings-')) && this._isAuthenticated) {
             if (this._userRole === 'Subcontractor' || this._userRole === 'Viewer') {
                 setTimeout(() => this._navigate('/'), 0);
                 return html`<div class="loading-screen">Redirecting...</div>`;

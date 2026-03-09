@@ -68,8 +68,15 @@ func (s *VisionService) ParseDocument(ctx context.Context, fileBytes []byte, mim
 
 	result, err := s.client.GenerateContent(ctx, req)
 	if err != nil {
-		slog.Error("vision: extraction failed", "error", err.Error())
-		return nil, fmt.Errorf("AI extraction failed: %w", err)
+		slog.Error("vision: extraction failed, falling back to manual mode", "error", err.Error())
+		return &models.VisionExtractionResponse{
+			ExtractedValues: make(map[string]any),
+			ConfidenceReport: models.ConfidenceReport{
+				OverallConfidence: 0.0,
+				FieldConfidences:  make(map[string]float64),
+				Warnings:          []string{"AI service unavailable. Please enter details manually."},
+			},
+		}, nil
 	}
 
 	// Strip markdown code block wrappers if present

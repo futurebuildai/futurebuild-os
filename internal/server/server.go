@@ -63,6 +63,7 @@ type Server struct {
 	AuthMiddleware         *middleware.AuthMiddleware
 	PortalRateLimiter      *middleware.IPRateLimiter // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter      *middleware.IPRateLimiter // L7: Rate limiter for public invite/portal action endpoints
+	AIClient               ai.Client                 // Sprint 6.3: Reference for AI health checks
 }
 
 func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server {
@@ -322,6 +323,7 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		AuthMiddleware:         authMiddleware,
 		PortalRateLimiter:      portalRateLimiter,
 		PublicRateLimiter:      publicRateLimiter,
+		AIClient:               aiClient,
 	}
 
 	s.routes()
@@ -339,6 +341,8 @@ func (s *Server) routes() {
 	s.Router.Get("/health", s.HandleHealth)
 
 	s.Router.Route("/api/v1", func(r chi.Router) {
+		// Sprint 6.3 AI health check (public, so frontend can adapt layout pre-login if necessary, or just rely on it)
+		r.Get("/health/ai", s.HandleAIHealthCheck)
 		// Phase 12: Legacy /auth/login and /auth/verify removed — Clerk handles sign-in.
 		// See STEP_78_AUTH_PROVIDER.md Section 2.1
 		r.Route("/auth", func(r chi.Router) {
@@ -645,6 +649,17 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
+}
+
+func (s *Server) HandleAIHealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.AIClient == nil {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status": "manual_mode"}`))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status": "healthy"}`))
 }
 
 // securityHeaders adds standard HTTP security headers to every response.

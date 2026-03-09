@@ -25,6 +25,12 @@
           "items": {
             "$ref": "#/definitions/GanttTask"
           }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GanttDependency"
+          }
         }
       },
       "required": [
@@ -86,6 +92,23 @@
         "Delayed"
       ],
       "description": "TaskStatus defines the lifecycle of a ProjectTask. See API_AND_TYPES_SPEC.md Section 1.1"
+    },
+    "GanttDependency": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "additionalProperties": false,
+      "description": "GanttDependency represents a directed edge between two tasks. See STEP_89_DEPENDENCY_ARROWS.md Section 1.2"
     }
   }
 }

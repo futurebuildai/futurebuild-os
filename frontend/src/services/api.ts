@@ -131,6 +131,26 @@ export interface OnboardProcessResponse {
     status?: 'gathering' | 'clarifying' | 'satisfied' | 'error';
 }
 
+/**
+ * Confidence data for extracted fields.
+ */
+export interface ConfidenceReport {
+    overall_confidence: number;
+    field_confidences: Record<string, number>;
+    warnings: string[];
+    suggested_questions: string[];
+}
+
+/**
+ * Response from the VisionExtractionResponse endpoint.
+ */
+export interface VisionExtractionResponse {
+    extracted_values: Record<string, unknown>;
+    confidence_report: ConfidenceReport;
+    long_lead_items?: LongLeadItem[];
+    raw_text?: string;
+}
+
 // ============================================================================
 // Chat Types
 // ============================================================================
@@ -626,6 +646,35 @@ export const api = {
          */
         status(assetId: string): Promise<VisionStatusResponse> {
             return get<VisionStatusResponse>(`/vision/status/${assetId}`);
+        },
+
+        /**
+         * Extract data from a document (e.g. plan set or image).
+         * @param file - File to extract data from
+         */
+        async extract(file: File): Promise<VisionExtractionResponse> {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Manual fetch since http wrapper doesn't support FormData directly
+            const headers: Record<string, string> = {};
+            const tokenResponse = localStorage.getItem('fb_auth_token'); // Mock token if not configured
+            if (tokenResponse) {
+                headers['Authorization'] = `Bearer ${tokenResponse}`;
+            }
+
+            const response = await fetch('/api/v1/vision/extract', {
+                method: 'POST',
+                headers,
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(errorBody.error || `HTTP ${response.status}`);
+            }
+
+            return response.json() as Promise<VisionExtractionResponse>;
         },
     },
 

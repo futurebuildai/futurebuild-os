@@ -44,11 +44,11 @@ func (m *MockVertexClient) GenerateContent(ctx context.Context, req ai.GenerateR
 			"vendor": "ACME Concrete Supplies",
 			"date": "2026-01-15",
 			"invoice_number": "INV-2026-001",
-			"total_amount_cents": 140000,
+			"total_amount_cents": "140000",
 			"line_items": [
-				{"description": "3000 PSI Ready Mix Concrete", "quantity": 10, "unit_price_cents": 12000, "total_cents": 120000},
-				{"description": "Delivery Fee", "quantity": 1, "unit_price_cents": 15000, "total_cents": 15000},
-				{"description": "Environmental Surcharge", "quantity": 1, "unit_price_cents": 5000, "total_cents": 5000}
+				{"description": "3000 PSI Ready Mix Concrete", "quantity": 10, "unit_price_cents": "12000", "total_cents": "120000"},
+				{"description": "Delivery Fee", "quantity": 1, "unit_price_cents": "15000", "total_cents": "15000"},
+				{"description": "Environmental Surcharge", "quantity": 1, "unit_price_cents": "5000", "total_cents": "5000"}
 			],
 			"suggested_wbs_code": "6.2",
 			"confidence": 0.98
@@ -84,7 +84,7 @@ func contains(s, substr string) bool {
 func TestVisionService_VerifyTask(t *testing.T) {
 	// 1. Setup Client (Real or Mock)
 	var client ai.Client
-	cfg := getTestConfig()
+	cfg := getTestConfig("")
 
 	if cfg.VertexProjectID != "" {
 		// Try to use Real Client
@@ -107,7 +107,7 @@ func TestVisionService_VerifyTask(t *testing.T) {
 	}
 	defer client.Close()
 
-	visionService := service.NewVisionService(client)
+	visionService := service.NewVisionService(client, nil)
 	ctx := context.Background()
 
 	// Create a mock server to serve an image

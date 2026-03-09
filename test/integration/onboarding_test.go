@@ -13,9 +13,11 @@ import (
 	"testing"
 
 	"github.com/colton/futurebuild/internal/api/handlers"
+	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/ai"
+	"github.com/colton/futurebuild/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +73,7 @@ func TestOnboardEndpoint_ReturnsValidJSON(t *testing.T) {
 		},
 	}
 
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	reqBody := models.OnboardRequest{
@@ -85,9 +87,12 @@ func TestOnboardEndpoint_ReturnsValidJSON(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Simulate auth middleware setting context values
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{
+		UserID: "user_123",
+		OrgID:  "tenant_456",
+		Role:   types.UserRoleBuilder,
+	}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -107,7 +112,7 @@ func TestOnboardEndpoint_ReturnsValidJSON(t *testing.T) {
 
 func TestOnboardEndpoint_RequiresAuth(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	reqBody := models.OnboardRequest{
@@ -148,7 +153,7 @@ func TestOnboardEndpoint_ExtractsFromMessage(t *testing.T) {
 		},
 	}
 
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	reqBody := models.OnboardRequest{
@@ -160,9 +165,8 @@ func TestOnboardEndpoint_ExtractsFromMessage(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -202,7 +206,7 @@ func TestOnboardEndpoint_ProgressesToReady(t *testing.T) {
 		},
 	}
 
-	interrogatorService1 := service.NewInterrogatorService(mockClient1)
+	interrogatorService1 := service.NewInterrogatorService(mockClient1, nil)
 	handler1 := handlers.NewOnboardingHandler(interrogatorService1)
 
 	reqBody1 := models.OnboardRequest{
@@ -214,9 +218,8 @@ func TestOnboardEndpoint_ProgressesToReady(t *testing.T) {
 
 	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes1))
 	req1.Header.Set("Content-Type", "application/json")
-	ctx1 := context.WithValue(req1.Context(), "user_id", "user_123")
-	ctx1 = context.WithValue(ctx1, "tenant_id", "tenant_456")
-	req1 = req1.WithContext(ctx1)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req1 = req1.WithContext(middleware.WithClaims(req1.Context(), claims))
 
 	rr1 := httptest.NewRecorder()
 	handler1.HandleOnboard(rr1, req1)
@@ -243,7 +246,7 @@ func TestOnboardEndpoint_ProgressesToReady(t *testing.T) {
 		},
 	}
 
-	interrogatorService2 := service.NewInterrogatorService(mockClient2)
+	interrogatorService2 := service.NewInterrogatorService(mockClient2, nil)
 	handler2 := handlers.NewOnboardingHandler(interrogatorService2)
 
 	// Current state includes extracted values from turn 1
@@ -260,9 +263,8 @@ func TestOnboardEndpoint_ProgressesToReady(t *testing.T) {
 
 	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes2))
 	req2.Header.Set("Content-Type", "application/json")
-	ctx2 := context.WithValue(req2.Context(), "user_id", "user_123")
-	ctx2 = context.WithValue(ctx2, "tenant_id", "tenant_456")
-	req2 = req2.WithContext(ctx2)
+	claims2 := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req2 = req2.WithContext(middleware.WithClaims(req2.Context(), claims2))
 
 	rr2 := httptest.NewRecorder()
 	handler2.HandleOnboard(rr2, req2)
@@ -277,7 +279,7 @@ func TestOnboardEndpoint_ProgressesToReady(t *testing.T) {
 
 func TestOnboardEndpoint_RejectsOversizedBody(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	// Create a 2MB request body (exceeds 1MB limit)
@@ -291,9 +293,8 @@ func TestOnboardEndpoint_RejectsOversizedBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -303,7 +304,7 @@ func TestOnboardEndpoint_RejectsOversizedBody(t *testing.T) {
 
 func TestOnboardEndpoint_RejectsInvalidSessionID(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	testCases := []struct {
@@ -327,9 +328,8 @@ func TestOnboardEndpoint_RejectsInvalidSessionID(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 			req.Header.Set("Content-Type", "application/json")
-			ctx := context.WithValue(req.Context(), "user_id", "user_123")
-			ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-			req = req.WithContext(ctx)
+			claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+			req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 			rr := httptest.NewRecorder()
 			handler.HandleOnboard(rr, req)
@@ -345,7 +345,7 @@ func TestOnboardEndpoint_RejectsInvalidSessionID(t *testing.T) {
 
 func TestOnboardEndpoint_RejectsInvalidDocumentURL(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	testCases := []struct {
@@ -356,9 +356,10 @@ func TestOnboardEndpoint_RejectsInvalidDocumentURL(t *testing.T) {
 	}{
 		{"valid http URL", "http://example.com/blueprint.jpg", false, false},
 		{"valid https URL", "https://example.com/blueprint.jpg", false, false},
-		{"invalid scheme", "file:///etc/passwd", false, true}, // SSRF blocks file://
-		{"too long URL", "http://" + strings.Repeat("a", 2000) + ".com", true, false}, // Input validation catches length
-		{"malformed URL", "not a url", false, true}, // Passes validation, caught by SSRF
+		{"invalid scheme", "file:///etc/passwd", true, false},                          // Input validation blocks file://
+		{"too long URL", "http://" + strings.Repeat("a", 2000) + ".com", true, false},  // Input validation catches length
+		{"malformed URL", "not a url", true, false},                                    // Input validation catches
+		{"aws metadata ssrf", "http://169.254.169.254/latest/meta-data/", false, true}, // SSRF protection blocks local IP
 	}
 
 	for _, tc := range testCases {
@@ -372,9 +373,8 @@ func TestOnboardEndpoint_RejectsInvalidDocumentURL(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 			req.Header.Set("Content-Type", "application/json")
-			ctx := context.WithValue(req.Context(), "user_id", "user_123")
-			ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-			req = req.WithContext(ctx)
+			claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+			req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 			rr := httptest.NewRecorder()
 			handler.HandleOnboard(rr, req)
@@ -391,7 +391,10 @@ func TestOnboardEndpoint_RejectsInvalidDocumentURL(t *testing.T) {
 				require.NoError(t, err)
 
 				// Should contain friendly error message
-				assert.Contains(t, resp.Reply, "couldn't read")
+				// Should contain friendly error message or graceful degradation mode
+				assert.Condition(t, func() bool {
+					return strings.Contains(resp.Reply, "couldn't read") || strings.Contains(resp.Reply, "manual_mode")
+				}, "Reply should indicate error or fallback mode, got: "+resp.Reply)
 			} else {
 				// Valid URL (may fail to fetch, but that's OK for this test)
 				assert.Equal(t, http.StatusOK, rr.Code)
@@ -402,7 +405,7 @@ func TestOnboardEndpoint_RejectsInvalidDocumentURL(t *testing.T) {
 
 func TestOnboardEndpoint_RejectsTooManyStateFields(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	// Create state with 51 fields (exceeds 50 limit)
@@ -420,9 +423,8 @@ func TestOnboardEndpoint_RejectsTooManyStateFields(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -432,7 +434,7 @@ func TestOnboardEndpoint_RejectsTooManyStateFields(t *testing.T) {
 
 func TestOnboardEndpoint_RejectsNilCurrentState(t *testing.T) {
 	mockClient := &MockAIClient{}
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	reqBody := map[string]any{
@@ -444,9 +446,8 @@ func TestOnboardEndpoint_RejectsNilCurrentState(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -480,7 +481,7 @@ func TestOnboardingFlow_CompleteWizard(t *testing.T) {
 		},
 	}
 
-	interrogatorService := service.NewInterrogatorService(mockClient)
+	interrogatorService := service.NewInterrogatorService(mockClient, nil)
 	handler := handlers.NewOnboardingHandler(interrogatorService)
 
 	reqBody := models.OnboardRequest{
@@ -492,9 +493,8 @@ func TestOnboardingFlow_CompleteWizard(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), "user_id", "user_123")
-	ctx = context.WithValue(ctx, "tenant_id", "tenant_456")
-	req = req.WithContext(ctx)
+	claims := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req = req.WithContext(middleware.WithClaims(req.Context(), claims))
 
 	rr := httptest.NewRecorder()
 	handler.HandleOnboard(rr, req)
@@ -526,7 +526,7 @@ func TestOnboardingFlow_CompleteWizard(t *testing.T) {
 		},
 	}
 
-	interrogatorService2 := service.NewInterrogatorService(mockClient2)
+	interrogatorService2 := service.NewInterrogatorService(mockClient2, nil)
 	handler2 := handlers.NewOnboardingHandler(interrogatorService2)
 
 	reqBody2 := models.OnboardRequest{
@@ -541,9 +541,8 @@ func TestOnboardingFlow_CompleteWizard(t *testing.T) {
 
 	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/agent/onboard", bytes.NewReader(bodyBytes2))
 	req2.Header.Set("Content-Type", "application/json")
-	ctx2 := context.WithValue(req2.Context(), "user_id", "user_123")
-	ctx2 = context.WithValue(ctx2, "tenant_id", "tenant_456")
-	req2 = req2.WithContext(ctx2)
+	claims2 := &types.Claims{UserID: "user_123", OrgID: "tenant_456", Role: types.UserRoleBuilder}
+	req2 = req2.WithContext(middleware.WithClaims(req2.Context(), claims2))
 
 	rr2 := httptest.NewRecorder()
 	handler2.HandleOnboard(rr2, req2)

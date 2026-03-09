@@ -21,9 +21,9 @@ import (
 	"github.com/colton/futurebuild/internal/server"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/types"
+	"github.com/colton/futurebuild/test/testhelpers"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,18 +112,20 @@ func getTestConfig(jwksIssuerURL string) *config.Config {
 	if err == nil {
 		// Override with test JWKS server so the middleware validates our test tokens
 		cfg.ClerkIssuerURL = jwksIssuerURL
+		cfg.InvoiceConfidenceThreshold = 0.85 // Make sure tests have a predictable threshold
 		return cfg
 	}
 
 	// Create a test config with sensible defaults
 	return &config.Config{
-		DatabaseURL:    "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable",
-		RedisURL:       "localhost:6379",
-		AppPort:        8080,
-		JWTSecret:      "test-secret-for-integration-tests",
-		JWTExpiry:      24 * time.Hour,
-		WebhookSecret:  "test-webhook-secret",
-		ClerkIssuerURL: jwksIssuerURL,
+		DatabaseURL:                "postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable",
+		RedisURL:                   "localhost:6379",
+		AppPort:                    8080,
+		JWTSecret:                  "test-secret-for-integration-tests",
+		JWTExpiry:                  24 * time.Hour,
+		WebhookSecret:              "test-webhook-secret",
+		ClerkIssuerURL:             jwksIssuerURL,
+		InvoiceConfidenceThreshold: 0.85,
 	}
 }
 
@@ -139,16 +141,9 @@ func TestChat_EndToEnd(t *testing.T) {
 	// 1. Setup DB Connection
 	cfg := getTestConfig(jwksServer.URL)
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// Verify database is reachable
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
+	var err error
 
 	// 2. Create Test Fixtures (Org, User, Project)
 	orgID := uuid.New()
@@ -166,6 +161,10 @@ func TestChat_EndToEnd(t *testing.T) {
 
 	projectID := uuid.New()
 	_, err = db.Exec(ctx, "INSERT INTO projects (id, org_id, name, status) VALUES ($1, $2, 'Chat Test Project', 'Active')", projectID, orgID)
+	require.NoError(t, err)
+
+	threadID := uuid.New()
+	_, err = db.Exec(ctx, "INSERT INTO threads (id, project_id, title) VALUES ($1, $2, 'Test Thread')", threadID, projectID)
 	require.NoError(t, err)
 
 	// 3. Generate RS256 JWT (Phase 12: Clerk JWKS)
@@ -192,6 +191,7 @@ func TestChat_EndToEnd(t *testing.T) {
 	// 5. Execute Request
 	chatReq := chat.ChatRequest{
 		ProjectID: projectID,
+		ThreadID:  threadID,
 		Message:   "Analyze this invoice",
 	}
 	body, err := json.Marshal(chatReq)
@@ -250,16 +250,8 @@ func TestChat_NoToken_Unauthorized(t *testing.T) {
 	defer jwksServer.Close()
 
 	cfg := getTestConfig(jwksServer.URL)
-	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)
@@ -268,6 +260,7 @@ func TestChat_NoToken_Unauthorized(t *testing.T) {
 	// Request WITHOUT Authorization header
 	chatReq := chat.ChatRequest{
 		ProjectID: uuid.New(),
+		ThreadID:  uuid.New(),
 		Message:   "Test message",
 	}
 	body, err := json.Marshal(chatReq)
@@ -296,16 +289,8 @@ func TestChat_InvalidToken_Unauthorized(t *testing.T) {
 	defer jwksServer.Close()
 
 	cfg := getTestConfig(jwksServer.URL)
-	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)
@@ -314,6 +299,7 @@ func TestChat_InvalidToken_Unauthorized(t *testing.T) {
 	// Request with GARBAGE token
 	chatReq := chat.ChatRequest{
 		ProjectID: uuid.New(),
+		ThreadID:  uuid.New(),
 		Message:   "Test message",
 	}
 	body, err := json.Marshal(chatReq)
@@ -342,16 +328,8 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 	defer jwksServer.Close()
 
 	cfg := getTestConfig(jwksServer.URL)
-	ctx := context.Background()
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.Ping(ctx); err != nil {
-		t.Skipf("Skipping test: database not reachable: %v", err)
-	}
+	db, cleanup := testhelpers.StartPostgresContainer(t)
+	defer cleanup()
 
 	s := server.NewServer(db, cfg, &noOpClient{})
 	ts := httptest.NewServer(s.Router)
@@ -372,6 +350,7 @@ func TestChat_ExpiredToken_Unauthorized(t *testing.T) {
 	// Request with expired token
 	chatReq := chat.ChatRequest{
 		ProjectID: uuid.New(),
+		ThreadID:  uuid.New(),
 		Message:   "Test message",
 	}
 	body, err := json.Marshal(chatReq)

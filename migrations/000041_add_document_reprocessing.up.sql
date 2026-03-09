@@ -19,4 +19,4 @@ ALTER TABLE invoices
     ADD COLUMN IF NOT EXISTS source_document_id UUID REFERENCES documents(id) ON DELETE SET NULL;
 
 -- Index for invoice-document lookups (enables efficient UPSERT checks)
-CREATE INDEX IF NOT EXISTS idx_invoices_source_document_id ON invoices(source_document_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_source_document_id ON invoices(source_document_id);

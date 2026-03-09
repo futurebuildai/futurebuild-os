@@ -24,7 +24,7 @@ CREATE TABLE feed_cards (
 
 -- Primary query: active cards for an org, sorted by priority
 CREATE INDEX idx_feed_cards_org_active ON feed_cards(org_id, priority, created_at DESC)
-    WHERE dismissed_at IS NULL AND (snoozed_until IS NULL OR snoozed_until < NOW());
+    WHERE dismissed_at IS NULL;
 
 -- Filter by project
 CREATE INDEX idx_feed_cards_project ON feed_cards(project_id, created_at DESC)

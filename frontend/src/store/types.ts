@@ -289,6 +289,8 @@ export interface UIState {
     activeProjectId: string | null;
     /** Currently active thread ID */
     activeThreadId: string | null;
+    /** Sprint 6.3: Is Vertex AI online and available? */
+    aiAvailable: boolean;
 }
 
 // ============================================================================
@@ -400,6 +402,7 @@ export interface StoreActions {
     setIsTablet(isTablet: boolean): void;
     setActiveProject(projectId: string | null): void;
     setActiveThread(threadId: string | null): void;
+    setAIAvailable(available: boolean): void;
 
     // Upload actions (Step 56: Drag-and-Drop Ingestion)
     setDragging(isDragging: boolean): void;
