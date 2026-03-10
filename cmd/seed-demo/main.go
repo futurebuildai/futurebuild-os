@@ -14,6 +14,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -191,17 +192,25 @@ func seedDemoData(ctx context.Context, tx pgx.Tx) error {
 	// =========================================================================
 	// 3. Contacts (Subcontractors)
 	// =========================================================================
+	// Demo Roofing Co contact for FB-Brain integration (referenced by email from FB-Brain seed)
+	demoRoofingContact := DemoContact{
+		ID: uuid.New(), Name: "Demo Roofing Co", Company: "Demo Roofing Co",
+		Phone: "+16195551234", Email: "owner@demo-roofing.com",
+		Role: "Subcontractor", ContactPreference: "Email",
+	}
+
 	contacts := []DemoContact{
 		{ID: uuid.New(), Name: "Rodriguez Electric", Company: "Rodriguez Electrical LLC", Phone: "+15551234001", Email: "dispatch@rodriguez-electric.demo", Role: "Subcontractor", ContactPreference: "SMS"},
 		{ID: uuid.New(), Name: "Premium Plumbing", Company: "Premium Plumbing Co", Phone: "+15551234002", Email: "jobs@premium-plumbing.demo", Role: "Subcontractor", ContactPreference: "Both"},
 		{ID: uuid.New(), Name: "HVAC Masters", Company: "HVAC Masters Inc", Phone: "+15551234003", Email: "service@hvac-masters.demo", Role: "Subcontractor", ContactPreference: "Email"},
 		{ID: uuid.New(), Name: "Drywall Pro", Company: "Drywall Professionals", Phone: "+15551234004", Email: "quotes@drywallpro.demo", Role: "Subcontractor", ContactPreference: "SMS"},
 		{ID: uuid.New(), Name: "Summit Roofing", Company: "Summit Roofing Group", Phone: "+15551234005", Email: "bids@summit-roofing.demo", Role: "Subcontractor", ContactPreference: "Both"},
+		demoRoofingContact,
 	}
 
 	for _, c := range contacts {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO contacts (id, org_id, name, company, phone, email, global_role, contact_preference)
+			INSERT INTO contacts (id, org_id, name, company, phone, email, role, contact_preference)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`, c.ID, org.ID, c.Name, c.Company, c.Phone, c.Email, c.Role, c.ContactPreference)
 		if err != nil {
@@ -214,6 +223,20 @@ func seedDemoData(ctx context.Context, tx pgx.Tx) error {
 	// 4. Projects (3 at different completion stages)
 	// =========================================================================
 	baseDate := time.Now().AddDate(0, -3, 0) // 3 months ago
+
+	// Riverside project: set permit date so WBS 8.2 (Roofing) early_start ≈ May 1, 2026.
+	// Sum of durations from 5.2→8.2: 0+3+2+3+4+2+1+3+4+6+5+3+1+3 = 40 working days.
+	// Set permit ~47 calendar days before May 1 to account for that.
+	riversidePermitDate := time.Date(2026, 2, 26, 0, 0, 0, 0, time.UTC)
+	riversideProject := DemoProject{
+		ID:                uuid.New(),
+		Name:              "Riverside New Home Build",
+		Address:           "2100 River Road, San Diego, CA 92101",
+		Status:            "Active",
+		GSF:               3200,
+		PermitIssuedDate:  riversidePermitDate,
+		CompletionPercent: 55, // Everything through Phase 7 complete
+	}
 
 	projects := []DemoProject{
 		{
@@ -243,6 +266,7 @@ func seedDemoData(ctx context.Context, tx pgx.Tx) error {
 			PermitIssuedDate:  time.Now().AddDate(0, 0, 14), // 2 weeks from now
 			CompletionPercent: 0,
 		},
+		riversideProject,
 	}
 
 	for _, p := range projects {
@@ -283,6 +307,7 @@ func seedDemoData(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO project_assignments (id, project_id, contact_id, wbs_phase_id)
 			VALUES ($1, $2, $3, $4)
+			ON CONFLICT DO NOTHING
 		`, uuid.New(), chenProject.ID, c.ID, phases[phaseIdx])
 		if err != nil {
 			return fmt.Errorf("insert assignment for %s: %w", c.Name, err)
@@ -291,7 +316,51 @@ func seedDemoData(ctx context.Context, tx pgx.Tx) error {
 	log.Printf("Created %d project assignments", len(contacts))
 
 	// =========================================================================
-	// 6. Auth Token for Demo Login (optional - for testing)
+	// 6. Integration Feed Cards (Riverside project — FB-Brain demo flow)
+	// =========================================================================
+	type feedCardAction struct {
+		ID    string `json:"id"`
+		Label string `json:"label"`
+		Style string `json:"style"`
+	}
+
+	materialActions, _ := json.Marshal([]feedCardAction{
+		{ID: "request_material_quote", Label: "Request Quote", Style: "primary"},
+		{ID: "dismiss", Label: "Later", Style: "secondary"},
+	})
+	laborActions, _ := json.Marshal([]feedCardAction{
+		{ID: "send_labor_rfq", Label: "Send RFQ", Style: "primary"},
+		{ID: "dismiss", Label: "Later", Style: "secondary"},
+	})
+
+	// Material quote prompt card
+	_, err = tx.Exec(ctx, `
+		INSERT INTO feed_cards (id, org_id, project_id, card_type, priority, headline, body, horizon, actions, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+	`, uuid.New(), org.ID, riversideProject.ID, "material_quote_prompt", 1,
+		"Get roofing material quotes for Riverside New Home",
+		"Roofing phase starts May 1, 2026. Request pricing from your LBM supplier for standard roofing scope.",
+		"today", materialActions)
+	if err != nil {
+		return fmt.Errorf("insert material_quote_prompt card: %w", err)
+	}
+	log.Println("Created feed card: material_quote_prompt")
+
+	// Labor bid prompt card
+	_, err = tx.Exec(ctx, `
+		INSERT INTO feed_cards (id, org_id, project_id, card_type, priority, headline, body, horizon, actions, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+	`, uuid.New(), org.ID, riversideProject.ID, "labor_bid_prompt", 1,
+		"Get labor bid from Demo Roofing Co",
+		"Send an RFQ to Demo Roofing Co for the roofing phase. They're available in the San Diego area.",
+		"today", laborActions)
+	if err != nil {
+		return fmt.Errorf("insert labor_bid_prompt card: %w", err)
+	}
+	log.Println("Created feed card: labor_bid_prompt")
+
+	// =========================================================================
+	// 7. Auth Token for Demo Login (optional - for testing)
 	// =========================================================================
 	// Create a pre-generated magic link token for the admin user
 	demoToken := "demo-magic-link-token-12345"

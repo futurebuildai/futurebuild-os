@@ -31,6 +31,15 @@ const (
 	FeedCardCalibrationDrift    FeedCardType = "calibration_drift"
 	FeedCardMilestone           FeedCardType = "milestone"
 	FeedCardWelcome             FeedCardType = "welcome"
+
+	// Integration card types (FB-Brain cross-system flows)
+	FeedCardMaterialQuotePrompt  FeedCardType = "material_quote_prompt"
+	FeedCardMaterialQuoteReview  FeedCardType = "material_quote_review"
+	FeedCardMaterialOrderConfirm FeedCardType = "material_order_confirm"
+	FeedCardLaborBidPrompt       FeedCardType = "labor_bid_prompt"
+	FeedCardLaborBidReview       FeedCardType = "labor_bid_review"
+	FeedCardLaborBidConfirm      FeedCardType = "labor_bid_confirm"
+	FeedCardDeliveryConfirm      FeedCardType = "delivery_confirm"
 )
 
 // FeedCardHorizon defines the temporal grouping of a feed card.

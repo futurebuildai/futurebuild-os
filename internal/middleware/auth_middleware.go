@@ -58,8 +58,15 @@ func NewAuthMiddleware(cfg *config.Config, db *pgxpool.Pool) *AuthMiddleware {
 
 // RequireAuth validates a Clerk-issued JWT from the Authorization header.
 // Extracts claims and populates types.Claims in the request context.
+// If claims are already present (e.g., from DevAuthMiddleware), skip JWT validation.
 func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Dev auth bypass: if claims already injected by DevAuthMiddleware, pass through.
+		if _, ok := r.Context().Value(claimsContextKey).(*types.Claims); ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			response.JSONError(w, http.StatusUnauthorized, "Unauthorized")

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -60,8 +61,10 @@ type Server struct {
 	FeedHandler            *handlers.FeedHandler            // V2: Portfolio feed endpoint
 	ContactHandler         *handlers.ContactHandler         // V2: Contact CRUD + assignments
 	VisionHandler          *handlers.VisionHandler          // Sprint 2.1: Vision Pipeline extract endpoint
+	IntegrationHandler     *handlers.IntegrationHandler     // FB-Brain integration webhook receiver
 	AuthMiddleware         *middleware.AuthMiddleware
-	PortalRateLimiter      *middleware.IPRateLimiter // Phase 12: Rate limiter for portal auth endpoints
+	DevAuthMiddleware      *middleware.DevAuthMiddleware // Dev-only auth bypass for integration demos
+	PortalRateLimiter      *middleware.IPRateLimiter     // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter      *middleware.IPRateLimiter // L7: Rate limiter for public invite/portal action endpoints
 	AIClient               ai.Client                 // Sprint 6.3: Reference for AI health checks
 }
@@ -190,6 +193,13 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	authHandler := handlers.NewAuthHandler()
 	authMiddleware := middleware.NewAuthMiddleware(cfg, db)
 
+	// Dev auth bypass: when DEV_AUTH_BYPASS=true, inject demo claims instead of Clerk JWT.
+	var devAuthMiddleware *middleware.DevAuthMiddleware
+	if middleware.IsDevAuthEnabled() {
+		devAuthMiddleware = middleware.NewDevAuthMiddleware(db)
+		log.Println("DEV AUTH BYPASS ENABLED — Clerk JWT validation will be skipped")
+	}
+
 	// Phase 12: Portal contacts still use magic-link auth (separate from Clerk).
 	// AuthService provides token generation, storage, and verification for portal.
 	authService := service.NewAuthService(db, cfg)
@@ -247,6 +257,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// V2: Contact CRUD + project phase assignments
 	contactHandler := handlers.NewContactHandler(db)
+
+	// FB-Brain integration webhook receiver (API-key auth, no Clerk)
+	integrationHandler := handlers.NewIntegrationHandler(feedService, db)
 
 	// Project Completion: service + handler
 	completionService := service.NewCompletionService(db)
@@ -320,7 +333,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		FeedHandler:            feedHandler,            // V2: Portfolio feed
 		ContactHandler:         contactHandler,         // V2: Contact CRUD + assignments
 		VisionHandler:          visionHandler,          // Sprint 2.1: Vision Pipeline extract
+		IntegrationHandler:     integrationHandler,     // FB-Brain integration
 		AuthMiddleware:         authMiddleware,
+		DevAuthMiddleware:      devAuthMiddleware,
 		PortalRateLimiter:      portalRateLimiter,
 		PublicRateLimiter:      publicRateLimiter,
 		AIClient:               aiClient,
@@ -341,8 +356,22 @@ func (s *Server) routes() {
 	s.Router.Get("/health", s.HandleHealth)
 
 	s.Router.Route("/api/v1", func(r chi.Router) {
+		// Dev auth bypass: inject demo claims for all routes when DEV_AUTH_BYPASS=true.
+		// RequireAuth will detect pre-existing claims and skip JWT validation.
+		if s.DevAuthMiddleware != nil {
+			r.Use(s.DevAuthMiddleware.Handler)
+		}
+
 		// Sprint 6.3 AI health check (public, so frontend can adapt layout pre-login if necessary, or just rely on it)
 		r.Get("/health/ai", s.HandleAIHealthCheck)
+
+		// FB-Brain integration webhook routes (API-key auth, bypasses Clerk)
+		r.Route("/integration", func(r chi.Router) {
+			r.Use(s.IntegrationHandler.ValidateAPIKey)
+			r.Post("/feed-card", s.IntegrationHandler.CreateFeedCard)
+			r.Post("/assign-contact", s.IntegrationHandler.AssignContact)
+		})
+
 		// Phase 12: Legacy /auth/login and /auth/verify removed — Clerk handles sign-in.
 		// See STEP_78_AUTH_PROVIDER.md Section 2.1
 		r.Route("/auth", func(r chi.Router) {

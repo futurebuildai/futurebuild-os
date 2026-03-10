@@ -17,12 +17,16 @@ import (
 // FeedHandler handles portfolio feed endpoints.
 // See FRONTEND_V2_SPEC.md §5.1, §5.2
 type FeedHandler struct {
-	feedService *service.FeedService
+	feedService        *service.FeedService
+	integrationClient  *IntegrationClient
 }
 
 // NewFeedHandler creates a new FeedHandler.
 func NewFeedHandler(fs *service.FeedService) *FeedHandler {
-	return &FeedHandler{feedService: fs}
+	return &FeedHandler{
+		feedService:       fs,
+		integrationClient: NewIntegrationClient(),
+	}
 }
 
 // GetFeed handles GET /api/v1/portfolio/feed.
@@ -342,6 +346,123 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.Effect = "dismiss"
 		resp.Message = "Contact assigned"
+
+	// ── Integration actions (FB-Brain cross-system flows) ──
+
+	case "request_material_quote":
+		card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+		if err != nil {
+			http.Error(w, "Card not found", http.StatusNotFound)
+			return
+		}
+		flowResp, err := h.integrationClient.StartMaterialsFlow(orgID.String(), card.ProjectID.String(), cardID.String())
+		if err != nil {
+			slog.Error("feed: start materials flow failed", "error", err)
+			http.Error(w, "Failed to request material quote: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = h.feedService.DismissCard(ctx, orgID, cardID)
+		resp.Effect = "dismiss"
+		resp.Message = flowResp.Message
+
+	case "approve_material_quote":
+		rfqID := ""
+		if v, ok := req.Payload["rfq_id"].(string); ok {
+			rfqID = v
+		}
+		// Also check card engine_data for rfq_id
+		if rfqID == "" {
+			card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+			if err == nil && card.EngineData != nil {
+				var ed map[string]interface{}
+				json.Unmarshal(card.EngineData, &ed)
+				if v, ok := ed["rfq_id"].(string); ok {
+					rfqID = v
+				}
+			}
+		}
+		if rfqID == "" {
+			http.Error(w, "rfq_id required", http.StatusBadRequest)
+			return
+		}
+		flowResp, err := h.integrationClient.ApproveMaterialsQuote(rfqID)
+		if err != nil {
+			slog.Error("feed: approve materials quote failed", "error", err)
+			http.Error(w, "Failed to approve quote: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = h.feedService.DismissCard(ctx, orgID, cardID)
+		resp.Effect = "dismiss"
+		resp.Message = flowResp.Message
+
+	case "send_labor_rfq":
+		card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+		if err != nil {
+			http.Error(w, "Card not found", http.StatusNotFound)
+			return
+		}
+		flowResp, err := h.integrationClient.StartLaborFlow(orgID.String(), card.ProjectID.String(), cardID.String())
+		if err != nil {
+			slog.Error("feed: start labor flow failed", "error", err)
+			http.Error(w, "Failed to send labor RFQ: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = h.feedService.DismissCard(ctx, orgID, cardID)
+		resp.Effect = "dismiss"
+		resp.Message = flowResp.Message
+
+	case "approve_labor_bid":
+		rfqID := ""
+		if v, ok := req.Payload["rfq_id"].(string); ok {
+			rfqID = v
+		}
+		if rfqID == "" {
+			card, err := h.feedService.GetCardByID(ctx, orgID, cardID)
+			if err == nil && card.EngineData != nil {
+				var ed map[string]interface{}
+				json.Unmarshal(card.EngineData, &ed)
+				if v, ok := ed["rfq_id"].(string); ok {
+					rfqID = v
+				}
+			}
+		}
+		if rfqID == "" {
+			http.Error(w, "rfq_id required", http.StatusBadRequest)
+			return
+		}
+		flowResp, err := h.integrationClient.ApproveLaborBid(rfqID)
+		if err != nil {
+			slog.Error("feed: approve labor bid failed", "error", err)
+			http.Error(w, "Failed to approve bid: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = h.feedService.DismissCard(ctx, orgID, cardID)
+		resp.Effect = "dismiss"
+		resp.Message = flowResp.Message
+
+	case "confirm_delivery":
+		rfqID := ""
+		if v, ok := req.Payload["rfq_id"].(string); ok {
+			rfqID = v
+		}
+		if rfqID == "" {
+			// No rfq needed for delivery confirm — just dismiss
+			_ = h.feedService.DismissCard(ctx, orgID, cardID)
+			resp.Effect = "dismiss"
+			resp.Message = "Delivery confirmed"
+			break
+		}
+		flowResp, err := h.integrationClient.ConfirmDelivery(rfqID)
+		if err != nil {
+			slog.Error("feed: confirm delivery failed", "error", err)
+		}
+		_ = h.feedService.DismissCard(ctx, orgID, cardID)
+		resp.Effect = "dismiss"
+		if flowResp != nil {
+			resp.Message = flowResp.Message
+		} else {
+			resp.Message = "Delivery confirmed"
+		}
 
 	default:
 		slog.Info("feed: unhandled action", "action_id", req.ActionID, "card_id", req.CardID, "org_id", orgID)

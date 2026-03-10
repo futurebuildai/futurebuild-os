@@ -32,6 +32,14 @@ const CARD_ICONS: Partial<Record<FeedCardType, string>> = {
     budget_alert: '\uD83D\uDCB8',    // 💸
     milestone: '\uD83C\uDFC1',     // 🏁
     welcome: '\uD83D\uDC4B',       // 👋
+    // Integration card types (FB-Brain cross-system flows)
+    material_quote_prompt: '\uD83D\uDCE6',   // 📦
+    material_quote_review: '\uD83D\uDCCB',   // 📋
+    material_order_confirm: '\u2705',         // ✅
+    labor_bid_prompt: '\uD83D\uDC77',        // 👷
+    labor_bid_review: '\uD83D\uDCCB',        // 📋
+    labor_bid_confirm: '\u2705',              // ✅
+    delivery_confirm: '\uD83D\uDE9A',        // 🚚
 };
 
 @customElement('fb-feed-card')
@@ -243,12 +251,62 @@ export class FBFeedCard extends FBElement {
                 border-radius: 4px;
             }
 
+            .engine-data {
+                padding: 8px 0 4px 20px;
+                font-size: 13px;
+                color: var(--fb-text-secondary, #a0a0b0);
+            }
+
+            .engine-data details {
+                cursor: pointer;
+            }
+
+            .engine-data summary {
+                font-weight: 600;
+                color: var(--fb-text-primary, #e0e0e0);
+                margin-bottom: 8px;
+            }
+
+            .line-items {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+
+            .line-items th {
+                text-align: left;
+                padding: 4px 8px;
+                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                color: var(--fb-text-tertiary, #707080);
+                font-weight: 500;
+            }
+
+            .line-items td {
+                padding: 4px 8px;
+                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+            }
+
+            .bid-summary {
+                font-size: 16px;
+                margin-bottom: 4px;
+            }
+
+            .bid-summary strong {
+                color: var(--fb-text-primary, #e0e0e0);
+            }
+
+            .bid-notes {
+                font-style: italic;
+                color: var(--fb-text-tertiary, #707080);
+                margin-top: 4px;
+            }
+
             @media (max-width: 768px) {
                 .card {
                     padding: 12px 14px;
                 }
 
-                .body, .consequence, .actions-row, .inline-form {
+                .body, .consequence, .actions-row, .inline-form, .engine-data {
                     padding-left: 0;
                 }
             }
@@ -346,6 +404,8 @@ export class FBFeedCard extends FBElement {
                 ? html`<div class="consequence">${this.card.consequence}</div>`
                 : nothing}
 
+                ${this._renderEngineData()}
+
                 ${this.card.card_type === 'setup_contacts'
                 ? html`
                           <div class="inline-form">
@@ -389,8 +449,66 @@ export class FBFeedCard extends FBElement {
         `;
     }
 
+    /**
+     * Render engine_data details for integration cards (quote line items, bid details).
+     */
+    private _renderEngineData() {
+        if (!this.card.engine_data) return nothing;
+
+        const data = this.card.engine_data;
+
+        // Material quote review: show line items and total
+        if (this.card.card_type === 'material_quote_review' && data.lines) {
+            const lines = data.lines as Array<{ sku: string; description: string; quantity: number; unit_price: number; line_total: number }>;
+            const total = data.total as number;
+            return html`
+                <div class="engine-data">
+                    <details>
+                        <summary>Quote Details \u2014 $${total?.toLocaleString() ?? '...'}</summary>
+                        <table class="line-items">
+                            <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+                            <tbody>
+                                ${lines.map(l => html`
+                                    <tr>
+                                        <td>${l.description}</td>
+                                        <td>${l.quantity}</td>
+                                        <td>$${l.unit_price?.toFixed(2)}</td>
+                                        <td>$${l.line_total?.toFixed(2)}</td>
+                                    </tr>
+                                `)}
+                            </tbody>
+                        </table>
+                    </details>
+                </div>
+            `;
+        }
+
+        // Labor bid review: show bid amount and details
+        if (this.card.card_type === 'labor_bid_review' && data.total_amount_cents) {
+            const amount = (data.total_amount_cents as number) / 100;
+            const days = data.estimated_days as number | undefined;
+            const notes = data.notes as string | undefined;
+            return html`
+                <div class="engine-data">
+                    <div class="bid-summary">
+                        <strong>$${amount.toLocaleString()}</strong>
+                        ${days ? html` \u2022 ${days} days estimated` : nothing}
+                    </div>
+                    ${notes ? html`<div class="bid-notes">${notes}</div>` : nothing}
+                </div>
+            `;
+        }
+
+        return nothing;
+    }
+
     private _showTellMeMore(): boolean {
-        const skip: FeedCardType[] = ['setup_team', 'setup_contacts', 'welcome'];
+        const skip: FeedCardType[] = [
+            'setup_team', 'setup_contacts', 'welcome',
+            'material_quote_prompt', 'material_quote_review', 'material_order_confirm',
+            'labor_bid_prompt', 'labor_bid_review', 'labor_bid_confirm',
+            'delivery_confirm',
+        ];
         return !skip.includes(this.card.card_type);
     }
 }

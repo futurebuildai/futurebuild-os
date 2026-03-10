@@ -26,7 +26,15 @@ export type FeedCardType =
     | 'setup_contacts'
     | 'calibration_drift'
     | 'milestone'
-    | 'welcome';
+    | 'welcome'
+    // Integration card types (FB-Brain cross-system flows)
+    | 'material_quote_prompt'
+    | 'material_quote_review'
+    | 'material_order_confirm'
+    | 'labor_bid_prompt'
+    | 'labor_bid_review'
+    | 'labor_bid_confirm'
+    | 'delivery_confirm';
 
 /**
  * FeedCardHorizon — temporal grouping.
