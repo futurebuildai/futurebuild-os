@@ -46,7 +46,7 @@ export class FBViewPortalLogin extends FBViewElement {
             }
 
             .subtitle {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
@@ -58,7 +58,7 @@ export class FBViewPortalLogin extends FBViewElement {
             }
 
             .label {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 font-weight: 500;
             }
@@ -66,8 +66,8 @@ export class FBViewPortalLogin extends FBViewElement {
             .input {
                 padding: 14px 16px;
                 font-size: 16px;
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
                 color: var(--fb-text-primary, #fff);
                 outline: none;
@@ -75,18 +75,18 @@ export class FBViewPortalLogin extends FBViewElement {
             }
 
             .input:focus {
-                border-color: var(--fb-primary, #667eea);
+                border-color: var(--fb-primary, #00FFA3);
             }
 
             .input::placeholder {
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
 
             .submit-btn {
                 padding: 16px 24px;
                 font-size: 16px;
                 font-weight: 600;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -106,12 +106,12 @@ export class FBViewPortalLogin extends FBViewElement {
 
             .footer {
                 text-align: center;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
 
             .footer-link {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 text-decoration: none;
             }
 
@@ -127,7 +127,7 @@ export class FBViewPortalLogin extends FBViewElement {
             .success-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
                 margin-bottom: 16px;
             }
 
@@ -139,7 +139,7 @@ export class FBViewPortalLogin extends FBViewElement {
             }
 
             .success-text {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }

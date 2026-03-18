@@ -23,14 +23,14 @@ export class FBGreetingBanner extends FBElement {
             .greeting {
                 font-size: 28px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 6px;
                 line-height: 1.2;
             }
 
             .summary {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 line-height: 1.5;
                 display: flex;
                 align-items: center;
@@ -40,7 +40,7 @@ export class FBGreetingBanner extends FBElement {
 
             .stat {
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .alert {
@@ -49,7 +49,7 @@ export class FBGreetingBanner extends FBElement {
             }
 
             .divider {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin: 0 4px;
             }
 

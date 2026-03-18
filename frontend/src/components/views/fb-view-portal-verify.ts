@@ -38,8 +38,8 @@ export class FBViewPortalVerify extends FBViewElement {
             .spinner {
                 width: 48px;
                 height: 48px;
-                border: 4px solid var(--fb-border, #333);
-                border-top-color: var(--fb-primary, #667eea);
+                border: 4px solid var(--fb-border, rgba(255,255,255,0.05));
+                border-top-color: var(--fb-primary, #00FFA3);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
                 margin-bottom: 24px;
@@ -57,7 +57,7 @@ export class FBViewPortalVerify extends FBViewElement {
             }
 
             .subtitle {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
@@ -65,12 +65,12 @@ export class FBViewPortalVerify extends FBViewElement {
             .error-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-error, #c62828);
+                color: var(--fb-error, #F43F5E);
                 margin-bottom: 16px;
             }
 
             .error-message {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0 0 24px 0;
             }
@@ -79,7 +79,7 @@ export class FBViewPortalVerify extends FBViewElement {
                 padding: 12px 24px;
                 font-size: 14px;
                 font-weight: 600;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -94,7 +94,7 @@ export class FBViewPortalVerify extends FBViewElement {
             .success-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
                 margin-bottom: 16px;
             }
         `,

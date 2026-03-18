@@ -28,7 +28,7 @@ export class FBFileDrop extends FBElement {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: rgba(102, 126, 234, 0.1);
+                background: rgba(0, 255, 163, 0.1);
                 backdrop-filter: blur(4px);
                 z-index: var(--fb-z-overlay, 1000);
                 opacity: 0;

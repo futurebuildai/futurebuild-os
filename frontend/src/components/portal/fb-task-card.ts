@@ -42,15 +42,15 @@ export class FBTaskCard extends FBElement {
                 align-items: center;
                 gap: 16px;
                 padding: 16px;
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 cursor: pointer;
                 transition: all 0.2s ease;
             }
 
             .card:hover {
-                border-color: var(--fb-primary, #667eea);
+                border-color: var(--fb-primary, #00FFA3);
             }
 
             .card:active {
@@ -65,19 +65,19 @@ export class FBTaskCard extends FBElement {
             }
 
             .status-indicator--pending {
-                background: var(--fb-text-muted, #666);
+                background: var(--fb-text-muted, #4A4B55);
             }
 
             .status-indicator--in_progress {
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
             }
 
             .status-indicator--completed {
-                background: var(--fb-success, #2e7d32);
+                background: var(--fb-success, #00FFA3);
             }
 
             .status-indicator--blocked {
-                background: var(--fb-error, #c62828);
+                background: var(--fb-error, #F43F5E);
             }
 
             .content {
@@ -104,11 +104,11 @@ export class FBTaskCard extends FBElement {
 
             .wbs {
                 flex-shrink: 0;
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 font-size: 11px;
                 font-weight: 500;
                 padding: 2px 6px;
-                background: var(--fb-primary-alpha, rgba(102, 126, 234, 0.1));
+                background: var(--fb-primary-alpha, rgba(0, 255, 163, 0.1));
                 border-radius: 4px;
             }
 
@@ -116,7 +116,7 @@ export class FBTaskCard extends FBElement {
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
             }
 
@@ -135,11 +135,11 @@ export class FBTaskCard extends FBElement {
                 flex-shrink: 0;
                 width: 20px;
                 height: 20px;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
 
             .photo-icon {
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
             }
         `,
     ];

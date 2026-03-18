@@ -34,8 +34,8 @@ export class FBToast extends FBElement {
                 align-items: flex-start;
                 gap: 12px;
                 padding: 12px 16px;
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
                 min-width: 280px;
@@ -71,11 +71,11 @@ export class FBToast extends FBElement {
 
             /* Type-specific border colors */
             .toast--success {
-                border-left: 4px solid var(--fb-success, #2e7d32);
+                border-left: 4px solid var(--fb-success, #00FFA3);
             }
 
             .toast--error {
-                border-left: 4px solid var(--fb-error, #c62828);
+                border-left: 4px solid var(--fb-error, #F43F5E);
             }
 
             .toast--warning {
@@ -83,7 +83,7 @@ export class FBToast extends FBElement {
             }
 
             .toast--info {
-                border-left: 4px solid var(--fb-primary, #667eea);
+                border-left: 4px solid var(--fb-primary, #00FFA3);
             }
 
             .icon {
@@ -96,11 +96,11 @@ export class FBToast extends FBElement {
             }
 
             .icon--success {
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
             }
 
             .icon--error {
-                color: var(--fb-error, #c62828);
+                color: var(--fb-error, #F43F5E);
             }
 
             .icon--warning {
@@ -108,7 +108,7 @@ export class FBToast extends FBElement {
             }
 
             .icon--info {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
             }
 
             .content {
@@ -134,7 +134,7 @@ export class FBToast extends FBElement {
                 padding: 4px 12px;
                 font-size: 13px;
                 font-weight: 500;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 color: white;
                 border: none;
                 border-radius: 4px;
@@ -157,7 +157,7 @@ export class FBToast extends FBElement {
                 background: transparent;
                 border: none;
                 border-radius: 4px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 transition: background 0.2s ease, color 0.2s ease;
             }

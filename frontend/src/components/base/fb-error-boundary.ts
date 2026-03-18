@@ -29,7 +29,7 @@ export class FBErrorBoundary extends FBElement {
                 justify-content: center;
                 padding: var(--fb-spacing-lg);
                 background: var(--fb-bg-tertiary);
-                border: 1px dashed var(--fb-error, #ef4444);
+                border: 1px dashed var(--fb-error, #F43F5E);
                 border-radius: var(--fb-radius-md);
                 color: var(--fb-text-secondary);
                 text-align: center;
@@ -44,7 +44,7 @@ export class FBErrorBoundary extends FBElement {
             .error-title {
                 font-size: var(--fb-text-sm);
                 font-weight: 600;
-                color: var(--fb-error, #ef4444);
+                color: var(--fb-error, #F43F5E);
                 margin-bottom: var(--fb-spacing-xs);
             }
 

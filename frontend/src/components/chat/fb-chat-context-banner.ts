@@ -23,8 +23,8 @@ export class FBChatContextBanner extends FBElement {
                 align-items: flex-start;
                 gap: 10px;
                 padding: 10px 16px;
-                background: var(--fb-surface-2, #252540);
-                border-left: 3px solid var(--fb-accent, #6366f1);
+                background: var(--fb-surface-2, #1E2029);
+                border-left: 3px solid var(--fb-accent, #00FFA3);
                 border-radius: 0 8px 8px 0;
                 margin: 8px 16px;
             }
@@ -32,8 +32,8 @@ export class FBChatContextBanner extends FBElement {
             .badge {
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-accent, #6366f1);
-                background: rgba(99, 102, 241, 0.15);
+                color: var(--fb-accent, #00FFA3);
+                background: rgba(0, 255, 163, 0.15);
                 padding: 2px 8px;
                 border-radius: 4px;
                 white-space: nowrap;
@@ -49,7 +49,7 @@ export class FBChatContextBanner extends FBElement {
             .headline {
                 font-size: 13px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 line-height: 1.3;
             }
 
@@ -73,8 +73,8 @@ export class FBChatContextBanner extends FBElement {
             }
 
             .dismiss:hover {
-                color: var(--fb-text-primary, #e0e0e0);
-                background: var(--fb-bg-tertiary, #2a2a3e);
+                color: var(--fb-text-primary, #F0F0F5);
+                background: var(--fb-bg-tertiary, rgba(255,255,255,0.05));
             }
         `,
     ];

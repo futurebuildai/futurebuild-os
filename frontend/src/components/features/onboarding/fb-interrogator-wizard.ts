@@ -394,7 +394,7 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
 
             .confidence-high {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .confidence-medium {
@@ -404,7 +404,7 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
 
             .confidence-low {
                 background: rgba(239, 68, 68, 0.15);
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             /* ========== Chat input area ========== */
@@ -532,7 +532,7 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
             }
 
             .btn-generate.gate-open {
-                background: #22c55e;
+                background: #00FFA3;
                 color: #fff;
                 box-shadow: 0 0 16px rgba(34, 197, 94, 0.35), var(--md-sys-elevation-2);
             }
@@ -951,8 +951,8 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
                                         y="${String(box.y)}"
                                         width="${String(box.width)}"
                                         height="${String(box.height)}"
-                                        fill="rgba(99, 102, 241, 0.12)"
-                                        stroke="rgba(99, 102, 241, 0.7)"
+                                        fill="rgba(0, 255, 163, 0.12)"
+                                        stroke="rgba(0, 255, 163, 0.7)"
                                         stroke-width="0.003"
                                         rx="0.004"
                                     />

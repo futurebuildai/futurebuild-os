@@ -63,7 +63,7 @@ export class FBArtifactGantt extends FBElement {
 
             /* Step 88: Critical path row highlight */
             .task-row.critical {
-                background: rgba(198, 40, 40, 0.05);
+                background: rgba(244, 63, 94, 0.05);
             }
 
             .task-name {
@@ -112,12 +112,13 @@ export class FBArtifactGantt extends FBElement {
 
             /* Step 88: Critical path bar color */
             .task-bar.critical {
-                background: #c62828;
+                background: #F43F5E;
             }
 
             .task-meta {
                 width: 80px;
                 text-align: right;
+                font-family: var(--fb-font-mono, monospace);
                 font-size: var(--fb-text-xs);
                 color: var(--fb-text-secondary);
             }
@@ -132,7 +133,7 @@ export class FBArtifactGantt extends FBElement {
                 position: absolute;
                 right: 0;
                 top: 0;
-                background: rgba(198, 40, 40, 0.9);
+                background: rgba(244, 63, 94, 0.9);
                 color: white;
                 font-size: var(--fb-text-xs);
                 padding: 2px 8px;
@@ -271,7 +272,7 @@ export class FBArtifactGantt extends FBElement {
                         markerHeight="6"
                         orient="auto-start-reverse"
                     >
-                        ${svg`<polygon points="0 0, 10 3.5, 0 7" fill="var(--fb-primary, #667eea)" />`}
+                        ${svg`<polygon points="0 0, 10 3.5, 0 7" fill="var(--fb-primary, #00FFA3)" />`}
                     </marker>
                 </defs>
                 ${deps.map(dep => {
@@ -294,7 +295,7 @@ export class FBArtifactGantt extends FBElement {
                     const cpx1 = x1 + 4;
                     const cpx2 = x2 - 4;
 
-                    const stroke = isHighlighted ? 'var(--fb-primary, #667eea)' : 'var(--fb-border, #555)';
+                    const stroke = isHighlighted ? 'var(--fb-primary, #00FFA3)' : 'var(--fb-border, #555)';
                     const marker = isHighlighted ? 'url(#arrowhead-highlight)' : 'url(#arrowhead)';
                     const strokeWidth = isHighlighted ? '0.4' : '0.25';
 

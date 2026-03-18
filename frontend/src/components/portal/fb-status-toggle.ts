@@ -37,8 +37,8 @@ export class FBStatusToggle extends FBElement {
                 align-items: center;
                 gap: 12px;
                 padding: 16px 20px;
-                background: var(--fb-bg-card, #111);
-                border: 2px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 2px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -46,12 +46,12 @@ export class FBStatusToggle extends FBElement {
             }
 
             .toggle-btn:hover:not([disabled]) {
-                border-color: var(--fb-primary, #667eea);
+                border-color: var(--fb-primary, #00FFA3);
             }
 
             .toggle-btn[aria-pressed="true"] {
-                border-color: var(--fb-primary, #667eea);
-                background: var(--fb-primary-alpha, rgba(102, 126, 234, 0.1));
+                border-color: var(--fb-primary, #00FFA3);
+                background: var(--fb-primary-alpha, rgba(0, 255, 163, 0.1));
             }
 
             .toggle-btn[disabled] {
@@ -75,13 +75,13 @@ export class FBStatusToggle extends FBElement {
             }
 
             .icon--in_progress {
-                background: var(--fb-primary-alpha, rgba(102, 126, 234, 0.2));
-                color: var(--fb-primary, #667eea);
+                background: var(--fb-primary-alpha, rgba(0, 255, 163, 0.2));
+                color: var(--fb-primary, #00FFA3);
             }
 
             .icon--completed {
                 background: var(--fb-success-alpha, rgba(46, 125, 50, 0.2));
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
             }
 
             .icon svg {
@@ -102,7 +102,7 @@ export class FBStatusToggle extends FBElement {
             }
 
             .label-desc {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 4px 0 0 0;
             }
@@ -111,7 +111,7 @@ export class FBStatusToggle extends FBElement {
                 flex-shrink: 0;
                 width: 24px;
                 height: 24px;
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 opacity: 0;
                 transition: opacity 0.2s ease;
             }

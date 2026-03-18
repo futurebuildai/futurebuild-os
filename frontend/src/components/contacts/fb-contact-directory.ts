@@ -46,12 +46,12 @@ export class FBContactDirectory extends FBElement {
             .header-text .title {
                 font-size: 24px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .header-text .subtitle {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 4px;
             }
 
@@ -71,7 +71,7 @@ export class FBContactDirectory extends FBElement {
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -81,12 +81,12 @@ export class FBContactDirectory extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
             }
 
             .back-link {
@@ -94,13 +94,13 @@ export class FBContactDirectory extends FBElement {
                 align-items: center;
                 gap: 6px;
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 margin-bottom: 16px;
             }
 
             .back-link:hover {
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             /* Search and filters */
@@ -118,21 +118,21 @@ export class FBContactDirectory extends FBElement {
             .search-input {
                 width: 100%;
                 padding: 12px 16px 12px 44px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 box-sizing: border-box;
             }
 
             .search-input:focus {
                 outline: none;
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             .search-input::placeholder {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .search-icon {
@@ -140,28 +140,28 @@ export class FBContactDirectory extends FBElement {
                 left: 16px;
                 top: 50%;
                 transform: translateY(-50%);
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .filter-select {
                 padding: 12px 16px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 min-width: 140px;
             }
 
             .filter-select:focus {
                 outline: none;
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             /* Contact list */
             .contact-list {
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 overflow: hidden;
             }
@@ -171,10 +171,10 @@ export class FBContactDirectory extends FBElement {
                 grid-template-columns: 2fr 1fr 1fr 1fr 60px;
                 gap: 16px;
                 padding: 12px 20px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
@@ -184,7 +184,7 @@ export class FBContactDirectory extends FBElement {
                 grid-template-columns: 2fr 1fr 1fr 1fr 60px;
                 gap: 16px;
                 padding: 16px 20px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 cursor: pointer;
                 transition: background 0.15s;
                 align-items: center;
@@ -195,7 +195,7 @@ export class FBContactDirectory extends FBElement {
             }
 
             .contact-row:hover {
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
             }
 
             .contact-info {
@@ -208,7 +208,7 @@ export class FBContactDirectory extends FBElement {
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 display: flex;
                 align-items: center;
@@ -225,7 +225,7 @@ export class FBContactDirectory extends FBElement {
             .contact-name {
                 font-size: 14px;
                 font-weight: 500;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -233,7 +233,7 @@ export class FBContactDirectory extends FBElement {
 
             .contact-company {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -241,7 +241,7 @@ export class FBContactDirectory extends FBElement {
 
             .contact-phone {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-family: monospace;
             }
 
@@ -253,8 +253,8 @@ export class FBContactDirectory extends FBElement {
 
             .trade-tag {
                 padding: 2px 8px;
-                background: rgba(99, 102, 241, 0.15);
-                color: var(--fb-accent, #6366f1);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-accent, #00FFA3);
                 border-radius: 4px;
                 font-size: 11px;
                 font-weight: 500;
@@ -274,7 +274,7 @@ export class FBContactDirectory extends FBElement {
 
             .badge.portal {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .badge.sms {
@@ -284,16 +284,16 @@ export class FBContactDirectory extends FBElement {
 
             .badge.on-time {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .stat-value {
                 font-size: 14px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .stat-value.good {
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             /* Empty state */
@@ -307,24 +307,24 @@ export class FBContactDirectory extends FBElement {
                 height: 64px;
                 margin: 0 auto 16px;
                 border-radius: 50%;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 font-size: 28px;
             }
 
             .empty-title {
                 font-size: 18px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 8px;
             }
 
             .empty-text {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-bottom: 20px;
             }
 
@@ -332,7 +332,7 @@ export class FBContactDirectory extends FBElement {
             .loading {
                 padding: 60px;
                 text-align: center;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             /* Pagination */
@@ -341,28 +341,28 @@ export class FBContactDirectory extends FBElement {
                 justify-content: center;
                 gap: 8px;
                 padding: 16px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .page-btn {
                 padding: 8px 12px;
                 border-radius: 6px;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
                 cursor: pointer;
                 transition: all 0.15s;
             }
 
             .page-btn:hover:not(:disabled) {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .page-btn.active {
-                background: var(--fb-accent, #6366f1);
-                border-color: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
+                border-color: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 

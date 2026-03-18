@@ -44,7 +44,7 @@ export class FBViewPortalDashboard extends FBViewElement {
             }
 
             .subtitle {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
@@ -61,8 +61,8 @@ export class FBViewPortalDashboard extends FBViewElement {
             .spinner {
                 width: 32px;
                 height: 32px;
-                border: 3px solid var(--fb-border, #333);
-                border-top-color: var(--fb-primary, #667eea);
+                border: 3px solid var(--fb-border, rgba(255,255,255,0.05));
+                border-top-color: var(--fb-primary, #00FFA3);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
             }
@@ -76,7 +76,7 @@ export class FBViewPortalDashboard extends FBViewElement {
             }
 
             .project-title {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 12px;
                 font-weight: 600;
                 text-transform: uppercase;
@@ -98,7 +98,7 @@ export class FBViewPortalDashboard extends FBViewElement {
             .empty-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 margin-bottom: 16px;
             }
 
@@ -110,7 +110,7 @@ export class FBViewPortalDashboard extends FBViewElement {
             }
 
             .empty-text {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
@@ -124,7 +124,7 @@ export class FBViewPortalDashboard extends FBViewElement {
                 justify-content: space-around;
                 padding: 12px 0;
                 background: var(--fb-bg-secondary, #0a0a0a);
-                border-top: 1px solid var(--fb-border, #333);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .nav-item {
@@ -136,13 +136,13 @@ export class FBViewPortalDashboard extends FBViewElement {
                 background: none;
                 border: none;
                 cursor: pointer;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 transition: color 0.2s ease;
             }
 
             .nav-item:hover,
             .nav-item--active {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
             }
 
             .nav-item svg {

@@ -95,7 +95,7 @@ export class FBPhotoGallery extends FBElement {
             .empty {
                 text-align: center;
                 padding: 32px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
         `,

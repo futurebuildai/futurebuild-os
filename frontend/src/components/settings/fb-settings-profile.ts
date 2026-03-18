@@ -32,18 +32,18 @@ export class FBSettingsProfile extends FBElement {
             .title {
                 font-size: 24px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .subtitle {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 4px;
             }
 
             .card {
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 padding: 24px;
                 margin-bottom: 20px;
@@ -52,10 +52,10 @@ export class FBSettingsProfile extends FBElement {
             .card-title {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 20px;
                 padding-bottom: 12px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .form-group {
@@ -70,24 +70,24 @@ export class FBSettingsProfile extends FBElement {
                 display: block;
                 font-size: 13px;
                 font-weight: 500;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-bottom: 6px;
             }
 
             input {
                 width: 100%;
                 padding: 10px 12px;
-                background: var(--fb-surface-2, #252540);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-2, #1E2029);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 box-sizing: border-box;
             }
 
             input:focus {
                 outline: none;
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             input:disabled {
@@ -102,14 +102,14 @@ export class FBSettingsProfile extends FBElement {
 
             .hint {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-top: 4px;
             }
 
             .role-badge {
                 display: inline-block;
                 padding: 4px 10px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 border-radius: 4px;
                 font-size: 12px;
@@ -122,7 +122,7 @@ export class FBSettingsProfile extends FBElement {
                 justify-content: space-between;
                 align-items: center;
                 padding: 12px 0;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .info-row:last-child {
@@ -131,12 +131,12 @@ export class FBSettingsProfile extends FBElement {
 
             .info-label {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .info-value {
                 font-size: 13px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-weight: 500;
             }
 
@@ -145,7 +145,7 @@ export class FBSettingsProfile extends FBElement {
                 gap: 12px;
                 margin-top: 20px;
                 padding-top: 20px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .btn {
@@ -159,7 +159,7 @@ export class FBSettingsProfile extends FBElement {
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -174,13 +174,13 @@ export class FBSettingsProfile extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .message {
@@ -192,12 +192,12 @@ export class FBSettingsProfile extends FBElement {
 
             .message-success {
                 background: rgba(34, 197, 94, 0.1);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .message-error {
                 background: rgba(239, 68, 68, 0.1);
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .back-link {
@@ -205,13 +205,13 @@ export class FBSettingsProfile extends FBElement {
                 align-items: center;
                 gap: 6px;
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 margin-bottom: 16px;
             }
 
             .back-link:hover {
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
         `,
     ];

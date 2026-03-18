@@ -26,8 +26,10 @@ export class FBPanelRight extends FBElement {
                 display: flex;
                 flex-direction: column;
                 height: 100%;
-                background: var(--fb-bg-panel);
-                border-left: 1px solid var(--fb-border);
+                background: rgba(10, 11, 16, 0.8);
+                backdrop-filter: blur(48px);
+                -webkit-backdrop-filter: blur(48px);
+                border-left: 1px solid rgba(255, 255, 255, 0.05);
                 overflow: hidden;
             }
 
@@ -77,9 +79,11 @@ export class FBPanelRight extends FBElement {
             }
 
             .artifact-card {
-                background: var(--fb-bg-card);
-                border: 1px solid var(--fb-border);
-                border-radius: var(--fb-radius-md);
+                background: rgba(22, 24, 33, 0.6);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 16px;
                 overflow: hidden;
             }
 
@@ -154,7 +158,7 @@ export class FBPanelRight extends FBElement {
             }
 
             .action-btn.approve {
-                background: var(--fb-success, #22c55e);
+                background: var(--fb-success, #00FFA3);
                 color: white;
             }
 
@@ -165,7 +169,7 @@ export class FBPanelRight extends FBElement {
             }
 
             .action-btn.deny {
-                background: var(--fb-error, #ef4444);
+                background: var(--fb-error, #F43F5E);
                 color: white;
             }
 
@@ -207,8 +211,8 @@ export class FBPanelRight extends FBElement {
             }
 
             .scope-tab.active {
-                color: var(--fb-primary);
-                border-bottom-color: var(--fb-primary);
+                color: #00FFA3;
+                border-bottom-color: #00FFA3;
             }
         `,
     ];

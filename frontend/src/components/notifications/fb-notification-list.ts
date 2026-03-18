@@ -55,8 +55,8 @@ export class FBNotificationList extends FBElement {
                 margin-top: var(--fb-spacing-xs, 4px);
                 width: 360px;
                 max-height: 420px;
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: var(--fb-radius-lg, 12px);
                 box-shadow: var(--fb-shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.5));
                 overflow: hidden;
@@ -88,7 +88,7 @@ export class FBNotificationList extends FBElement {
             .mark-read-btn {
                 border: none;
                 background: transparent;
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 font-size: var(--fb-text-xs, 0.75rem);
                 font-weight: 500;
                 font-family: var(--fb-font-family, 'Poppins', system-ui, sans-serif);
@@ -99,11 +99,11 @@ export class FBNotificationList extends FBElement {
             }
 
             .mark-read-btn:hover {
-                background: rgba(102, 126, 234, 0.1);
+                background: rgba(0, 255, 163, 0.1);
             }
 
             .mark-read-btn:focus-visible {
-                outline: 2px solid var(--fb-primary, #667eea);
+                outline: 2px solid var(--fb-primary, #00FFA3);
                 outline-offset: 2px;
             }
 
@@ -131,7 +131,7 @@ export class FBNotificationList extends FBElement {
             }
 
             .item:focus-visible {
-                outline: 2px solid var(--fb-primary, #667eea);
+                outline: 2px solid var(--fb-primary, #00FFA3);
                 outline-offset: -2px;
             }
 
@@ -140,7 +140,7 @@ export class FBNotificationList extends FBElement {
             }
 
             .item.unread {
-                background: rgba(102, 126, 234, 0.05);
+                background: rgba(0, 255, 163, 0.05);
             }
 
             .item.unread::before {
@@ -150,7 +150,7 @@ export class FBNotificationList extends FBElement {
                 top: 0;
                 bottom: 0;
                 width: 3px;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
             }
 
             .item {
@@ -178,13 +178,13 @@ export class FBNotificationList extends FBElement {
             }
 
             .icon-wrapper.alert {
-                background: rgba(198, 40, 40, 0.15);
-                color: var(--fb-error, #c62828);
+                background: rgba(244, 63, 94, 0.15);
+                color: var(--fb-error, #F43F5E);
             }
 
             .icon-wrapper.success {
                 background: rgba(46, 125, 50, 0.15);
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
             }
 
             .icon-wrapper.system {
@@ -193,8 +193,8 @@ export class FBNotificationList extends FBElement {
             }
 
             .icon-wrapper.mention {
-                background: rgba(102, 126, 234, 0.15);
-                color: var(--fb-primary, #667eea);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-primary, #00FFA3);
             }
 
             .content {
@@ -216,7 +216,7 @@ export class FBNotificationList extends FBElement {
 
             .message {
                 font-size: var(--fb-text-xs, 0.75rem);
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin: 2px 0 0 0;
                 line-height: 1.4;
                 display: -webkit-box;
@@ -227,7 +227,7 @@ export class FBNotificationList extends FBElement {
 
             .time {
                 font-size: 10px;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 margin-top: 4px;
                 flex-shrink: 0;
                 align-self: flex-start;
@@ -239,7 +239,7 @@ export class FBNotificationList extends FBElement {
                 align-items: center;
                 justify-content: center;
                 padding: var(--fb-spacing-xl, 32px);
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 font-size: var(--fb-text-sm, 0.875rem);
             }
         `,

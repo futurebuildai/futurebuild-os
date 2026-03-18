@@ -22,15 +22,15 @@ export class FBLeftNav extends FBElement {
                 display: block;
                 width: 64px; /* Icon-only width */
                 height: 100%;
-                /* Seamless background matching top bar */
-                background: var(--fb-surface-1, #1a1a2e);
-                /* Remove border for seamless flow */
-                /* border-right: 1px solid var(--fb-border, #2a2a3e); */
+                /* Glassmorphism panel */
+                background: rgba(10, 11, 16, 0.8);
+                backdrop-filter: blur(48px);
+                -webkit-backdrop-filter: blur(48px);
                 display: flex;
                 flex-direction: column;
                 align-items: center; /* Center icons */
                 padding: 16px 0;
-                font-family: 'Inter', sans-serif;
+                font-family: var(--fb-font-family);
                 z-index: 20; /* Ensure on top for tooltips if needed */
             }
 
@@ -50,7 +50,7 @@ export class FBLeftNav extends FBElement {
                 height: 48px;
                 padding: 0;
                 border-radius: 12px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 text-decoration: none;
                 transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 cursor: pointer;
@@ -64,8 +64,8 @@ export class FBLeftNav extends FBElement {
                 content: attr(aria-label);
                 position: absolute;
                 left: 60px;
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
                 padding: 4px 8px;
                 border-radius: 4px;
                 font-size: 12px;
@@ -84,15 +84,28 @@ export class FBLeftNav extends FBElement {
             /* Minimal hover effect */
             .nav-item:hover {
                 background: rgba(255, 255, 255, 0.05);
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 transform: scale(1.05);
             }
 
-            /* Modern active state with pill indicator or soft glow */
+            /* Active state with green indicator bar */
             .nav-item.active {
-                background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%);
-                color: var(--fb-accent, #6366f1);
-                box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+                background: rgba(0, 255, 163, 0.1);
+                color: #00FFA3;
+                border: 1px solid rgba(0, 255, 163, 0.15);
+                box-shadow: 0 0 12px rgba(0, 255, 163, 0.15);
+            }
+
+            .nav-item.active::before {
+                content: '';
+                position: absolute;
+                left: -8px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 3px;
+                height: 60%;
+                background: #00FFA3;
+                border-radius: 0 3px 3px 0;
             }
 
             .nav-item svg {
@@ -115,11 +128,11 @@ export class FBLeftNav extends FBElement {
             }
 
             .context-dot.global {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
             }
 
             .context-dot.project {
-                background: #22c55e;
+                background: #00FFA3;
             }
 
             /* Logo styles */
@@ -131,13 +144,13 @@ export class FBLeftNav extends FBElement {
             .logo-icon {
                 width: 40px;
                 height: 40px;
-                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                background: linear-gradient(135deg, #00FFA3 0%, #00CC82 100%);
                 border-radius: 10px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+                box-shadow: 0 4px 12px rgba(0, 255, 163, 0.3);
                 transition: transform 0.2s ease;
             }
 
@@ -169,7 +182,7 @@ export class FBLeftNav extends FBElement {
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 display: flex;
                 align-items: center;
@@ -186,16 +199,18 @@ export class FBLeftNav extends FBElement {
                 transform: scale(1.05);
             }
 
-            /* User menu dropdown */
+            /* User menu dropdown - glassmorphism */
             .user-menu {
                 position: absolute;
                 bottom: 12px;
                 left: 56px; /* Pop out to the right */
                 width: 200px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                background: rgba(22, 24, 33, 0.85);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
                 z-index: 100;
                 overflow: hidden;
                 animation: fadeIn 0.15s ease;
@@ -203,18 +218,18 @@ export class FBLeftNav extends FBElement {
 
             .menu-header {
                 padding: 12px 16px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .menu-name {
                 font-size: 14px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .menu-role {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-top: 2px;
             }
 
@@ -227,7 +242,7 @@ export class FBLeftNav extends FBElement {
                 width: 100%;
                 padding: 10px 16px;
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 background: none;
                 border: none;
                 text-align: left;
@@ -236,23 +251,23 @@ export class FBLeftNav extends FBElement {
             }
 
             .menu-item:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .menu-divider {
                 height: 1px;
-                background: var(--fb-border, #2a2a3e);
+                background: var(--fb-border, rgba(255,255,255,0.05));
                 margin: 4px 0;
             }
 
             .menu-item--danger {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .menu-item--danger:hover {
                 background: rgba(239, 68, 68, 0.1);
-                color: #ef4444;
+                color: #F43F5E;
             }
             
             @keyframes fadeIn {

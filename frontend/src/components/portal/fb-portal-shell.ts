@@ -36,7 +36,7 @@ export class FBPortalShell extends FBElement {
                 justify-content: space-between;
                 padding: 16px 20px;
                 background: var(--fb-bg-secondary, #0a0a0a);
-                border-bottom: 1px solid var(--fb-border, #333);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .header--minimal {
@@ -49,7 +49,7 @@ export class FBPortalShell extends FBElement {
                 gap: 8px;
                 font-size: 18px;
                 font-weight: 600;
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
             }
 
             .logo svg {
@@ -59,7 +59,7 @@ export class FBPortalShell extends FBElement {
 
             .project-name {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .main {
@@ -76,17 +76,17 @@ export class FBPortalShell extends FBElement {
                 padding: 16px 20px;
                 text-align: center;
                 background: var(--fb-bg-secondary, #0a0a0a);
-                border-top: 1px solid var(--fb-border, #333);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .footer-text {
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 font-size: 12px;
                 margin: 0;
             }
 
             .footer-link {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 text-decoration: none;
             }
 

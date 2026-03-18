@@ -44,6 +44,7 @@ export class FBArtifactBudget extends FBElement {
             }
 
             .value {
+                font-family: var(--fb-font-mono, monospace);
                 font-size: var(--fb-text-xl);
                 font-weight: 600;
                 color: var(--fb-text-primary);
@@ -72,7 +73,7 @@ export class FBArtifactBudget extends FBElement {
             }
 
             .cat-name { color: var(--fb-text-primary); }
-            .cat-val { color: var(--fb-text-secondary); }
+            .cat-val { color: var(--fb-text-secondary); font-family: var(--fb-font-mono, monospace); }
 
             .progress-bg {
                 height: 8px;

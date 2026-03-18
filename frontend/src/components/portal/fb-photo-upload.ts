@@ -76,8 +76,8 @@ export class FBPhotoUpload extends FBElement {
                 justify-content: center;
                 gap: 12px;
                 padding: 32px;
-                background: var(--fb-bg-card, #111);
-                border: 2px dashed var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 2px dashed var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 min-height: 200px;
                 cursor: pointer;
@@ -85,7 +85,7 @@ export class FBPhotoUpload extends FBElement {
             }
 
             .upload-area:hover {
-                border-color: var(--fb-primary, #667eea);
+                border-color: var(--fb-primary, #00FFA3);
             }
 
             .upload-area--has-preview {
@@ -106,7 +106,7 @@ export class FBPhotoUpload extends FBElement {
             .upload-icon {
                 width: 48px;
                 height: 48px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .upload-text {
@@ -117,7 +117,7 @@ export class FBPhotoUpload extends FBElement {
             }
 
             .upload-hint {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
@@ -146,7 +146,7 @@ export class FBPhotoUpload extends FBElement {
             }
 
             .btn--primary {
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 color: white;
             }
 
@@ -157,11 +157,11 @@ export class FBPhotoUpload extends FBElement {
             .btn--secondary {
                 background: var(--fb-bg-tertiary, #1a1a1a);
                 color: var(--fb-text-primary, #fff);
-                border: 1px solid var(--fb-border, #333);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .btn--secondary:hover:not([disabled]) {
-                background: var(--fb-bg-card, #111);
+                background: var(--fb-bg-card, #161821);
             }
 
             .btn[disabled] {
@@ -178,7 +178,7 @@ export class FBPhotoUpload extends FBElement {
 
             .progress-fill {
                 height: 100%;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 border-radius: 2px;
                 transition: width 0.3s ease;
             }
@@ -188,10 +188,10 @@ export class FBPhotoUpload extends FBElement {
                 align-items: center;
                 gap: 8px;
                 padding: 12px;
-                background: var(--fb-error-alpha, rgba(198, 40, 40, 0.1));
-                border: 1px solid var(--fb-error, #c62828);
+                background: var(--fb-error-alpha, rgba(244, 63, 94, 0.1));
+                border: 1px solid var(--fb-error, #F43F5E);
                 border-radius: 8px;
-                color: var(--fb-error, #c62828);
+                color: var(--fb-error, #F43F5E);
                 font-size: 14px;
             }
 
@@ -207,8 +207,8 @@ export class FBPhotoUpload extends FBElement {
             .analyzing-spinner {
                 width: 32px;
                 height: 32px;
-                border: 3px solid var(--fb-border, #333);
-                border-top-color: var(--fb-primary, #667eea);
+                border: 3px solid var(--fb-border, rgba(255,255,255,0.05));
+                border-top-color: var(--fb-primary, #00FFA3);
                 border-radius: 50%;
                 animation: spin 0.8s linear infinite;
             }
@@ -224,7 +224,7 @@ export class FBPhotoUpload extends FBElement {
             }
 
             .analyzing-hint {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 12px;
             }
 

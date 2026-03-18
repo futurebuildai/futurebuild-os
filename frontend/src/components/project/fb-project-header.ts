@@ -18,8 +18,8 @@ export class FBProjectHeader extends FBElement {
         css`
             :host {
                 display: block;
-                background: var(--fb-surface-1, #1a1a2e);
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 padding: 12px 20px;
             }
 
@@ -37,8 +37,8 @@ export class FBProjectHeader extends FBElement {
                 padding: 6px 12px;
                 border-radius: 6px;
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
                 font-weight: 500;
                 cursor: pointer;
@@ -46,8 +46,8 @@ export class FBProjectHeader extends FBElement {
             }
 
             .back-btn:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .back-btn svg {
@@ -58,7 +58,7 @@ export class FBProjectHeader extends FBElement {
             .divider {
                 width: 1px;
                 height: 24px;
-                background: var(--fb-border, #2a2a3e);
+                background: var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .project-info {
@@ -71,7 +71,7 @@ export class FBProjectHeader extends FBElement {
             .project-name {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -94,7 +94,7 @@ export class FBProjectHeader extends FBElement {
 
             .status-badge.active {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .status-badge.on_hold {
@@ -112,27 +112,27 @@ export class FBProjectHeader extends FBElement {
                 align-items: center;
                 gap: 8px;
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .completion-bar {
                 width: 80px;
                 height: 6px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 3px;
                 overflow: hidden;
             }
 
             .completion-fill {
                 height: 100%;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 border-radius: 3px;
                 transition: width 0.3s ease;
             }
 
             .completion-date {
                 font-size: 13px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .nav-buttons {
@@ -150,7 +150,7 @@ export class FBProjectHeader extends FBElement {
                 border-radius: 6px;
                 background: transparent;
                 border: none;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
                 font-weight: 500;
                 cursor: pointer;
@@ -158,12 +158,12 @@ export class FBProjectHeader extends FBElement {
             }
 
             .nav-btn:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .nav-btn.active {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 

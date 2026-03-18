@@ -54,27 +54,27 @@ export class FBContactBulkInput extends FBElement {
             }
 
             .container {
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 overflow: hidden;
             }
 
             .header {
                 padding: 20px 24px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .title {
                 font-size: 18px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 6px;
             }
 
             .subtitle {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .content {
@@ -90,10 +90,10 @@ export class FBContactBulkInput extends FBElement {
                 width: 100%;
                 height: 200px;
                 padding: 16px;
-                background: var(--fb-surface-2, #252540);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-2, #1E2029);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 font-family: monospace;
                 line-height: 1.6;
@@ -103,16 +103,16 @@ export class FBContactBulkInput extends FBElement {
 
             textarea:focus {
                 outline: none;
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             textarea::placeholder {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .format-help {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-top: 8px;
             }
 
@@ -126,20 +126,20 @@ export class FBContactBulkInput extends FBElement {
             .review-table th {
                 text-align: left;
                 padding: 12px 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .review-table td {
                 padding: 12px 16px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 font-size: 14px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .review-table tr:last-child td {
@@ -151,29 +151,29 @@ export class FBContactBulkInput extends FBElement {
             }
 
             .review-table tr.invalid td {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .trade-select {
                 padding: 6px 10px;
-                background: var(--fb-surface-2, #252540);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-2, #1E2029);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 4px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 13px;
                 min-width: 120px;
             }
 
             .trade-select:focus {
                 outline: none;
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             .trade-badge {
                 display: inline-block;
                 padding: 4px 10px;
-                background: rgba(99, 102, 241, 0.15);
-                color: var(--fb-accent, #6366f1);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-accent, #00FFA3);
                 border-radius: 4px;
                 font-size: 12px;
                 font-weight: 500;
@@ -188,19 +188,19 @@ export class FBContactBulkInput extends FBElement {
                 padding: 4px 8px;
                 background: transparent;
                 border: none;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 cursor: pointer;
                 font-size: 16px;
                 transition: color 0.15s;
             }
 
             .remove-row-btn:hover {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .summary {
                 padding: 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 margin-bottom: 16px;
             }
@@ -209,7 +209,7 @@ export class FBContactBulkInput extends FBElement {
                 display: flex;
                 justify-content: space-between;
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .summary-row + .summary-row {
@@ -218,7 +218,7 @@ export class FBContactBulkInput extends FBElement {
 
             .summary-value {
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .summary-value.warning {
@@ -226,7 +226,7 @@ export class FBContactBulkInput extends FBElement {
             }
 
             .summary-value.error {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             /* Actions */
@@ -235,7 +235,7 @@ export class FBContactBulkInput extends FBElement {
                 justify-content: flex-end;
                 gap: 12px;
                 padding: 16px 24px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .btn {
@@ -249,7 +249,7 @@ export class FBContactBulkInput extends FBElement {
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -264,18 +264,18 @@ export class FBContactBulkInput extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
             }
 
             .error-banner {
                 padding: 12px 16px;
                 background: rgba(239, 68, 68, 0.1);
-                color: #ef4444;
+                color: #F43F5E;
                 font-size: 14px;
                 margin-bottom: 16px;
                 border-radius: 8px;
@@ -284,7 +284,7 @@ export class FBContactBulkInput extends FBElement {
             .success-banner {
                 padding: 12px 16px;
                 background: rgba(34, 197, 94, 0.1);
-                color: #22c55e;
+                color: #00FFA3;
                 font-size: 14px;
                 margin-bottom: 16px;
                 border-radius: 8px;
@@ -510,7 +510,7 @@ Mike's Plumbing, (555) 020-1234"
                                                           )}
                                                       </select>
                                                   `
-                                            : html`<span style="color: #ef4444">${contact.error}</span>`}
+                                            : html`<span style="color: #F43F5E">${contact.error}</span>`}
                                     </td>
                                     <td>
                                         <button

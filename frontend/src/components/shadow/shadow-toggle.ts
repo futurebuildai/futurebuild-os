@@ -47,9 +47,9 @@ export class ShadowToggle extends FBElement {
             }
 
             .toggle-btn.active {
-                background: #1a1a2e;
-                border-color: #4f46e5;
-                color: #818cf8;
+                background: #161821;
+                border-color: #00CC82;
+                color: #33FFB8;
             }
 
             .icon {

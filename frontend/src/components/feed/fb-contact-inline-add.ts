@@ -34,20 +34,20 @@ export class FBContactInlineAdd extends FBElement {
             input {
                 flex: 1;
                 padding: 8px 12px;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 6px;
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 outline: none;
             }
 
             input:focus {
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             input::placeholder {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .preference-row {
@@ -55,7 +55,7 @@ export class FBContactInlineAdd extends FBElement {
                 align-items: center;
                 gap: 12px;
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .preference-row label {
@@ -86,7 +86,7 @@ export class FBContactInlineAdd extends FBElement {
             }
 
             .btn-save {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -97,8 +97,8 @@ export class FBContactInlineAdd extends FBElement {
 
             .btn-cancel {
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                color: var(--fb-text-secondary, #8B8D98);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .suggestions {
@@ -114,20 +114,20 @@ export class FBContactInlineAdd extends FBElement {
                 padding: 4px 10px;
                 border-radius: 16px;
                 font-size: 12px;
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-secondary, #a0a0b0);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-secondary, #8B8D98);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 cursor: pointer;
             }
 
             .suggestion:hover {
-                border-color: var(--fb-accent, #6366f1);
-                color: var(--fb-text-primary, #e0e0e0);
+                border-color: var(--fb-accent, #00FFA3);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .error {
                 font-size: 12px;
-                color: #ef4444;
+                color: #F43F5E;
             }
         `,
     ];

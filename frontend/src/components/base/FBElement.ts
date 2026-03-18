@@ -4,6 +4,7 @@
  *
  * All FutureBuild web components extend this class to inherit:
  * - Shared foundational styles (box-sizing, etc.)
+ * - Industrial Dark utility classes (glassmorphism, glow, hover-lift)
  * - Standardized event dispatching via emit()
  * - Future: SignalWatcher integration (Step 51.2)
  */
@@ -55,13 +56,83 @@ export abstract class FBElement extends LitElement {
             box-sizing: inherit;
         }
 
-        /* Shared Skeleton Loading Styles — theme-aware surface colors */
+        /* === Glassmorphism Utilities === */
+        .glass-card {
+            background: rgba(22, 24, 33, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+        }
+
+        .glass-panel {
+            background: rgba(10, 11, 16, 0.8);
+            backdrop-filter: blur(48px);
+            -webkit-backdrop-filter: blur(48px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* === Hover / Interaction Utilities === */
+        .hover-lift {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 2px 6px 2px rgba(0, 0, 0, 0.25), 0px 1px 2px 0px rgba(0, 0, 0, 0.4);
+        }
+
+        /* === Glow Utilities === */
+        .glow-accent {
+            box-shadow: 0 0 20px rgba(0, 255, 163, 0.15);
+        }
+        .glow-accent-strong {
+            box-shadow: 0 0 30px rgba(0, 255, 163, 0.3), 0 0 60px rgba(0, 255, 163, 0.1);
+        }
+
+        /* === Active Indicator (Green left-bar pill) === */
+        .active-indicator {
+            position: relative;
+        }
+        .active-indicator::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            background: #00FFA3;
+            border-radius: 0 3px 3px 0;
+        }
+
+        /* === Button Utilities === */
+        .btn-primary {
+            transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 163, 0.15);
+            transform: translateY(-1px);
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+            box-shadow: none;
+        }
+
+        .btn-destructive {
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            transition: box-shadow 0.15s ease-out;
+        }
+        .btn-destructive:hover {
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.15);
+        }
+
+        /* === Skeleton Loading — Industrial Dark surface colors === */
         .skeleton {
             background: linear-gradient(
                 90deg,
-                var(--fb-bg-tertiary, #29292d) 25%,
-                var(--fb-bg-secondary, #1f1f23) 50%,
-                var(--fb-bg-tertiary, #29292d) 75%
+                var(--fb-surface-2, #1E2029) 25%,
+                var(--fb-surface-1, #161821) 50%,
+                var(--fb-surface-2, #1E2029) 75%
             );
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;

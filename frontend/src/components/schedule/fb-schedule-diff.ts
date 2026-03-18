@@ -45,8 +45,8 @@ export class FBScheduleDiff extends FBElement {
             }
 
             .diff-overlay {
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 overflow: hidden;
             }
@@ -56,13 +56,13 @@ export class FBScheduleDiff extends FBElement {
                 align-items: center;
                 justify-content: space-between;
                 padding: 16px 20px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .diff-title {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .close-btn {
@@ -71,7 +71,7 @@ export class FBScheduleDiff extends FBElement {
                 border-radius: 6px;
                 border: none;
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 display: flex;
                 align-items: center;
@@ -80,8 +80,8 @@ export class FBScheduleDiff extends FBElement {
             }
 
             .close-btn:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .diff-summary {
@@ -89,19 +89,19 @@ export class FBScheduleDiff extends FBElement {
                 grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
                 gap: 16px;
                 padding: 20px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .summary-card {
                 padding: 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 text-align: center;
             }
 
             .summary-label {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
                 margin-bottom: 8px;
@@ -113,20 +113,20 @@ export class FBScheduleDiff extends FBElement {
             }
 
             .summary-value.positive {
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .summary-value.negative {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .summary-value.neutral {
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .summary-detail {
                 font-size: 12px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 4px;
             }
 
@@ -141,7 +141,7 @@ export class FBScheduleDiff extends FBElement {
 
             .date-box {
                 padding: 12px 20px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 text-align: center;
             }
@@ -152,7 +152,7 @@ export class FBScheduleDiff extends FBElement {
 
             .date-box-label {
                 font-size: 11px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 margin-bottom: 4px;
             }
@@ -160,7 +160,7 @@ export class FBScheduleDiff extends FBElement {
             .date-box-value {
                 font-size: 15px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .date-box.old .date-box-value {
@@ -169,7 +169,7 @@ export class FBScheduleDiff extends FBElement {
 
             .arrow {
                 font-size: 18px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .delta-badge {
@@ -181,12 +181,12 @@ export class FBScheduleDiff extends FBElement {
 
             .delta-badge.positive {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .delta-badge.negative {
                 background: rgba(239, 68, 68, 0.15);
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .task-changes {
@@ -196,7 +196,7 @@ export class FBScheduleDiff extends FBElement {
             .section-title {
                 font-size: 13px;
                 font-weight: 600;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
                 margin-bottom: 12px;
@@ -213,7 +213,7 @@ export class FBScheduleDiff extends FBElement {
                 align-items: center;
                 justify-content: space-between;
                 padding: 12px 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
             }
 
@@ -226,13 +226,13 @@ export class FBScheduleDiff extends FBElement {
             .task-name {
                 font-size: 14px;
                 font-weight: 500;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .task-wbs {
                 font-size: 11px;
                 font-family: monospace;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .task-delta {
@@ -247,11 +247,11 @@ export class FBScheduleDiff extends FBElement {
             }
 
             .task-delta-value.slip {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .task-delta-value.advance {
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .critical-badge {
@@ -264,18 +264,18 @@ export class FBScheduleDiff extends FBElement {
 
             .critical-badge.became {
                 background: rgba(239, 68, 68, 0.15);
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .critical-badge.removed {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .empty-changes {
                 padding: 40px 20px;
                 text-align: center;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
 
@@ -284,7 +284,7 @@ export class FBScheduleDiff extends FBElement {
                 justify-content: flex-end;
                 gap: 12px;
                 padding: 16px 20px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .btn {
@@ -299,17 +299,17 @@ export class FBScheduleDiff extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 

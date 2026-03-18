@@ -28,12 +28,12 @@ export class FBEmptyHome extends FBElement {
                 width: 80px;
                 height: 80px;
                 border-radius: 20px;
-                background: linear-gradient(135deg, var(--fb-accent, #6366f1), var(--fb-accent-light, #818cf8));
+                background: linear-gradient(135deg, var(--fb-accent, #00FFA3), var(--fb-accent-light, #33FFB8));
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 margin-bottom: 32px;
-                box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+                box-shadow: 0 8px 32px rgba(0, 255, 163, 0.3);
             }
 
             .icon svg {
@@ -45,14 +45,14 @@ export class FBEmptyHome extends FBElement {
             .title {
                 font-size: 28px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 12px;
                 line-height: 1.2;
             }
 
             .body {
                 font-size: 16px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 line-height: 1.6;
                 max-width: 360px;
                 margin-bottom: 32px;
@@ -64,19 +64,19 @@ export class FBEmptyHome extends FBElement {
                 gap: 8px;
                 padding: 14px 32px;
                 border-radius: 10px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 font-size: 16px;
                 font-weight: 600;
                 cursor: pointer;
                 border: none;
                 transition: all 0.2s ease;
-                box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+                box-shadow: 0 4px 16px rgba(0, 255, 163, 0.3);
             }
 
             .cta:hover {
                 transform: translateY(-1px);
-                box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);
+                box-shadow: 0 6px 24px rgba(0, 255, 163, 0.4);
             }
 
             .cta:active {
@@ -84,7 +84,7 @@ export class FBEmptyHome extends FBElement {
             }
 
             .cta:focus-visible {
-                outline: 2px solid var(--fb-accent, #6366f1);
+                outline: 2px solid var(--fb-accent, #00FFA3);
                 outline-offset: 3px;
             }
 

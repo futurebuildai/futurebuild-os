@@ -53,8 +53,8 @@ export class FBViewPortalAction extends FBViewElement {
             .spinner {
                 width: 40px;
                 height: 40px;
-                border: 3px solid var(--fb-border, #333);
-                border-top-color: var(--fb-primary, #667eea);
+                border: 3px solid var(--fb-border, rgba(255,255,255,0.05));
+                border-top-color: var(--fb-primary, #00FFA3);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
             }
@@ -64,7 +64,7 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .loading-text {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
 
@@ -81,7 +81,7 @@ export class FBViewPortalAction extends FBViewElement {
             .error-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-error, #c62828);
+                color: var(--fb-error, #F43F5E);
             }
 
             .error-title {
@@ -92,7 +92,7 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .error-message {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
                 max-width: 300px;
@@ -105,8 +105,8 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .task-card {
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 padding: 20px;
             }
@@ -127,11 +127,11 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .task-wbs {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 font-size: 12px;
                 font-weight: 500;
                 padding: 4px 8px;
-                background: var(--fb-primary-alpha, rgba(102, 126, 234, 0.1));
+                background: var(--fb-primary-alpha, rgba(0, 255, 163, 0.1));
                 border-radius: 4px;
             }
 
@@ -145,7 +145,7 @@ export class FBViewPortalAction extends FBViewElement {
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
 
@@ -167,7 +167,7 @@ export class FBViewPortalAction extends FBViewElement {
                 padding: 16px 24px;
                 font-size: 16px;
                 font-weight: 600;
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -197,7 +197,7 @@ export class FBViewPortalAction extends FBViewElement {
             .success-icon {
                 width: 64px;
                 height: 64px;
-                color: var(--fb-success, #2e7d32);
+                color: var(--fb-success, #00FFA3);
             }
 
             .success-title {
@@ -208,14 +208,14 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .success-message {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 margin: 0;
             }
 
             .upsell {
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 padding: 20px;
                 text-align: center;
@@ -229,7 +229,7 @@ export class FBViewPortalAction extends FBViewElement {
             }
 
             .upsell-link {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
                 text-decoration: none;
                 font-size: 14px;
             }

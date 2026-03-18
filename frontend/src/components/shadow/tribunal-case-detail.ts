@@ -39,13 +39,13 @@ export class TribunalCaseDetail extends FBElement {
             .consensus-score {
                 font-size: 24px;
                 font-weight: 600;
-                color: #818cf8;
+                color: #33FFB8;
             }
 
             .context {
                 margin-bottom: 16px;
                 padding: 12px;
-                background: #1a1a2e;
+                background: #161821;
                 border-radius: 6px;
                 color: #9ca3af;
                 font-size: 14px;
@@ -60,7 +60,7 @@ export class TribunalCaseDetail extends FBElement {
             }
 
             .vote-card {
-                background: #1a1a2e;
+                background: #161821;
                 border-radius: 8px;
                 padding: 12px;
                 margin-bottom: 8px;
@@ -108,7 +108,7 @@ export class TribunalCaseDetail extends FBElement {
             }
 
             .reasoning a {
-                color: #818cf8;
+                color: #33FFB8;
                 text-decoration: none;
             }
 

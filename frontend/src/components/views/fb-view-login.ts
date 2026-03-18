@@ -73,8 +73,8 @@ export class FBViewLogin extends FBViewElement {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: #000;
-                    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #0A0B10;
+                    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
                     overflow-y: auto;
                 }
 
@@ -96,11 +96,11 @@ export class FBViewLogin extends FBViewElement {
                 #${PORTAL_ID} .logo svg {
                     width: 200px;
                     height: auto;
-                    color: #667eea;
+                    color: #00FFA3;
                 }
 
                 #${PORTAL_ID} .tagline {
-                    color: #aaa;
+                    color: #8B8D98;
                     text-align: center;
                     margin: 0;
                     font-size: 0.95rem;
@@ -114,12 +114,12 @@ export class FBViewLogin extends FBViewElement {
                 }
 
                 #${PORTAL_ID} .loading-text {
-                    color: #666;
+                    color: #5A5B66;
                     font-size: 0.875rem;
                 }
 
                 #${PORTAL_ID} .error-text {
-                    color: #e74c3c;
+                    color: #F43F5E;
                     font-size: 0.875rem;
                     text-align: center;
                 }
@@ -149,8 +149,8 @@ export class FBViewLogin extends FBViewElement {
                             <path d="M46 78 L50 82 L54 78"/>
                         </g>
                         <g fill="currentColor">
-                            <text x="40" y="130" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="3">FUTURE</text>
-                            <text x="148" y="130" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="300" letter-spacing="3">BUILD AI</text>
+                            <text x="40" y="130" font-family="Outfit, system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="3">FUTURE</text>
+                            <text x="148" y="130" font-family="Outfit, system-ui, sans-serif" font-size="22" font-weight="300" letter-spacing="3">BUILD AI</text>
                         </g>
                     </svg>
                 </div>

@@ -28,7 +28,7 @@ export class ShadowDocsViewer extends FBElement {
 
             .markdown-content {
                 line-height: 1.7;
-                color: #e0e0e0;
+                color: #F0F0F5;
             }
 
             .markdown-content h1 {
@@ -38,7 +38,7 @@ export class ShadowDocsViewer extends FBElement {
                 margin-top: 0;
                 margin-bottom: 16px;
                 padding-bottom: 8px;
-                border-bottom: 1px solid #1a1a2e;
+                border-bottom: 1px solid #161821;
             }
 
             .markdown-content h2 {
@@ -72,7 +72,7 @@ export class ShadowDocsViewer extends FBElement {
             }
 
             .markdown-content code {
-                background: #1a1a2e;
+                background: #161821;
                 padding: 2px 6px;
                 border-radius: 4px;
                 font-size: 0.9em;
@@ -80,7 +80,7 @@ export class ShadowDocsViewer extends FBElement {
             }
 
             .markdown-content pre {
-                background: #1a1a2e;
+                background: #161821;
                 padding: 16px;
                 border-radius: 8px;
                 overflow-x: auto;
@@ -93,7 +93,7 @@ export class ShadowDocsViewer extends FBElement {
             }
 
             .markdown-content a {
-                color: #818cf8;
+                color: #33FFB8;
                 text-decoration: none;
             }
 
@@ -102,10 +102,10 @@ export class ShadowDocsViewer extends FBElement {
             }
 
             .markdown-content blockquote {
-                border-left: 4px solid #4f46e5;
+                border-left: 4px solid #00CC82;
                 margin: 16px 0;
                 padding: 8px 16px;
-                background: #1a1a2e;
+                background: #161821;
                 color: #9ca3af;
             }
 
@@ -127,19 +127,19 @@ export class ShadowDocsViewer extends FBElement {
 
             .markdown-content th,
             .markdown-content td {
-                border: 1px solid #2a2a3e;
+                border: 1px solid rgba(255,255,255,0.05);
                 padding: 8px 12px;
                 text-align: left;
             }
 
             .markdown-content th {
-                background: #1a1a2e;
+                background: #161821;
                 font-weight: 600;
             }
 
             .markdown-content hr {
                 border: none;
-                border-top: 1px solid #2a2a3e;
+                border-top: 1px solid rgba(255,255,255,0.05);
                 margin: 24px 0;
             }
 
@@ -173,7 +173,7 @@ export class ShadowDocsViewer extends FBElement {
                 color: #6b7280;
                 margin-bottom: 16px;
                 padding-bottom: 8px;
-                border-bottom: 1px solid #1a1a2e;
+                border-bottom: 1px solid #161821;
             }
         `,
     ];

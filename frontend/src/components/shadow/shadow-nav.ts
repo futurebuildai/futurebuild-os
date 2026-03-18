@@ -26,7 +26,7 @@ export class ShadowNav extends FBElement {
 
             .tabs {
                 display: flex;
-                border-bottom: 1px solid #1a1a2e;
+                border-bottom: 1px solid #161821;
             }
 
             .tab {
@@ -43,13 +43,13 @@ export class ShadowNav extends FBElement {
             }
 
             .tab:hover {
-                background: #1a1a2e;
+                background: #161821;
                 color: #e5e7eb;
             }
 
             .tab.active {
-                color: #818cf8;
-                border-bottom-color: #818cf8;
+                color: #33FFB8;
+                border-bottom-color: #33FFB8;
             }
 
             .content {
@@ -71,13 +71,13 @@ export class ShadowNav extends FBElement {
             }
 
             .tree-item:hover {
-                background: #1a1a2e;
+                background: #161821;
                 color: #e5e7eb;
             }
 
             .tree-item.selected {
                 background: #1a1a3e;
-                color: #818cf8;
+                color: #33FFB8;
             }
 
             .tree-children {

@@ -63,7 +63,7 @@ export class FBMobileNav extends FBElement {
                 right: 0;
                 z-index: 1000;
                 background: var(--fb-bg-secondary, #0a0a0a);
-                border-top: 1px solid var(--fb-border, #333);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 /* Safe area for iOS notch devices */
                 padding-bottom: env(safe-area-inset-bottom, 0px);
             }
@@ -93,7 +93,7 @@ export class FBMobileNav extends FBElement {
                 padding: var(--fb-spacing-xs, 4px) 0;
                 border: none;
                 background: transparent;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 cursor: pointer;
                 /* Minimum 44x44px touch target (WCAG 2.5.8) */
                 min-height: 44px;
@@ -105,17 +105,17 @@ export class FBMobileNav extends FBElement {
             }
 
             .tab:focus-visible {
-                outline: 2px solid var(--fb-primary, #667eea);
+                outline: 2px solid var(--fb-primary, #00FFA3);
                 outline-offset: -2px;
                 border-radius: var(--fb-radius-sm, 4px);
             }
 
             .tab.active {
-                color: var(--fb-primary, #667eea);
+                color: var(--fb-primary, #00FFA3);
             }
 
             .tab:not(.active):hover {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .tab-icon {

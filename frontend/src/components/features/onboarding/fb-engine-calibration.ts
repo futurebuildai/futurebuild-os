@@ -27,7 +27,7 @@ export class FBEngineCalibration extends FBElement {
 
             .intro {
                 font-size: 16px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 32px;
                 line-height: 1.5;
             }
@@ -39,7 +39,7 @@ export class FBEngineCalibration extends FBElement {
             .section-label {
                 font-size: 14px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 12px;
             }
 
@@ -59,19 +59,19 @@ export class FBEngineCalibration extends FBElement {
                 font-size: 13px;
                 font-weight: 600;
                 cursor: pointer;
-                border: 2px solid var(--fb-border, #2a2a3e);
+                border: 2px solid var(--fb-border, rgba(255,255,255,0.05));
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 transition: all 0.15s ease;
             }
 
             .day-btn:hover {
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             .day-btn[data-active] {
-                background: var(--fb-accent, #6366f1);
-                border-color: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
+                border-color: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -89,15 +89,15 @@ export class FBEngineCalibration extends FBElement {
 
             .latency-label {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             select {
                 padding: 8px 12px;
                 border-radius: 6px;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 outline: none;
                 cursor: pointer;
@@ -105,7 +105,7 @@ export class FBEngineCalibration extends FBElement {
             }
 
             select:focus {
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             .btn-row {
@@ -117,7 +117,7 @@ export class FBEngineCalibration extends FBElement {
             button.btn-primary {
                 padding: 12px 24px;
                 border-radius: 8px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 font-size: 14px;
                 font-weight: 600;
@@ -138,21 +138,21 @@ export class FBEngineCalibration extends FBElement {
                 padding: 12px 24px;
                 border-radius: 8px;
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 font-weight: 500;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 cursor: pointer;
             }
 
             button.btn-skip:hover {
-                border-color: var(--fb-text-secondary, #a0a0b0);
-                color: var(--fb-text-primary, #e0e0e0);
+                border-color: var(--fb-text-secondary, #8B8D98);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .error {
                 font-size: 13px;
-                color: #ef4444;
+                color: #F43F5E;
                 margin-top: 8px;
             }
         `,

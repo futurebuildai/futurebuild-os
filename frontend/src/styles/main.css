@@ -1,6 +1,6 @@
 /*
  * FutureBuild Global Styles
- * See FRONTEND_SCOPE.md Section 7
+ * Industrial Dark Theme
  */
 
 @import './variables.css';
@@ -27,11 +27,42 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Selection Highlight */
+::selection {
+    background: rgba(0, 255, 163, 0.2);
+    color: #F0F0F5;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
 /* Link Defaults */
 a {
     color: var(--fb-primary);
     text-decoration: none;
-    transition: color var(--fb-transition-fast);
+    transition: color var(--fb-transition-base);
 }
 
 a:hover {
@@ -39,13 +70,13 @@ a:hover {
 }
 
 a:focus-visible {
-    outline: 2px solid var(--fb-primary);
+    outline: 2px solid #00FFA3;
     outline-offset: 2px;
 }
 
 /* Focus Styles for Accessibility */
 :focus-visible {
-    outline: 2px solid var(--fb-primary);
+    outline: 2px solid #00FFA3;
     outline-offset: 2px;
 }
 

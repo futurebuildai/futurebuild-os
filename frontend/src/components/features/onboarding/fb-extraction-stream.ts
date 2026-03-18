@@ -42,9 +42,9 @@ export class FBExtractionStream extends FBElement {
             :host {
                 display: block;
                 padding: 24px;
-                background: var(--fb-surface-1, #1a1a2e);
+                background: var(--fb-surface-1, #161821);
                 border-radius: 12px;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 max-width: 480px;
             }
 
@@ -59,7 +59,7 @@ export class FBExtractionStream extends FBElement {
                 width: 40px;
                 height: 40px;
                 border-radius: 10px;
-                background: linear-gradient(135deg, var(--fb-accent, #6366f1), var(--fb-accent-light, #818cf8));
+                background: linear-gradient(135deg, var(--fb-accent, #00FFA3), var(--fb-accent-light, #33FFB8));
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -78,12 +78,12 @@ export class FBExtractionStream extends FBElement {
             .header-title {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .header-subtitle {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 2px;
             }
 
@@ -98,14 +98,14 @@ export class FBExtractionStream extends FBElement {
                 align-items: flex-start;
                 gap: 12px;
                 padding: 12px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 transition: all 0.2s ease;
             }
 
             .stream-item.active {
-                background: rgba(99, 102, 241, 0.1);
-                border: 1px solid rgba(99, 102, 241, 0.3);
+                background: rgba(0, 255, 163, 0.1);
+                border: 1px solid rgba(0, 255, 163, 0.3);
             }
 
             .stream-item.error {
@@ -123,20 +123,20 @@ export class FBExtractionStream extends FBElement {
             }
 
             .status-icon.pending {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .status-icon.active {
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
                 animation: pulse 1s ease-in-out infinite;
             }
 
             .status-icon.complete {
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .status-icon.error {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             @keyframes pulse {
@@ -152,12 +152,12 @@ export class FBExtractionStream extends FBElement {
             .item-label {
                 font-size: 14px;
                 font-weight: 500;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .item-detail {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 4px;
                 word-break: break-word;
             }
@@ -174,7 +174,7 @@ export class FBExtractionStream extends FBElement {
 
             .confidence-badge.high {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .confidence-badge.medium {
@@ -184,13 +184,13 @@ export class FBExtractionStream extends FBElement {
 
             .confidence-badge.low {
                 background: rgba(239, 68, 68, 0.15);
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .empty-state {
                 text-align: center;
                 padding: 40px 20px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .empty-state svg {
@@ -203,8 +203,8 @@ export class FBExtractionStream extends FBElement {
             .spinner {
                 width: 20px;
                 height: 20px;
-                border: 2px solid var(--fb-border, #2a2a3e);
-                border-top-color: var(--fb-accent, #6366f1);
+                border: 2px solid var(--fb-border, rgba(255,255,255,0.05));
+                border-top-color: var(--fb-accent, #00FFA3);
                 border-radius: 50%;
                 animation: spin 0.8s linear infinite;
             }
@@ -227,13 +227,13 @@ export class FBExtractionStream extends FBElement {
             .complete-banner svg {
                 width: 24px;
                 height: 24px;
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .complete-text {
                 font-size: 14px;
                 font-weight: 500;
-                color: #22c55e;
+                color: #00FFA3;
             }
         `,
     ];

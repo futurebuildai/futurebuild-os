@@ -35,7 +35,7 @@ export class FBViewDirectory extends FBViewElement {
             h1 {
                 font-size: 24px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin: 0;
             }
 
@@ -46,27 +46,27 @@ export class FBViewDirectory extends FBViewElement {
             .search-input {
                 width: 100%;
                 padding: 10px 14px;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
-                background: var(--fb-surface-1, #1a1a2e);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-1, #161821);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-size: 14px;
                 outline: none;
                 box-sizing: border-box;
             }
 
             .search-input:focus {
-                border-color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
             }
 
             .search-input::placeholder {
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .btn-add {
                 padding: 10px 20px;
                 border-radius: 8px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 font-size: 14px;
                 font-weight: 600;
@@ -87,8 +87,8 @@ export class FBViewDirectory extends FBViewElement {
                 display: flex;
                 align-items: center;
                 padding: 14px 16px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 10px;
                 transition: border-color 0.15s ease;
             }
@@ -101,8 +101,8 @@ export class FBViewDirectory extends FBViewElement {
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-secondary, #a0a0b0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-secondary, #8B8D98);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -120,12 +120,12 @@ export class FBViewDirectory extends FBViewElement {
             .contact-name {
                 font-size: 14px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .contact-detail {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 2px;
             }
 
@@ -143,31 +143,31 @@ export class FBViewDirectory extends FBViewElement {
             }
 
             .badge-pref {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-tertiary, #707080);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .badge-portal {
-                background: rgba(99, 102, 241, 0.15);
-                color: var(--fb-accent, #6366f1);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-accent, #00FFA3);
             }
 
             .empty {
                 text-align: center;
                 padding: 60px 24px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .empty-title {
                 font-size: 18px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 8px;
             }
 
             .count {
                 font-size: 13px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-bottom: 16px;
             }
 
@@ -186,15 +186,15 @@ export class FBViewDirectory extends FBViewElement {
             .add-form {
                 margin-bottom: 20px;
                 padding: 16px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-accent, #6366f1);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-accent, #00FFA3);
                 border-radius: 10px;
             }
 
             .add-form-title {
                 font-size: 14px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 12px;
             }
 
@@ -301,10 +301,10 @@ export class FBViewDirectory extends FBViewElement {
                 : this._error
                     ? html`
                         <div class="empty" role="alert">
-                            <div class="empty-title" style="color: #ef4444;">Something went wrong</div>
+                            <div class="empty-title" style="color: #F43F5E;">Something went wrong</div>
                             <div>${this._error}</div>
                             <button
-                                style="margin-top: 12px; padding: 8px 20px; border-radius: 6px; border: 1px solid #ef4444; background: transparent; color: #ef4444; font-size: 13px; font-weight: 600; cursor: pointer;"
+                                style="margin-top: 12px; padding: 8px 20px; border-radius: 6px; border: 1px solid #F43F5E; background: transparent; color: #F43F5E; font-size: 13px; font-weight: 600; cursor: pointer;"
                                 @click=${() => this._loadContacts()}
                             >Retry</button>
                         </div>

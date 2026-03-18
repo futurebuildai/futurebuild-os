@@ -24,25 +24,25 @@ export class FBViewCreateProject extends FBElement {
 
             .subtitle {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-bottom: 24px;
             }
 
             .drop-zone {
-                border: 2px dashed var(--fb-border, #2a2a3e);
+                border: 2px dashed var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 padding: 40px 24px;
                 text-align: center;
                 cursor: pointer;
                 transition: all 0.2s ease;
                 margin-bottom: 24px;
-                background: var(--fb-surface-1, #1a1a2e);
+                background: var(--fb-surface-1, #161821);
             }
 
             .drop-zone:hover,
             .drop-zone.dragover {
-                border-color: var(--fb-accent, #6366f1);
-                background: rgba(99, 102, 241, 0.05);
+                border-color: var(--fb-accent, #00FFA3);
+                background: rgba(0, 255, 163, 0.05);
             }
 
             .drop-icon {
@@ -53,13 +53,13 @@ export class FBViewCreateProject extends FBElement {
             .drop-title {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 4px;
             }
 
             .drop-hint {
                 font-size: 13px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .file-list {
@@ -71,43 +71,43 @@ export class FBViewCreateProject extends FBElement {
                 align-items: center;
                 gap: 10px;
                 padding: 10px 14px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
                 margin-bottom: 8px;
                 font-size: 13px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .file-item .name { flex: 1; }
             .file-item .size {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .file-remove {
                 background: none;
                 border: none;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 cursor: pointer;
                 padding: 4px;
                 font-size: 16px;
             }
-            .file-remove:hover { color: #ef4444; }
+            .file-remove:hover { color: #F43F5E; }
 
             .divider {
                 display: flex;
                 align-items: center;
                 gap: 12px;
                 margin: 24px 0;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 font-size: 12px;
                 text-transform: uppercase;
             }
             .divider::before, .divider::after {
                 content: '';
                 flex: 1;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .form-group {

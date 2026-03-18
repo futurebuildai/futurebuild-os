@@ -52,7 +52,7 @@ export class FBFeedSection extends FBElement {
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 1px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 white-space: nowrap;
             }
 
@@ -65,11 +65,11 @@ export class FBFeedSection extends FBElement {
 
             /* Horizon-specific accents */
             :host([horizon="today"]) .label {
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
             }
 
             :host([horizon="today"]) .line {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 opacity: 0.4;
             }
 

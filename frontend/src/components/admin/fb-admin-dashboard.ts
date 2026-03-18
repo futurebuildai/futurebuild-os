@@ -32,7 +32,7 @@ export class FBAdminDashboard extends FBElement {
 
             .subtitle {
                 font-size: var(--fb-text-sm, 13px);
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 margin-bottom: var(--fb-spacing-xl, 24px);
             }
 
@@ -44,8 +44,8 @@ export class FBAdminDashboard extends FBElement {
             }
 
             .card {
-                background: var(--fb-bg-card, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-card, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: var(--fb-radius-lg, 12px);
                 padding: var(--fb-spacing-lg, 20px);
                 transition: border-color 0.15s ease;
@@ -87,7 +87,7 @@ export class FBAdminDashboard extends FBElement {
 
             .card-desc {
                 font-size: var(--fb-text-sm, 13px);
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 line-height: 1.5;
             }
 
@@ -106,7 +106,7 @@ export class FBAdminDashboard extends FBElement {
                 align-items: center;
                 gap: var(--fb-spacing-sm, 8px);
                 font-size: var(--fb-text-sm, 13px);
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .health-dot {
@@ -116,10 +116,10 @@ export class FBAdminDashboard extends FBElement {
                 flex-shrink: 0;
             }
 
-            .health-dot.ok { background: var(--fb-success, #22c55e); }
+            .health-dot.ok { background: var(--fb-success, #00FFA3); }
             .health-dot.degraded { background: var(--fb-warning, #f59e0b); }
-            .health-dot.error { background: var(--fb-danger, #ef4444); }
-            .health-dot.loading { background: var(--fb-text-muted, #666); }
+            .health-dot.error { background: var(--fb-danger, #F43F5E); }
+            .health-dot.loading { background: var(--fb-text-muted, #4A4B55); }
 
             .health-checks {
                 margin-top: var(--fb-spacing-sm, 8px);
@@ -133,7 +133,7 @@ export class FBAdminDashboard extends FBElement {
                 align-items: center;
                 gap: var(--fb-spacing-sm, 8px);
                 font-size: var(--fb-text-xs, 11px);
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
         `,
     ];

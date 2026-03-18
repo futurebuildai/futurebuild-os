@@ -45,7 +45,7 @@ export class FBViewCompletionReport extends FBElement {
             }
 
             .report-meta {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
                 margin: 0;
             }
@@ -57,14 +57,14 @@ export class FBViewCompletionReport extends FBElement {
             }
 
             .card {
-                background: var(--fb-bg-secondary, #111);
-                border: 1px solid var(--fb-border, #333);
+                background: var(--fb-bg-secondary, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: var(--fb-radius-md, 8px);
                 padding: 20px;
             }
 
             .card-title {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 12px;
                 font-weight: 600;
                 text-transform: uppercase;
@@ -80,11 +80,11 @@ export class FBViewCompletionReport extends FBElement {
             }
 
             .stat-row + .stat-row {
-                border-top: 1px solid var(--fb-border, #333);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .stat-label {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
             }
 
@@ -95,11 +95,11 @@ export class FBViewCompletionReport extends FBElement {
             }
 
             .stat-value--positive {
-                color: var(--fb-success, #22c55e);
+                color: var(--fb-success, #00FFA3);
             }
 
             .stat-value--negative {
-                color: var(--fb-danger, #ef4444);
+                color: var(--fb-danger, #F43F5E);
             }
 
             .notes-section {
@@ -107,7 +107,7 @@ export class FBViewCompletionReport extends FBElement {
             }
 
             .notes-label {
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 12px;
                 font-weight: 600;
                 text-transform: uppercase;
@@ -127,11 +127,11 @@ export class FBViewCompletionReport extends FBElement {
                 align-items: center;
                 justify-content: center;
                 min-height: 200px;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .error {
-                color: var(--fb-danger, #ef4444);
+                color: var(--fb-danger, #F43F5E);
                 padding: 16px;
                 text-align: center;
             }

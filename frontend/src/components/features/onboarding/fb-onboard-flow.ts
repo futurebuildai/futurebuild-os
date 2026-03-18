@@ -49,17 +49,17 @@ export class FBOnboardFlow extends FBElement {
                 align-items: center;
                 justify-content: space-between;
                 padding: 16px 24px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .logo {
                 font-size: 18px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .logo span {
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
             }
 
             .close-btn {
@@ -69,16 +69,16 @@ export class FBOnboardFlow extends FBElement {
                 padding: 8px 16px;
                 border-radius: 8px;
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 cursor: pointer;
                 transition: all 0.15s ease;
             }
 
             .close-btn:hover {
-                background: var(--fb-surface-1, #1a1a2e);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-1, #161821);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .progress-bar {
@@ -86,23 +86,23 @@ export class FBOnboardFlow extends FBElement {
                 align-items: center;
                 gap: 4px;
                 padding: 12px 24px;
-                background: var(--fb-surface-1, #1a1a2e);
+                background: var(--fb-surface-1, #161821);
             }
 
             .progress-step {
                 flex: 1;
                 height: 4px;
-                background: var(--fb-border, #2a2a3e);
+                background: var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 2px;
                 transition: background 0.3s ease;
             }
 
             .progress-step.active {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
             }
 
             .progress-step.complete {
-                background: #22c55e;
+                background: #00FFA3;
             }
 
             .content {
@@ -121,14 +121,14 @@ export class FBOnboardFlow extends FBElement {
             .step-title {
                 font-size: 28px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 text-align: center;
                 margin-bottom: 8px;
             }
 
             .step-subtitle {
                 font-size: 16px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 text-align: center;
                 margin-bottom: 32px;
             }
@@ -158,13 +158,13 @@ export class FBOnboardFlow extends FBElement {
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
             .btn-primary:hover:not(:disabled) {
                 transform: translateY(-1px);
-                box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+                box-shadow: 0 4px 16px rgba(0, 255, 163, 0.3);
             }
 
             .btn-primary:disabled {
@@ -174,13 +174,13 @@ export class FBOnboardFlow extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-1, #1a1a2e);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-1, #161821);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             @media (max-width: 768px) {
@@ -351,7 +351,7 @@ export class FBOnboardFlow extends FBElement {
     private _renderCompleteStep() {
         return html`
             <div class="step-container" style="text-align: center;">
-                <div style="width: 64px; height: 64px; margin: 0 auto 24px; border-radius: 50%; background: #22c55e; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 64px; height: 64px; margin: 0 auto 24px; border-radius: 50%; background: #00FFA3; display: flex; align-items: center; justify-content: center;">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"/>
                     </svg>

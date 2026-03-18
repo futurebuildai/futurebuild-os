@@ -51,21 +51,21 @@ export class FBViewSchedule extends FBViewElement {
                 align-items: center;
                 gap: 12px;
                 padding: 12px 20px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 flex-shrink: 0;
             }
 
             .toolbar-title {
                 font-size: 16px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .toolbar-spacer { flex: 1; }
 
             .toolbar-info {
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .recalc-btn {
@@ -74,15 +74,15 @@ export class FBViewSchedule extends FBViewElement {
                 font-size: 13px;
                 font-weight: 500;
                 cursor: pointer;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 transition: all 0.15s;
             }
 
             .recalc-btn:hover {
-                border-color: var(--fb-accent, #6366f1);
-                color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
+                color: var(--fb-accent, #00FFA3);
             }
 
             .recalc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -104,7 +104,7 @@ export class FBViewSchedule extends FBViewElement {
                 z-index: 2;
                 display: flex;
                 background: var(--fb-bg-primary, #0f0f1a);
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .date-axis-label-col {
@@ -114,7 +114,7 @@ export class FBViewSchedule extends FBViewElement {
                 padding: 8px 12px;
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
                 display: flex;
@@ -130,9 +130,10 @@ export class FBViewSchedule extends FBViewElement {
             .month-label {
                 position: absolute;
                 top: 4px;
+                font-family: var(--fb-font-mono, monospace);
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 white-space: nowrap;
             }
 
@@ -141,14 +142,15 @@ export class FBViewSchedule extends FBViewElement {
                 bottom: 0;
                 width: 1px;
                 height: 12px;
-                background: var(--fb-border, #2a2a3e);
+                background: var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .week-label {
                 position: absolute;
                 bottom: 14px;
+                font-family: var(--fb-font-mono, monospace);
                 font-size: 10px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 transform: translateX(-50%);
                 white-space: nowrap;
             }
@@ -163,7 +165,7 @@ export class FBViewSchedule extends FBViewElement {
                 transition: background 0.1s;
             }
 
-            .task-row:hover { background: var(--fb-surface-1, #1a1a2e); }
+            .task-row:hover { background: var(--fb-surface-1, #161821); }
 
             .task-label {
                 width: 220px;
@@ -174,14 +176,14 @@ export class FBViewSchedule extends FBViewElement {
                 gap: 8px;
                 padding: 0 12px;
                 font-size: 13px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 overflow: hidden;
             }
 
             .task-wbs {
                 font-size: 11px;
-                color: var(--fb-text-tertiary, #707080);
-                font-family: monospace;
+                color: var(--fb-text-tertiary, #5A5B66);
+                font-family: var(--fb-font-mono, monospace);
                 flex-shrink: 0;
             }
 
@@ -204,9 +206,9 @@ export class FBViewSchedule extends FBViewElement {
                 min-width: 4px;
             }
 
-            .task-bar.normal { background: var(--fb-accent, #6366f1); }
-            .task-bar.critical { background: #ef4444; }
-            .task-bar.completed { background: #22c55e; }
+            .task-bar.normal { background: var(--fb-accent, #00FFA3); }
+            .task-bar.critical { background: #F43F5E; }
+            .task-bar.completed { background: #00FFA3; }
             .task-bar.delayed { background: #f97316; }
 
             .dep-overlay {
@@ -219,13 +221,13 @@ export class FBViewSchedule extends FBViewElement {
 
             .dep-arrow {
                 fill: none;
-                stroke: var(--fb-text-tertiary, #707080);
+                stroke: var(--fb-text-tertiary, #5A5B66);
                 stroke-width: 1.5;
                 opacity: 0.5;
             }
 
             .dep-arrowhead {
-                fill: var(--fb-text-tertiary, #707080);
+                fill: var(--fb-text-tertiary, #5A5B66);
                 opacity: 0.5;
             }
 
@@ -234,7 +236,7 @@ export class FBViewSchedule extends FBViewElement {
                 top: 0;
                 bottom: 0;
                 width: 2px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 opacity: 0.4;
                 z-index: 1;
             }
@@ -245,21 +247,21 @@ export class FBViewSchedule extends FBViewElement {
                 align-items: center;
                 justify-content: center;
                 height: 200px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
                 gap: 12px;
             }
 
             .error-state {
-                color: #ef4444;
+                color: #F43F5E;
             }
 
             .retry-btn {
                 padding: 8px 20px;
                 border-radius: 6px;
-                border: 1px solid #ef4444;
+                border: 1px solid #F43F5E;
                 background: transparent;
-                color: #ef4444;
+                color: #F43F5E;
                 font-size: 13px;
                 font-weight: 600;
                 cursor: pointer;
@@ -267,7 +269,7 @@ export class FBViewSchedule extends FBViewElement {
             }
 
             .retry-btn:hover {
-                background: #ef4444;
+                background: #F43F5E;
                 color: #fff;
             }
 
@@ -275,7 +277,7 @@ export class FBViewSchedule extends FBViewElement {
                 display: flex;
                 gap: 16px;
                 padding: 8px 20px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 flex-shrink: 0;
             }
 
@@ -284,7 +286,7 @@ export class FBViewSchedule extends FBViewElement {
                 align-items: center;
                 gap: 6px;
                 font-size: 12px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .legend-dot {
@@ -563,9 +565,9 @@ export class FBViewSchedule extends FBViewElement {
             </div>
 
             <div class="legend" role="complementary" aria-label="Chart legend">
-                <div class="legend-item"><span class="legend-dot" style="background: var(--fb-accent, #6366f1)"></span> Normal</div>
-                <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span> Critical Path</div>
-                <div class="legend-item"><span class="legend-dot" style="background: #22c55e"></span> Completed</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--fb-accent, #00FFA3)"></span> Normal</div>
+                <div class="legend-item"><span class="legend-dot" style="background: #F43F5E"></span> Critical Path</div>
+                <div class="legend-item"><span class="legend-dot" style="background: #00FFA3"></span> Completed</div>
                 <div class="legend-item"><span class="legend-dot" style="background: #f97316"></span> Delayed</div>
             </div>
         `;

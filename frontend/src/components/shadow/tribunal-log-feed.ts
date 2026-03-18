@@ -25,7 +25,7 @@ export class TribunalLogFeed extends FBElement {
 
             .header {
                 padding: 16px;
-                border-bottom: 1px solid #1a1a2e;
+                border-bottom: 1px solid #161821;
             }
 
             .header h2 {
@@ -43,17 +43,17 @@ export class TribunalLogFeed extends FBElement {
 
             .filter-input {
                 padding: 6px 10px;
-                background: #1a1a2e;
-                border: 1px solid #2a2a3e;
+                background: #161821;
+                border: 1px solid rgba(255,255,255,0.05);
                 border-radius: 4px;
-                color: #e0e0e0;
+                color: #F0F0F5;
                 font-size: 13px;
                 font-family: inherit;
             }
 
             .filter-input:focus {
                 outline: none;
-                border-color: #4f46e5;
+                border-color: #00CC82;
             }
 
             .list {
@@ -66,13 +66,13 @@ export class TribunalLogFeed extends FBElement {
                 align-items: center;
                 gap: 12px;
                 padding: 12px 16px;
-                border-bottom: 1px solid #1a1a2e;
+                border-bottom: 1px solid #161821;
                 cursor: pointer;
                 transition: background 0.1s ease;
             }
 
             .item:hover {
-                background: #1a1a2e;
+                background: #161821;
             }
 
             .item.selected {

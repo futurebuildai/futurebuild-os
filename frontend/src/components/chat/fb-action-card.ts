@@ -113,15 +113,66 @@ export class FBActionCard extends FBElement {
             .btn-approve { background: var(--fb-success); color: white; border: none; }
             .btn-approve:hover { opacity: 0.9; background: var(--fb-success); }
 
-            .btn-edit { 
-                background: var(--fb-bg-tertiary); 
-                color: var(--fb-text-muted); 
+            .btn-edit {
+                background: var(--fb-bg-tertiary);
+                color: var(--fb-text-muted);
                 border: 1px dashed var(--fb-border);
                 cursor: not-allowed;
             }
-            
+
             .btn-deny { background: var(--fb-error); color: white; border: none; }
             .btn-deny:hover { opacity: 0.9; background: var(--fb-error); }
+
+            /* Draft message preview (email/SMS) */
+            .draft-preview {
+                background: var(--fb-bg-secondary);
+                border: 1px solid var(--fb-border);
+                border-radius: var(--fb-radius-md);
+                padding: var(--fb-spacing-md);
+                margin-bottom: var(--fb-spacing-md);
+                font-size: var(--fb-text-sm);
+            }
+
+            .draft-preview .draft-label {
+                font-size: var(--fb-text-xs);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--fb-text-muted);
+                margin-bottom: 6px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .draft-preview .draft-to {
+                font-size: var(--fb-text-xs);
+                color: var(--fb-text-secondary);
+                margin-bottom: 8px;
+            }
+
+            .draft-preview .draft-body {
+                color: var(--fb-text-primary);
+                line-height: 1.6;
+                white-space: pre-wrap;
+            }
+
+            /* Consequence callout */
+            .consequence {
+                background: rgba(245, 158, 11, 0.08);
+                border-left: 3px solid var(--fb-warning, #f59e0b);
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: var(--fb-text-xs);
+                color: var(--fb-warning, #f59e0b);
+                margin-bottom: var(--fb-spacing-sm);
+            }
+
+            /* Type-specific border colors */
+            .type-draft_message { border-left-color: #3b82f6; }
+            .type-agent_approval { border-left-color: var(--fb-warning); }
+            .type-agent_recommendation { border-left-color: var(--fb-primary); }
+            .type-change_order { border-left-color: #8b5cf6; }
+            .type-delay_mitigation { border-left-color: var(--fb-error); }
         `
     ];
 
@@ -141,14 +192,19 @@ export class FBActionCard extends FBElement {
         this.emit('action', { id: this.card.id, status });
     }
 
+    private _isDraftMessage(): boolean {
+        return this.card?.type === 'draft_message';
+    }
+
     override render(): TemplateResult {
         if (!this.card || !this.messageId) return html``;
         const isPending = this._isPending();
         const typeLabel = this.card.type.replace(/_/g, ' ');
+        const typeClass = `type-${this.card.type}`;
 
         return html`
-            <div 
-                class="card status-${this.card.status}"
+            <div
+                class="card status-${this.card.status} ${typeClass}"
                 role="region"
                 aria-label="Action required: ${this.card.title}"
             >
@@ -158,34 +214,65 @@ export class FBActionCard extends FBElement {
                         <span class="status-badge" role="status">${this.card.status.toUpperCase()}</span>
                     ` : nothing}
                 </div>
-                
+
                 <div class="title">${this.card.title}</div>
-                <div class="summary">${this.card.summary}</div>
+
+                ${this._isDraftMessage() && this.card.summary ? html`
+                    <div class="draft-preview">
+                        <div class="draft-label">${this.card.type === 'draft_message' ? '\u2709 Draft' : 'Preview'}</div>
+                        <div class="draft-body">${this.card.summary}</div>
+                    </div>
+                ` : html`
+                    <div class="summary">${this.card.summary}</div>
+                `}
 
                 ${isPending ? html`
                     <div class="actions" role="group" aria-label="Action buttons">
-                        <button 
-                            class="btn btn-approve" 
-                            @click=${(): void => { this._handleAction('approved'); }}
-                            aria-label="Approve: ${this.card.title}"
-                        >
-                            ✓ Approve
-                        </button>
-                        <button 
-                            class="btn btn-edit" 
-                            disabled
-                            aria-label="Edit action (coming soon)"
-                            title="Edit functionality coming soon"
-                        >
-                            ✎ Edit
-                        </button>
-                        <button 
-                            class="btn btn-deny" 
-                            @click=${(): void => { this._handleAction('denied'); }}
-                            aria-label="Deny: ${this.card.title}"
-                        >
-                            ✗ Deny
-                        </button>
+                        ${this._isDraftMessage() ? html`
+                            <button
+                                class="btn btn-approve"
+                                @click=${(): void => { this._handleAction('approved'); }}
+                                aria-label="Send: ${this.card.title}"
+                            >
+                                Send
+                            </button>
+                            <button
+                                class="btn btn-edit"
+                                disabled
+                                title="Edit functionality coming soon"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                class="btn btn-deny"
+                                @click=${(): void => { this._handleAction('denied'); }}
+                                aria-label="Discard: ${this.card.title}"
+                            >
+                                Discard
+                            </button>
+                        ` : html`
+                            <button
+                                class="btn btn-approve"
+                                @click=${(): void => { this._handleAction('approved'); }}
+                                aria-label="Approve: ${this.card.title}"
+                            >
+                                \u2713 Approve
+                            </button>
+                            <button
+                                class="btn btn-edit"
+                                disabled
+                                title="Edit functionality coming soon"
+                            >
+                                \u270E Edit
+                            </button>
+                            <button
+                                class="btn btn-deny"
+                                @click=${(): void => { this._handleAction('denied'); }}
+                                aria-label="Deny: ${this.card.title}"
+                            >
+                                \u2717 Deny
+                            </button>
+                        `}
                     </div>
                 ` : nothing}
             </div>

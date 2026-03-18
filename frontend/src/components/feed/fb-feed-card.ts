@@ -32,6 +32,12 @@ const CARD_ICONS: Partial<Record<FeedCardType, string>> = {
     budget_alert: '\uD83D\uDCB8',    // 💸
     milestone: '\uD83C\uDFC1',     // 🏁
     welcome: '\uD83D\uDC4B',       // 👋
+    // Agent approval card types (human-in-the-loop)
+    agent_approval: '\u270B',                 // ✋
+    agent_recommendation: '\uD83D\uDCA1',     // 💡
+    change_order: '\uD83D\uDCDD',             // 📝
+    delay_mitigation: '\u23F0',               // ⏰
+    draft_message: '\u2709',                  // ✉
     // Integration card types (FB-Brain cross-system flows)
     material_quote_prompt: '\uD83D\uDCE6',   // 📦
     material_quote_review: '\uD83D\uDCCB',   // 📋
@@ -52,22 +58,22 @@ export class FBFeedCard extends FBElement {
             }
 
             .card {
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 12px;
                 padding: 16px 20px;
                 transition: border-color 0.15s ease, box-shadow 0.15s ease;
             }
 
             :host([priority="critical"]) .card {
-                border-left: 4px solid #ef4444;
-                border-color: #ef4444;
-                background: linear-gradient(90deg, rgba(239,68,68,0.05) 0%, var(--fb-surface-1, #1a1a2e) 15%);
+                border-left: 4px solid #F43F5E;
+                border-color: #F43F5E;
+                background: linear-gradient(90deg, rgba(239,68,68,0.05) 0%, var(--fb-surface-1, #161821) 15%);
             }
             :host([priority="urgent"]) .card {
                 border-left: 4px solid #f59e0b;
                 border-color: #f59e0b;
-                background: linear-gradient(90deg, rgba(245,158,11,0.05) 0%, var(--fb-surface-1, #1a1a2e) 15%);
+                background: linear-gradient(90deg, rgba(245,158,11,0.05) 0%, var(--fb-surface-1, #161821) 15%);
             }
             :host([priority="routine"]) .card {
                 border-left: 4px solid #10b981;
@@ -98,7 +104,7 @@ export class FBFeedCard extends FBElement {
                 border-radius: 50%;
             }
             .priority-badge.critical .pulse-dot {
-                background: #ef4444;
+                background: #F43F5E;
                 box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
                 animation: pulse 2s infinite;
             }
@@ -114,7 +120,7 @@ export class FBFeedCard extends FBElement {
                 letter-spacing: 0.5px;
             }
             .priority-badge.critical .badge-text {
-                color: #ef4444;
+                color: #F43F5E;
             }
             .priority-badge.urgent .badge-text {
                 color: #f59e0b;
@@ -139,19 +145,19 @@ export class FBFeedCard extends FBElement {
             .headline {
                 font-size: 15px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 line-height: 1.3;
             }
 
             .project-label {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-top: 2px;
             }
 
             .body {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 line-height: 1.5;
                 margin: 8px 0;
                 padding-left: 20px;
@@ -184,44 +190,46 @@ export class FBFeedCard extends FBElement {
             }
 
             .action-btn[data-style='primary'] {
-                background: var(--fb-accent, #6366f1);
-                color: #fff;
+                background: #f59e0b;
+                color: #000;
+                font-weight: 600;
             }
 
             .action-btn[data-style='primary']:hover {
-                opacity: 0.9;
+                background: #fbbf24;
             }
 
             .action-btn[data-style='secondary'] {
-                background: transparent;
-                border-color: var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                background: rgba(255, 255, 255, 0.08);
+                border-color: rgba(255, 255, 255, 0.15);
+                color: #F0F0F5;
             }
 
             .action-btn[data-style='secondary']:hover {
-                border-color: var(--fb-text-secondary, #a0a0b0);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: rgba(255, 255, 255, 0.12);
+                border-color: rgba(255, 255, 255, 0.25);
+                color: #fff;
             }
 
             .action-btn[data-style='danger'] {
                 background: transparent;
-                border-color: #ef4444;
-                color: #ef4444;
+                border-color: #F43F5E;
+                color: #F43F5E;
             }
 
             .action-btn[data-style='danger']:hover {
-                background: #ef4444;
+                background: #F43F5E;
                 color: #fff;
             }
 
             .action-btn:focus-visible {
-                outline: 2px solid var(--fb-accent, #6366f1);
+                outline: 2px solid var(--fb-accent, #00FFA3);
                 outline-offset: 2px;
             }
 
             .deadline {
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-left: auto;
             }
 
@@ -233,7 +241,7 @@ export class FBFeedCard extends FBElement {
                 display: block;
                 padding: 8px 0 0 20px;
                 font-size: 13px;
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
                 cursor: pointer;
                 background: none;
                 border: none;
@@ -246,7 +254,7 @@ export class FBFeedCard extends FBElement {
             }
 
             .tell-me-more:focus-visible {
-                outline: 2px solid var(--fb-accent, #6366f1);
+                outline: 2px solid var(--fb-accent, #00FFA3);
                 outline-offset: 2px;
                 border-radius: 4px;
             }
@@ -254,7 +262,7 @@ export class FBFeedCard extends FBElement {
             .engine-data {
                 padding: 8px 0 4px 20px;
                 font-size: 13px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .engine-data details {
@@ -263,7 +271,7 @@ export class FBFeedCard extends FBElement {
 
             .engine-data summary {
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 8px;
             }
 
@@ -276,14 +284,14 @@ export class FBFeedCard extends FBElement {
             .line-items th {
                 text-align: left;
                 padding: 4px 8px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-tertiary, #707080);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-tertiary, #5A5B66);
                 font-weight: 500;
             }
 
             .line-items td {
                 padding: 4px 8px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .bid-summary {
@@ -292,12 +300,12 @@ export class FBFeedCard extends FBElement {
             }
 
             .bid-summary strong {
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .bid-notes {
                 font-style: italic;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-top: 4px;
             }
 

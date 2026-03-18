@@ -43,20 +43,20 @@ export class FBHomeFeed extends FBElement {
             .greeting {
                 font-size: 28px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 4px;
             }
 
             .summary {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 margin-bottom: 32px;
                 line-height: 1.5;
             }
 
             .summary-stat {
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .summary-alert {
@@ -73,7 +73,7 @@ export class FBHomeFeed extends FBElement {
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 0.8px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-bottom: 12px;
                 padding-left: 4px;
             }
@@ -106,7 +106,7 @@ export class FBHomeFeed extends FBElement {
                 gap: 16px;
                 padding: 12px 16px;
                 background: rgba(255, 255, 255, 0.03);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 8px;
                 margin-bottom: 16px;
                 overflow-x: auto;
@@ -118,14 +118,14 @@ export class FBHomeFeed extends FBElement {
                 gap: 6px;
                 font-size: 13px;
                 font-weight: 500;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 transition: color 0.15s ease;
                 white-space: nowrap;
             }
 
             .summary-item:hover, .summary-item.active {
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .summary-dot {
@@ -134,13 +134,13 @@ export class FBHomeFeed extends FBElement {
                 border-radius: 50%;
             }
 
-            .summary-dot.critical { background: #ef4444; }
+            .summary-dot.critical { background: #F43F5E; }
             .summary-dot.urgent { background: #f59e0b; }
             .summary-dot.routine { background: #10b981; }
 
             .summary-count {
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .filter-tabs {
@@ -154,8 +154,8 @@ export class FBHomeFeed extends FBElement {
                 padding: 6px 14px;
                 border-radius: 16px;
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 13px;
                 font-weight: 500;
                 cursor: pointer;
@@ -164,14 +164,14 @@ export class FBHomeFeed extends FBElement {
             }
 
             .filter-tab:hover {
-                border-color: var(--fb-text-tertiary, #707080);
-                color: var(--fb-text-primary, #e0e0e0);
+                border-color: var(--fb-text-tertiary, #5A5B66);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .filter-tab.active {
-                background: var(--fb-surface-2, #2a2a3e);
-                color: var(--fb-text-primary, #e0e0e0);
-                border-color: var(--fb-surface-2, #2a2a3e);
+                background: var(--fb-surface-2, rgba(255,255,255,0.05));
+                color: var(--fb-text-primary, #F0F0F5);
+                border-color: var(--fb-surface-2, rgba(255,255,255,0.05));
             }
 
             /* Sprint 5.1: Slide-in animation for new cards */
@@ -196,7 +196,7 @@ export class FBHomeFeed extends FBElement {
                 align-items: center;
                 gap: 6px;
                 font-size: 11px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-bottom: 16px;
             }
 
@@ -204,12 +204,12 @@ export class FBHomeFeed extends FBElement {
                 width: 7px;
                 height: 7px;
                 border-radius: 50%;
-                background: #ef4444;
+                background: #F43F5E;
                 transition: background 0.3s ease;
             }
 
             .status-dot.connected {
-                background: #22c55e;
+                background: #00FFA3;
             }
 
             .empty {
@@ -220,7 +220,7 @@ export class FBHomeFeed extends FBElement {
             .empty-title {
                 font-size: 24px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 8px;
             }
 
@@ -231,7 +231,7 @@ export class FBHomeFeed extends FBElement {
                 justify-content: center;
                 padding: 60px 24px;
                 text-align: center;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 gap: 32px;
                 min-height: 400px;
             }
@@ -239,7 +239,7 @@ export class FBHomeFeed extends FBElement {
             .widget-clock {
                 font-size: 64px;
                 font-weight: 200;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 font-variant-numeric: tabular-nums;
                 letter-spacing: -2px;
             }
@@ -247,7 +247,7 @@ export class FBHomeFeed extends FBElement {
             .widget-date {
                 font-size: 18px;
                 font-weight: 500;
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
                 margin-top: -24px;
                 margin-bottom: 24px;
                 text-transform: uppercase;
@@ -259,7 +259,7 @@ export class FBHomeFeed extends FBElement {
                 align-items: center;
                 gap: 12px;
                 font-size: 16px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 background: rgba(255, 255, 255, 0.05);
                 padding: 8px 16px;
                 border-radius: 20px;
@@ -271,8 +271,8 @@ export class FBHomeFeed extends FBElement {
                 line-height: 1.6;
                 position: relative;
                 padding: 20px;
-                border-left: 3px solid var(--fb-accent, #6366f1);
-                background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
+                border-left: 3px solid var(--fb-accent, #00FFA3);
+                background: linear-gradient(90deg, rgba(0, 255, 163, 0.1) 0%, transparent 100%);
                 border-radius: 0 8px 8px 0;
                 text-align: left;
             }
@@ -280,13 +280,13 @@ export class FBHomeFeed extends FBElement {
             .haiku-text {
                 white-space: pre-line;
                 font-size: 16px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .haiku-meta {
                 margin-top: 12px;
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }
@@ -297,7 +297,7 @@ export class FBHomeFeed extends FBElement {
                 gap: 8px;
                 padding: 12px 28px;
                 border-radius: 8px;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 font-size: 15px;
                 font-weight: 600;
@@ -311,16 +311,16 @@ export class FBHomeFeed extends FBElement {
             }
 
             .empty-cta:focus-visible {
-                outline: 2px solid var(--fb-accent, #6366f1);
+                outline: 2px solid var(--fb-accent, #00FFA3);
                 outline-offset: 2px;
             }
 
             .error {
                 padding: 16px;
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid #ef4444;
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid #F43F5E;
                 border-radius: 8px;
-                color: #ef4444;
+                color: #F43F5E;
                 font-size: 14px;
                 margin-top: 24px;
             }
@@ -331,9 +331,9 @@ export class FBHomeFeed extends FBElement {
                 margin-top: 12px;
                 padding: 8px 20px;
                 border-radius: 6px;
-                border: 1px solid #ef4444;
+                border: 1px solid #F43F5E;
                 background: transparent;
-                color: #ef4444;
+                color: #F43F5E;
                 font-size: 13px;
                 font-weight: 600;
                 cursor: pointer;
@@ -341,7 +341,7 @@ export class FBHomeFeed extends FBElement {
             }
 
             .error-retry:hover {
-                background: #ef4444;
+                background: #F43F5E;
                 color: #fff;
             }
 
@@ -525,7 +525,18 @@ export class FBHomeFeed extends FBElement {
             this._summary = resp.summary;
             this._cards = resp.cards;
         } catch (err) {
-            this._error = err instanceof Error ? err.message : 'Failed to load feed';
+            // Fallback to mock feed service for demo/dev
+            try {
+                const { mockFeedService } = await import('../../services/mock-feed-service');
+                const resp = await mockFeedService.getFeed(
+                    this._filterProjectId ?? undefined
+                );
+                this._greeting = resp.greeting;
+                this._summary = resp.summary;
+                this._cards = resp.cards;
+            } catch (mockErr) {
+                this._error = mockErr instanceof Error ? mockErr.message : 'Failed to load feed';
+            }
         } finally {
             this._loading = false;
         }

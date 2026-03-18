@@ -25,7 +25,7 @@ export class FBShadowStatus extends LitElement {
     }
 
     .indicator--active {
-      background-color: var(--color-success, #22c55e);
+      background-color: var(--color-success, #00FFA3);
     }
 
     .indicator--disabled {
@@ -37,7 +37,7 @@ export class FBShadowStatus extends LitElement {
     }
 
     .indicator--error {
-      background-color: var(--color-error, #ef4444);
+      background-color: var(--color-error, #F43F5E);
     }
 
     .label {

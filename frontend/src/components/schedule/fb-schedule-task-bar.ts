@@ -61,15 +61,15 @@ export class FBScheduleTaskBar extends FBElement {
 
             /* Status colors */
             .task-bar.normal {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
             }
 
             .task-bar.critical {
-                background: #ef4444;
+                background: #F43F5E;
             }
 
             .task-bar.completed {
-                background: #22c55e;
+                background: #00FFA3;
             }
 
             .task-bar.delayed {
@@ -77,8 +77,8 @@ export class FBScheduleTaskBar extends FBElement {
             }
 
             .task-bar.pending {
-                background: var(--fb-surface-2, #252540);
-                border: 1px dashed var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-2, #1E2029);
+                border: 1px dashed var(--fb-border, rgba(255,255,255,0.05));
             }
 
             /* Progress overlay */
@@ -97,7 +97,7 @@ export class FBScheduleTaskBar extends FBElement {
                 position: absolute;
                 height: 100%;
                 background: transparent;
-                border: 1px dashed var(--fb-text-tertiary, #707080);
+                border: 1px dashed var(--fb-text-tertiary, #5A5B66);
                 border-radius: 4px;
                 opacity: 0.5;
             }
@@ -110,7 +110,7 @@ export class FBScheduleTaskBar extends FBElement {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                background: #ef4444;
+                background: #F43F5E;
                 border: 1px solid var(--fb-bg-primary, #0f0f1a);
             }
 
@@ -120,8 +120,8 @@ export class FBScheduleTaskBar extends FBElement {
                 bottom: calc(100% + 8px);
                 left: 50%;
                 transform: translateX(-50%);
-                background: var(--fb-surface-1, #1a1a2e);
-                border: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 12px;
@@ -146,24 +146,25 @@ export class FBScheduleTaskBar extends FBElement {
                 left: 50%;
                 transform: translateX(-50%);
                 border: 6px solid transparent;
-                border-top-color: var(--fb-border, #2a2a3e);
+                border-top-color: var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .tooltip-title {
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 4px;
             }
 
             .tooltip-wbs {
-                font-family: monospace;
+                font-family: var(--fb-font-mono, monospace);
                 font-size: 10px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 margin-bottom: 6px;
             }
 
             .tooltip-dates {
-                color: var(--fb-text-secondary, #a0a0b0);
+                font-family: var(--fb-font-mono, monospace);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .tooltip-status {
@@ -180,14 +181,15 @@ export class FBScheduleTaskBar extends FBElement {
                 border-radius: 50%;
             }
 
-            .status-dot.normal { background: var(--fb-accent, #6366f1); }
-            .status-dot.critical { background: #ef4444; }
-            .status-dot.completed { background: #22c55e; }
+            .status-dot.normal { background: var(--fb-accent, #00FFA3); }
+            .status-dot.critical { background: #F43F5E; }
+            .status-dot.completed { background: #00FFA3; }
             .status-dot.delayed { background: #f97316; }
-            .status-dot.pending { background: var(--fb-text-tertiary, #707080); }
+            .status-dot.pending { background: var(--fb-text-tertiary, #5A5B66); }
 
             .tooltip-float {
-                color: var(--fb-text-tertiary, #707080);
+                font-family: var(--fb-font-mono, monospace);
+                color: var(--fb-text-tertiary, #5A5B66);
                 font-size: 11px;
                 margin-top: 4px;
             }

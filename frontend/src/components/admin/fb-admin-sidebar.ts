@@ -18,7 +18,7 @@ export class FBAdminSidebar extends FBElement {
                 flex-direction: column;
                 height: 100%;
                 background: var(--fb-bg-panel, #0a0a0a);
-                border-right: 1px solid var(--fb-border, #333);
+                border-right: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 color: var(--fb-text-primary, #fff);
             }
 
@@ -71,7 +71,7 @@ export class FBAdminSidebar extends FBElement {
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
                 margin-top: var(--fb-spacing-sm, 8px);
             }
 
@@ -82,7 +82,7 @@ export class FBAdminSidebar extends FBElement {
                 padding: var(--fb-spacing-sm, 8px) var(--fb-spacing-md, 16px);
                 border-radius: var(--fb-radius-md, 8px);
                 cursor: pointer;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: var(--fb-text-sm, 13px);
                 border: none;
                 background: transparent;
@@ -131,7 +131,7 @@ export class FBAdminSidebar extends FBElement {
             }
 
             .back-link .nav-item {
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
 
             .back-link .nav-item:hover {
@@ -150,7 +150,7 @@ export class FBAdminSidebar extends FBElement {
                 width: 28px;
                 height: 28px;
                 border-radius: 50%;
-                background: var(--fb-dawn-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+                background: var(--fb-dawn-gradient, linear-gradient(135deg, #00FFA3 0%, #00CC82 100%));
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -162,7 +162,7 @@ export class FBAdminSidebar extends FBElement {
 
             .user-name {
                 font-size: var(--fb-text-xs, 11px);
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -265,6 +265,28 @@ export class FBAdminSidebar extends FBElement {
                         <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     </span>
                     Shadow Mode
+                </button>
+
+                <div class="section-label">Intelligence</div>
+                <button
+                    class="nav-item ${this._isActive('/admin/agents') ? 'active' : ''}"
+                    @click=${(): void => { this._navigate('/admin/agents'); }}
+                    aria-label="Agent Settings"
+                >
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    </span>
+                    Agent Settings
+                </button>
+                <button
+                    class="nav-item ${this._isActive('/admin/brain') ? 'active' : ''}"
+                    @click=${(): void => { this._navigate('/admin/brain'); }}
+                    aria-label="FB-Brain"
+                >
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
+                    </span>
+                    FB-Brain
                 </button>
             </nav>
 

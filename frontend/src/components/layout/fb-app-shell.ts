@@ -143,7 +143,7 @@ export class FBAppShell extends FBElement {
             fb-left-nav {
                 grid-column: 1;
                 grid-row: 1 / -1; /* Span full height */
-                border-right: 1px solid var(--fb-border, #2a2a3e);
+                border-right: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 z-index: 20; /* Above regular content */
             }
 
@@ -217,7 +217,7 @@ export class FBAppShell extends FBElement {
                     width: min(380px, 100vw);
                     z-index: var(--fb-z-panel, 100);
                     background: var(--fb-bg-primary);
-                    border-left: 1px solid var(--fb-border, #2a2a3e);
+                    border-left: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                     transform: translateX(100%);
                     transition: transform 0.3s ease;
                 }
@@ -249,7 +249,7 @@ export class FBAppShell extends FBElement {
                 align-items: center;
                 justify-content: center;
                 height: 100vh;
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
         `,
     ];

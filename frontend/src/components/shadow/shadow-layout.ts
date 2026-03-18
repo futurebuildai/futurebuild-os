@@ -24,11 +24,11 @@ export class ShadowLayout extends FBElement {
                 grid-template-columns: 240px 1fr 400px;
                 height: 100%;
                 background: #0a0a12;
-                color: #e0e0e0;
+                color: #F0F0F5;
             }
 
             .panel {
-                border-right: 1px solid #1a1a2e;
+                border-right: 1px solid #161821;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;

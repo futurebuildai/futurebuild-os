@@ -243,7 +243,7 @@ export class FBViewSettings extends FBViewElement {
                 font-size: var(--fb-text-sm);
                 margin-bottom: var(--fb-spacing-md);
                 padding: var(--fb-spacing-sm) var(--fb-spacing-md);
-                background: rgba(198, 40, 40, 0.1);
+                background: rgba(244, 63, 94, 0.1);
                 border-radius: var(--fb-radius-sm);
             }
 
@@ -384,8 +384,8 @@ export class FBViewSettings extends FBViewElement {
             }
 
             .pace-badge.aggressive {
-                background: rgba(198, 40, 40, 0.15);
-                color: #ef5350;
+                background: rgba(244, 63, 94, 0.15);
+                color: #F43F5E;
             }
 
             .pace-badge.standard {
@@ -481,7 +481,7 @@ export class FBViewSettings extends FBViewElement {
             }
 
             .baseline-marker.industry {
-                background: var(--fb-text-muted, #666);
+                background: var(--fb-text-muted, #4A4B55);
             }
 
             .baseline-marker.org {
@@ -499,7 +499,7 @@ export class FBViewSettings extends FBViewElement {
             }
 
             .baseline-label.industry {
-                color: var(--fb-text-muted, #666);
+                color: var(--fb-text-muted, #4A4B55);
             }
 
             .baseline-label.org {

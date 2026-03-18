@@ -61,8 +61,8 @@ export class FBContactDetail extends FBElement {
                 bottom: 0;
                 width: 420px;
                 max-width: 100%;
-                background: var(--fb-surface-1, #1a1a2e);
-                border-left: 1px solid var(--fb-border, #2a2a3e);
+                background: var(--fb-surface-1, #161821);
+                border-left: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 display: flex;
                 flex-direction: column;
                 z-index: 1001;
@@ -83,13 +83,13 @@ export class FBContactDetail extends FBElement {
                 align-items: center;
                 justify-content: space-between;
                 padding: 20px 24px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .panel-title {
                 font-size: 18px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .close-btn {
@@ -98,7 +98,7 @@ export class FBContactDetail extends FBElement {
                 border-radius: 6px;
                 border: none;
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 display: flex;
                 align-items: center;
@@ -108,8 +108,8 @@ export class FBContactDetail extends FBElement {
             }
 
             .close-btn:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .panel-content {
@@ -129,12 +129,12 @@ export class FBContactDetail extends FBElement {
             .section-title {
                 font-size: 11px;
                 font-weight: 600;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
                 margin-bottom: 12px;
                 padding-bottom: 8px;
-                border-bottom: 1px solid var(--fb-border, #2a2a3e);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .contact-header {
@@ -148,7 +148,7 @@ export class FBContactDetail extends FBElement {
                 width: 64px;
                 height: 64px;
                 border-radius: 50%;
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
                 display: flex;
                 align-items: center;
@@ -164,13 +164,13 @@ export class FBContactDetail extends FBElement {
             .contact-name {
                 font-size: 20px;
                 font-weight: 600;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 4px;
             }
 
             .contact-company {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .info-row {
@@ -188,7 +188,7 @@ export class FBContactDetail extends FBElement {
             .info-icon {
                 width: 20px;
                 height: 20px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -197,17 +197,17 @@ export class FBContactDetail extends FBElement {
             .info-label {
                 width: 80px;
                 font-size: 12px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .info-value {
                 flex: 1;
                 font-size: 14px;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .info-value a {
-                color: var(--fb-accent, #6366f1);
+                color: var(--fb-accent, #00FFA3);
                 text-decoration: none;
             }
 
@@ -223,8 +223,8 @@ export class FBContactDetail extends FBElement {
 
             .trade-tag {
                 padding: 4px 10px;
-                background: rgba(99, 102, 241, 0.15);
-                color: var(--fb-accent, #6366f1);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-accent, #00FFA3);
                 border-radius: 4px;
                 font-size: 12px;
                 font-weight: 500;
@@ -243,16 +243,16 @@ export class FBContactDetail extends FBElement {
             }
 
             .portal-dot.enabled {
-                background: #22c55e;
+                background: #00FFA3;
             }
 
             .portal-dot.disabled {
-                background: var(--fb-text-tertiary, #707080);
+                background: var(--fb-text-tertiary, #5A5B66);
             }
 
             .notes-text {
                 font-size: 14px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 line-height: 1.6;
                 font-style: italic;
             }
@@ -266,7 +266,7 @@ export class FBContactDetail extends FBElement {
 
             .stat-card {
                 padding: 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 text-align: center;
             }
@@ -274,12 +274,12 @@ export class FBContactDetail extends FBElement {
             .stat-value {
                 font-size: 24px;
                 font-weight: 700;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
                 margin-bottom: 4px;
             }
 
             .stat-value.good {
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .stat-value.warning {
@@ -288,7 +288,7 @@ export class FBContactDetail extends FBElement {
 
             .stat-label {
                 font-size: 11px;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
                 text-transform: uppercase;
             }
 
@@ -304,7 +304,7 @@ export class FBContactDetail extends FBElement {
                 align-items: center;
                 justify-content: space-between;
                 padding: 12px 16px;
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
                 border-radius: 8px;
                 cursor: pointer;
                 transition: background 0.15s;
@@ -323,12 +323,12 @@ export class FBContactDetail extends FBElement {
             .project-name {
                 font-size: 14px;
                 font-weight: 500;
-                color: var(--fb-text-primary, #e0e0e0);
+                color: var(--fb-text-primary, #F0F0F5);
             }
 
             .project-phase {
                 font-size: 12px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .project-status {
@@ -340,13 +340,13 @@ export class FBContactDetail extends FBElement {
             }
 
             .project-status.active {
-                background: rgba(99, 102, 241, 0.15);
-                color: var(--fb-accent, #6366f1);
+                background: rgba(0, 255, 163, 0.15);
+                color: var(--fb-accent, #00FFA3);
             }
 
             .project-status.completed {
                 background: rgba(34, 197, 94, 0.15);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .project-status.pending {
@@ -357,7 +357,7 @@ export class FBContactDetail extends FBElement {
             .empty-state {
                 text-align: center;
                 padding: 32px;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 font-size: 14px;
             }
 
@@ -366,7 +366,7 @@ export class FBContactDetail extends FBElement {
                 display: flex;
                 gap: 12px;
                 padding: 16px 24px;
-                border-top: 1px solid var(--fb-border, #2a2a3e);
+                border-top: 1px solid var(--fb-border, rgba(255,255,255,0.05));
             }
 
             .btn {
@@ -382,7 +382,7 @@ export class FBContactDetail extends FBElement {
             }
 
             .btn-primary {
-                background: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
                 color: #fff;
             }
 
@@ -392,18 +392,18 @@ export class FBContactDetail extends FBElement {
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--fb-border, #2a2a3e);
-                color: var(--fb-text-secondary, #a0a0b0);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                color: var(--fb-text-secondary, #8B8D98);
             }
 
             .btn-secondary:hover {
-                background: var(--fb-surface-2, #252540);
+                background: var(--fb-surface-2, #1E2029);
             }
 
             .btn-danger {
                 background: transparent;
-                border: 1px solid #ef4444;
-                color: #ef4444;
+                border: 1px solid #F43F5E;
+                color: #F43F5E;
             }
 
             .btn-danger:hover {

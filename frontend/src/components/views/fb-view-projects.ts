@@ -59,7 +59,7 @@ export class FBViewProjects extends FBViewElement {
                 align-items: center;
                 gap: var(--fb-spacing-xs);
                 padding: var(--fb-spacing-sm) var(--fb-spacing-lg);
-                background: var(--fb-primary, #667eea);
+                background: var(--fb-primary, #00FFA3);
                 border: none;
                 border-radius: var(--fb-radius-md);
                 color: white;
@@ -145,7 +145,7 @@ export class FBViewProjects extends FBViewElement {
 
             .project-status[data-status="Active"] {
                 background: rgba(34, 197, 94, 0.1);
-                color: #22c55e;
+                color: #00FFA3;
             }
 
             .project-status[data-status="Preconstruction"] {

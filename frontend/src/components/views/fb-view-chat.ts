@@ -85,7 +85,7 @@ export class FBViewChat extends FBViewElement {
             .error-banner {
                 padding: var(--fb-spacing-sm) var(--fb-spacing-lg);
                 background: var(--fb-error-bg, #fef2f2);
-                color: var(--fb-error, #ef4444);
+                color: var(--fb-error, #F43F5E);
                 font-size: var(--fb-text-sm);
                 display: flex;
                 align-items: center;

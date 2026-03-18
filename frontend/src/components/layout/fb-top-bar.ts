@@ -20,9 +20,10 @@ export class FBTopBar extends FBElement {
             :host {
                 display: block;
                 height: 56px;
-                background: var(--fb-surface-1, #1a1a2e);
-                /* Removed border-bottom for seamless flow with sidebar */
-                /* border-bottom: 1px solid var(--fb-border, #2a2a3e); */
+                background: rgba(22, 24, 33, 0.6);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 padding: 0 16px;
                 z-index: 10;
             }
@@ -61,31 +62,34 @@ export class FBTopBar extends FBElement {
                 font-weight: 500;
                 white-space: nowrap;
                 cursor: pointer;
-                border: 1px solid var(--fb-border, #2a2a3e);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
                 background: transparent;
-                color: var(--fb-text-secondary, #a0a0b0);
+                color: var(--fb-text-secondary, #8B8D98);
                 transition: all 0.15s ease;
             }
 
             .pill:hover {
-                background: var(--fb-surface-2, #252540);
-                color: var(--fb-text-primary, #e0e0e0);
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
+                box-shadow: 0 0 10px rgba(0, 255, 163, 0.08);
             }
 
             .pill[data-active] {
-                background: var(--fb-accent, #6366f1);
-                color: #fff;
-                border-color: var(--fb-accent, #6366f1);
+                background: var(--fb-accent, #00FFA3);
+                color: #0A0B10;
+                border-color: var(--fb-accent, #00FFA3);
+                font-weight: 600;
+                box-shadow: 0 0 16px rgba(0, 255, 163, 0.25);
             }
 
             .pill-new {
                 border-style: dashed;
-                color: var(--fb-text-tertiary, #707080);
+                color: var(--fb-text-tertiary, #5A5B66);
             }
 
             .pill-new:hover {
-                border-color: var(--fb-accent, #6366f1);
-                color: var(--fb-accent, #6366f1);
+                border-color: var(--fb-accent, #00FFA3);
+                color: var(--fb-accent, #00FFA3);
             }
 
             .actions {

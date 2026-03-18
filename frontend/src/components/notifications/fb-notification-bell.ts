@@ -33,7 +33,7 @@ export class FBNotificationBell extends FBElement {
                 height: 36px;
                 border: none;
                 background: transparent;
-                color: var(--fb-text-secondary, #aaa);
+                color: var(--fb-text-secondary, #8B8D98);
                 cursor: pointer;
                 border-radius: var(--fb-radius-md, 8px);
                 transition: background var(--fb-transition-fast, 150ms ease),
@@ -47,7 +47,7 @@ export class FBNotificationBell extends FBElement {
             }
 
             .bell-btn:focus-visible {
-                outline: 2px solid var(--fb-primary, #667eea);
+                outline: 2px solid var(--fb-primary, #00FFA3);
                 outline-offset: 2px;
             }
 
@@ -72,7 +72,7 @@ export class FBNotificationBell extends FBElement {
                 height: 16px;
                 padding: 0 4px;
                 border-radius: 8px;
-                background: var(--fb-error, #c62828);
+                background: var(--fb-error, #F43F5E);
                 color: #fff;
                 font-size: 10px;
                 font-weight: 700;
