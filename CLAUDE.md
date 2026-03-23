@@ -150,8 +150,11 @@ Two separate auth systems:
 
 ## Git Workflow
 
-- Default branch for development: `build`
-- Do NOT push to `main` or `production` without explicit instruction
+- Two persistent branches: `staging` (dev/staging) and `main` (production)
+- `staging` → deploys to `staging.futurebuild.ai` via Railway
+- `main` → deploys to `project.futurebuild.ai` via Railway (requires PR + 1 review)
+- Both branches require all 5 CI checks to pass: Lint, TypeScript Check, Go Tests, Contract Tests, Docker Build
+- Direct push to `staging` allowed; `main` requires PR with approval
 - Commits should reference spec sections where applicable (e.g., `// See DATA_SPINE_SPEC.md Section 3.3`)
 
 ## Key Specifications
@@ -175,4 +178,4 @@ The repo uses specialized AI skills (in `skills/`):
 
 ## Current State
 
-Phase 8 (Production Readiness) is complete. Current focus is Phase 9 (FutureShade - The Intelligence Layer). Migrations are at `000076`. See `planning/ROADMAP.md` for detailed status.
+Phase 8 (Production Readiness) is complete. Current focus is Phase 9 (FutureShade - The Intelligence Layer). Migrations are at `000081`. CI/CD runs on Railway with multi-target Dockerfile (`api` + `worker`). See `planning/ROADMAP.md` for detailed status.
