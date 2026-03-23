@@ -81,12 +81,12 @@ seed-demo:
 
 # --- Deployment & CI Verification ---
 
-# Verify both Docker targets build locally
+# Verify both Docker images build locally
 deploy-check:
 	@echo "--- Verifying API Docker Build ---"
-	docker build --target api -f Dockerfile .
+	docker build -f Dockerfile .
 	@echo "--- Verifying Worker Docker Build ---"
-	docker build --target worker -f Dockerfile .
+	docker build -f Dockerfile.worker .
 
 # Validate CI workflow syntax
 validate-ci:
