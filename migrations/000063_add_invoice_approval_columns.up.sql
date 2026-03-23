@@ -1,3 +1,7 @@
+-- Migrate existing 'Pending' invoices to 'Draft' (moved from migration 62
+-- because PostgreSQL cannot use new enum values in the same transaction).
+UPDATE invoices SET status = 'Draft' WHERE status = 'Pending';
+
 -- Step 83: Add approval/rejection metadata columns to invoices.
 -- See STEP_83_APPROVAL_ACTIONS.md Section 2.3
 --

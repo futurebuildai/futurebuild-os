@@ -9,8 +9,3 @@
 
 ALTER TYPE invoice_status_type ADD VALUE IF NOT EXISTS 'Draft' BEFORE 'Pending';
 ALTER TYPE invoice_status_type ADD VALUE IF NOT EXISTS 'Rejected' AFTER 'Approved';
-
--- Migrate existing 'Pending' invoices to 'Draft' so they become editable.
--- This is the correct semantic: AI-generated invoices should start as Draft,
--- not Pending (which implies human review has occurred).
-UPDATE invoices SET status = 'Draft' WHERE status = 'Pending';
