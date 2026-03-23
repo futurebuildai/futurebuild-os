@@ -1,8 +1,9 @@
 # --- Stage 1: Frontend Builder ---
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
+ARG VITE_CLERK_PUBLISHABLE_KEY
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
@@ -12,8 +13,9 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-# Build the API binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/api ./cmd/api/main.go
+# Build both API and Worker binaries
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/api ./cmd/api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/worker ./cmd/worker/main.go
 
 # Download golang-migrate for database migrations
 RUN wget -q https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz \
@@ -21,41 +23,46 @@ RUN wget -q https://github.com/golang-migrate/migrate/releases/download/v4.17.0/
     && mv migrate /app/bin/migrate \
     && rm migrate.linux-amd64.tar.gz
 
-# --- Stage 3: Runtime ---
-FROM alpine:latest
+# --- Stage 3a: API Runtime ---
+FROM alpine:3.20 AS api
 WORKDIR /app
 
-# Add metadata
 LABEL org.opencontainers.image.source=https://github.com/futurebuildai/futurebuild-repo
-LABEL org.opencontainers.image.description="FutureBuild API & Frontend"
-LABEL org.opencontainers.image.licenses=UNLICENSED
+LABEL org.opencontainers.image.description="FutureBuild API"
 
-# Install security updates and ca-certificates
 RUN apk --no-cache add ca-certificates tzdata && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy backend binaries
+# API binary + migrate + migrations + frontend assets
 COPY --from=backend-builder /app/bin/api /app/api
 COPY --from=backend-builder /app/bin/migrate /app/migrate
-
-# Copy migrations
 COPY migrations /app/migrations
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
-# Copy entrypoint script
+# Entrypoint for local docker-compose (Railway uses release command instead)
 COPY scripts/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Copy frontend static assets (for serving via Chi)
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
-
-# Set ownership to non-root user
 RUN chown -R appuser:appgroup /app
-
-# Switch to non-root user
 USER appuser
-
-# Expose API port
 EXPOSE 8080
 
-# Run the entrypoint script (runs migrations then starts API)
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+# --- Stage 3b: Worker Runtime ---
+FROM alpine:3.20 AS worker
+WORKDIR /app
+
+LABEL org.opencontainers.image.source=https://github.com/futurebuildai/futurebuild-repo
+LABEL org.opencontainers.image.description="FutureBuild Worker"
+
+RUN apk --no-cache add ca-certificates tzdata && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Worker binary only — no migrations, no frontend assets
+COPY --from=backend-builder /app/bin/worker /app/worker
+
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+CMD ["/app/worker"]

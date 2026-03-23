@@ -3,8 +3,11 @@ set -e
 
 echo "=== FutureBuild API Startup ==="
 
-# Run database migrations if DATABASE_URL is set
-if [ -n "$DATABASE_URL" ]; then
+# On Railway, migrations are handled by the release command — skip here.
+# For local docker-compose, run migrations as before.
+if [ -n "$RAILWAY_ENVIRONMENT" ]; then
+    echo "Railway detected — skipping migrations (handled by release command)"
+elif [ -n "$DATABASE_URL" ]; then
     echo "Running database migrations..."
     # Use postgres:// scheme instead of postgresql:// for golang-migrate
     MIGRATE_URL=$(echo "$DATABASE_URL" | sed 's|^postgresql://|postgres://|')

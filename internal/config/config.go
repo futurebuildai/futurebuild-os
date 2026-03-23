@@ -116,6 +116,9 @@ type WorkerConfig struct {
 func LoadConfig() (*Config, error) {
 	portStr := os.Getenv("APP_PORT")
 	if portStr == "" {
+		portStr = os.Getenv("PORT") // Railway injects PORT
+	}
+	if portStr == "" {
 		portStr = "8080"
 	}
 	port, _ := strconv.Atoi(portStr)

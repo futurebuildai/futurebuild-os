@@ -80,20 +80,19 @@ seed-demo:
 	go run cmd/seed-demo/main.go
 
 # --- Deployment & CI Verification ---
-# See deployment/staging/README.md (implied)
 
-# Verify Docker build works locally
+# Verify both Docker targets build locally
 deploy-check:
-	@echo "--- Verifying Docker Build ---"
-	docker build . -f Dockerfile
+	@echo "--- Verifying API Docker Build ---"
+	docker build --target api -f Dockerfile .
+	@echo "--- Verifying Worker Docker Build ---"
+	docker build --target worker -f Dockerfile .
 
-# Validate config files
+# Validate CI workflow syntax
 validate-ci:
 	@echo "--- Validating Workflow Syntax (yq required) ---"
 	@if command -v yq >/dev/null; then \
-		yq . .github/workflows/ci.yml > /dev/null && echo "CI.yml valid"; \
-		yq . .github/workflows/deploy-staging.yml > /dev/null && echo "Deploy.yml valid"; \
-		yq . deployment/staging/app.yaml > /dev/null && echo "App.yaml valid"; \
+		yq . .github/workflows/ci.yml > /dev/null && echo "ci.yml valid"; \
 	else \
 		echo "yq not installed, skipping syntax check"; \
 	fi
