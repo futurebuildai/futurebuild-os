@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/futureshade"
@@ -160,6 +161,10 @@ func (h *WorkerHandler) HandleDriftDetection(ctx context.Context, task *asynq.Ta
 
 // HandleDailyBriefing executes the daily briefing agent logic.
 func (h *WorkerHandler) HandleDailyBriefing(ctx context.Context, task *asynq.Task) error {
+	if h.focusAgent == nil {
+		slog.Warn("daily focus agent not configured, skipping")
+		return nil
+	}
 	slog.Info("Handling Daily Briefing Task...")
 	if err := h.focusAgent.Execute(ctx); err != nil {
 		return fmt.Errorf("daily briefing agent failed: %w", err)
@@ -229,7 +234,7 @@ func (h *WorkerHandler) HandleProcurementNotification(ctx context.Context, task 
 
 // shouldSendNotification checks communication_logs for recent alerts.
 // See User Amendment #4: 72-hour dampening
-func (h *WorkerHandler) shouldSendNotification(ctx context.Context, itemID interface{}, timestamp interface{}) (bool, error) {
+func (h *WorkerHandler) shouldSendNotification(ctx context.Context, itemID uuid.UUID, timestamp time.Time) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM communication_logs
 		WHERE related_entity_id = $1
@@ -487,8 +492,26 @@ func (h *WorkerHandler) HandleDailyBriefingNotification(ctx context.Context, tas
 		return fmt.Errorf("send briefing notification: %w", err)
 	}
 
+	// Log to communication_logs for dampening
+	if logErr := h.logBriefingNotification(ctx, payload); logErr != nil {
+		slog.Warn("failed to log briefing notification", "error", logErr)
+	}
+
 	slog.Info("Briefing notification sent", "project_id", payload.ProjectID, "recipient", recipientEmail)
 	return nil
+}
+
+// logBriefingNotification persists the briefing notification to communication_logs for dampening.
+func (h *WorkerHandler) logBriefingNotification(ctx context.Context, payload DailyBriefingNotificationPayload) error {
+	query := `
+		INSERT INTO communication_logs (
+			project_id, direction, content, channel, timestamp,
+			related_entity_id, related_entity_type
+		) VALUES ($1, 'Outbound', $2, 'Email', NOW(), $3, 'daily_briefing')
+	`
+	content := fmt.Sprintf("[DAILY BRIEFING] %s", payload.Summary)
+	_, err := h.db.Exec(ctx, query, payload.ProjectID, content, payload.ProjectID)
+	return err
 }
 
 // shouldSendBriefingNotification checks if a briefing notification was already sent in the last 24h.

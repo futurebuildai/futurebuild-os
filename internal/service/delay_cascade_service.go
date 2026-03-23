@@ -268,6 +268,9 @@ func (s *DelayCascadeService) loadProjectTasks(ctx context.Context, projectID uu
 		}
 		tasks = append(tasks, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tasks: %w", err)
+	}
 	return tasks, nil
 }
 
@@ -291,6 +294,9 @@ func (s *DelayCascadeService) loadTaskDependencies(ctx context.Context, projectI
 			return nil, err
 		}
 		deps = append(deps, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate dependencies: %w", err)
 	}
 	return deps, nil
 }

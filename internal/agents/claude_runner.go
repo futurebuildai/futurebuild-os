@@ -17,6 +17,12 @@ import (
 // Prevents infinite loops if the model keeps requesting tools.
 const MaxAgentTurns = 15
 
+// safeErrorJSON returns a JSON-safe error string to prevent injection via unescaped error messages.
+func safeErrorJSON(err error) string {
+	escaped, _ := json.Marshal(err.Error())
+	return fmt.Sprintf(`{"error":%s}`, escaped)
+}
+
 // AgentRunner executes Claude-powered agent conversations with tool use.
 // It manages the tool-use loop: send message → receive tool_use → execute → send results → repeat.
 type AgentRunner struct {
@@ -147,7 +153,7 @@ func (r *AgentRunner) Run(ctx context.Context, systemPrompt string, userMessage 
 				toolResults = append(toolResults, ai.ContentPart{
 					ToolResult: &ai.ToolResultBlock{
 						ToolUseID: tc.ID,
-						Content:   fmt.Sprintf(`{"error":"%s"}`, err.Error()),
+						Content:   safeErrorJSON(err),
 						IsError:   true,
 					},
 				})
@@ -233,7 +239,7 @@ func (r *AgentRunner) RunWithHistory(ctx context.Context, systemPrompt string, m
 				toolResults = append(toolResults, ai.ContentPart{
 					ToolResult: &ai.ToolResultBlock{
 						ToolUseID: tc.ID,
-						Content:   fmt.Sprintf(`{"error":"%s"}`, err.Error()),
+						Content:   safeErrorJSON(err),
 						IsError:   true,
 					},
 				})

@@ -92,6 +92,9 @@ func (s *ResourceConflictService) DetectConflicts(ctx context.Context, orgID uui
 		}
 		bookingsByContact[b.ContactID] = append(bookingsByContact[b.ContactID], b)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate bookings: %w", err)
+	}
 
 	// Detect overlaps across different projects for each contact
 	var conflicts []ResourceConflict
@@ -225,6 +228,9 @@ func (s *ResourceConflictService) DetectAndNotifyAll(ctx context.Context) error 
 			return err
 		}
 		orgIDs = append(orgIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate org IDs: %w", err)
 	}
 
 	for _, orgID := range orgIDs {

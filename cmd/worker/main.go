@@ -22,6 +22,7 @@ import (
 	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/clock"
+
 	"github.com/joho/godotenv"
 )
 
@@ -69,7 +70,17 @@ func main() {
 	// 5. Initialize Services
 	projectService := service.NewProjectService(dbPool)
 	scheduleService := service.NewScheduleService(dbPool)
-	notificationService := service.NewConsoleEmailProvider()
+	notificationService := service.NewNotificationService(
+		cfg.ResendAPIKey,
+		cfg.EmailFromAddress,
+		cfg.EmailFromName,
+		cfg.TwilioAccountSID,
+		cfg.TwilioAuthToken,
+		cfg.TwilioFromNumber,
+		cfg.BirdAccessKey,
+		cfg.BirdOriginator,
+		cfg.NotificationProvider,
+	)
 	weatherService := service.NewMockWeatherService()
 	// Critical Blocker A Remediation: Add geocoding and directory services
 	geocodingService := service.NewGeocodingService()
@@ -145,7 +156,7 @@ func main() {
 
 	// Initialize FutureShade config (defaults to disabled if not configured)
 	futureShadeConfig := futureshade.Config{
-		Enabled: os.Getenv("FUTURESHADE_ENABLED") == "true",
+		Enabled: cfg.FutureShadeEnabled,
 	}
 	if futureShadeConfig.Enabled {
 		log.Println("INFO: FutureShade Action Bridge is ENABLED")
@@ -175,21 +186,22 @@ func main() {
 	// 7.5 Automated PR Review: Initialize GitHub service and Tribunal integration
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
 	if cfg.GitHubPAT != "" && cfg.GitHubWebhookSecret != "" {
-		log.Println("INFO: Automated PR Review is ENABLED")
-		githubService := service.NewGitHubService(cfg.GitHubPAT)
-		tribunalRepo := tribunal.NewRepository(dbPool)
+		if aiClient == nil {
+			log.Println("WARN: Automated PR Review requires Vertex AI — DISABLED (aiClient is nil)")
+		} else {
+			log.Println("INFO: Automated PR Review is ENABLED")
+			githubService := service.NewGitHubService(cfg.GitHubPAT)
+			tribunalRepo := tribunal.NewRepository(dbPool)
 
-		// Initialize Tribunal Jury with AI clients (reuses existing aiClient for Flash)
-		// Note: In full implementation, would initialize separate clients for Opus/CodeAssist
-		// For now, use the same client with different model types
-		jury := tribunal.Jury{
-			Coordinator: aiClient, // Gemini Flash
-			Architect:   aiClient, // Would be Claude Opus in production
-			Historian:   aiClient, // Would be Gemini Code Assist in production
+			jury := tribunal.Jury{
+				Coordinator: aiClient,
+				Architect:   aiClient,
+				Historian:   aiClient,
+			}
+			tribunalEngine := tribunal.NewConsensusEngine(jury, tribunalRepo)
+
+			workerHandler = workerHandler.WithPRReview(githubService, tribunalEngine, tribunalRepo)
 		}
-		tribunalEngine := tribunal.NewConsensusEngine(jury, tribunalRepo)
-
-		workerHandler = workerHandler.WithPRReview(githubService, tribunalEngine, tribunalRepo)
 	} else {
 		log.Println("INFO: Automated PR Review is DISABLED (set GITHUB_PAT and GITHUB_WEBHOOK_SECRET to enable)")
 	}
@@ -286,7 +298,7 @@ func main() {
 	// Wait for either shutdown signal OR critical error
 	select {
 	case err := <-errChan:
-		log.Fatalf("FATAL: %v", err)
+		log.Printf("FATAL: %v", err)
 	case <-quit:
 		log.Println("Shutting down worker...")
 	}

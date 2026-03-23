@@ -157,6 +157,9 @@ func (e *PolicyEngine) ListPolicies(ctx context.Context, orgID uuid.UUID) ([]Aut
 		}
 		policies = append(policies, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate policies: %w", err)
+	}
 	return policies, nil
 }
 

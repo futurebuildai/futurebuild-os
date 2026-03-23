@@ -81,7 +81,10 @@ func RegisterMarketTools(r *Registry) {
 			}
 
 			// Calculate savings vs best month
-			savingsPercent := (currentFactor - bestFactor) / currentFactor * 100
+			var savingsPercent float64
+			if currentFactor > 0 {
+				savingsPercent = (currentFactor - bestFactor) / currentFactor * 100
+			}
 
 			result := map[string]interface{}{
 				"start_month":          startDate.Month().String(),

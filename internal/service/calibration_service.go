@@ -68,8 +68,7 @@ func (s *CalibrationService) CalibrateFromCompletion(ctx context.Context, projec
 		var wbsCode string
 		var predictedDays, actualDays float64
 		if err := rows.Scan(&wbsCode, &predictedDays, &actualDays); err != nil {
-			slog.Warn("calibration: failed to scan task row", "error", err)
-			continue
+			return 0, fmt.Errorf("scan task row: %w", err)
 		}
 
 		if predictedDays <= 0 || actualDays <= 0 {
@@ -85,6 +84,9 @@ func (s *CalibrationService) CalibrateFromCompletion(ctx context.Context, projec
 			ActualDays:    actualDays,
 			Ratio:         ratio,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate completed tasks: %w", err)
 	}
 
 	if len(entries) == 0 {
@@ -158,7 +160,7 @@ func (s *CalibrationService) GetOrgMultipliers(ctx context.Context, orgID uuid.U
 		var avgRatio float64
 		var sampleSize int
 		if err := rows.Scan(&wbsCode, &avgRatio, &sampleSize); err != nil {
-			continue
+			return nil, fmt.Errorf("scan multiplier row: %w", err)
 		}
 
 		// Blend: 70% org-trained + 30% global default
@@ -169,6 +171,9 @@ func (s *CalibrationService) GetOrgMultipliers(ctx context.Context, orgID uuid.U
 			Multiplier: blended,
 			SampleSize: sampleSize,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate multipliers: %w", err)
 	}
 
 	return multipliers, nil

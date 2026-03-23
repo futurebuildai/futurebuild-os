@@ -43,6 +43,9 @@ func RegisterSimulationTools(r *Registry, db *pgxpool.Pool, cascadeSvc service.D
 			if err := json.Unmarshal(input, &params); err != nil {
 				return "", fmt.Errorf("parse input: %w", err)
 			}
+			if strings.TrimSpace(params.TaskNameOrWBS) == "" {
+				return `{"error":"task_name_or_wbs is required"}`, nil
+			}
 			if params.Days == 0 {
 				return `{"error":"days must be non-zero"}`, nil
 			}

@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"google.golang.org/genai"
 )
@@ -209,7 +210,7 @@ func calculateConfidenceFromLogprobs(result *genai.LogprobsResult) float32 {
 	count := 0
 	for _, candidate := range result.ChosenCandidates {
 		// Convert logprob to probability: prob = exp(logprob)
-		prob := exp64(float64(candidate.LogProbability))
+		prob := math.Exp(float64(candidate.LogProbability))
 		sumProb += prob
 		count++
 	}
@@ -223,23 +224,3 @@ func calculateConfidenceFromLogprobs(result *genai.LogprobsResult) float32 {
 	return float32(avgProb)
 }
 
-// exp64 computes e^x using a simple approximation suitable for logprobs.
-// For production, consider using math.Exp but this avoids the import.
-func exp64(x float64) float64 {
-	// e^x approximation using Taylor series for small x
-	// For logprobs (typically -10 to 0), this is sufficient
-	// Use: e^x ≈ 1 + x + x²/2 + x³/6 + x⁴/24 for accuracy
-	if x > 0 {
-		x = 0 // Clamp positive values (shouldn't happen for logprobs)
-	}
-	if x < -10 {
-		return 0.0001 // Floor for very negative logprobs
-	}
-
-	// More accurate: use standard library
-	// For simplicity, use the series approximation
-	x2 := x * x
-	x3 := x2 * x
-	x4 := x3 * x
-	return 1 + x + x2/2 + x3/6 + x4/24
-}

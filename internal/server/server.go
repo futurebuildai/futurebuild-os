@@ -181,11 +181,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// Technical Debt Remediation (P2): Uses adapters package for cleaner separation
 	var visionVerifier agents.InboundVisionVerifier
 	var visionHandler *handlers.VisionHandler
+	var visionSvc *service.VisionService
 	if aiClient != nil {
 		agentLogger := audit.NewPgxAgentLogger(db)
-		visionService := service.NewVisionService(aiClient, agentLogger)
-		visionVerifier = adapters.NewVisionServiceAdapter(visionService)
-		visionHandler = handlers.NewVisionHandler(visionService, db) // Sprint 2.1: Vision Pipeline
+		visionSvc = service.NewVisionService(aiClient, agentLogger)
+		visionVerifier = adapters.NewVisionServiceAdapter(visionSvc)
+		visionHandler = handlers.NewVisionHandler(visionSvc, db) // Sprint 2.1: Vision Pipeline
 	}
 
 	// Material extraction and budget planning services
@@ -217,11 +218,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	// Policy handler (Feature 8)
 	policyHandler := handlers.NewPolicyHandler(policyEngine)
 
-	// Progress photo handler (Feature 10)
+	// Progress photo handler (Feature 10) — reuses VisionService from above
 	var progressPhotoHandler *handlers.ProgressPhotoHandler
-	if aiClient != nil {
-		agentLogger := audit.NewPgxAgentLogger(db)
-		visionSvc := service.NewVisionService(aiClient, agentLogger)
+	if visionSvc != nil {
 		progressPhotoHandler = handlers.NewProgressPhotoHandler(visionSvc, feedService)
 	}
 

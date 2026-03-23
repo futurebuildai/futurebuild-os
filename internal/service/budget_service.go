@@ -96,6 +96,13 @@ func (s *BudgetService) SeedBudget(
 	var phaseEstimates []models.PhaseBudgetEstimate
 	var totalEstimated int64
 
+	// Wrap all upserts in a single transaction for atomicity
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin budget transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	for _, idx := range costIndices {
 		materialsCents := phaseMaterialCosts[idx.WBSPhaseCode]
 
@@ -139,8 +146,8 @@ func (s *BudgetService) SeedBudget(
 		phaseEstimates = append(phaseEstimates, phase)
 		totalEstimated += estimatedCents
 
-		// Upsert to project_budgets
-		_, err := s.db.Exec(ctx, `
+		// Upsert to project_budgets within transaction
+		_, err := tx.Exec(ctx, `
 			INSERT INTO project_budgets (
 				id, project_id, wbs_phase_id, estimated_amount_cents,
 				committed_amount_cents, actual_amount_cents,
@@ -158,6 +165,10 @@ func (s *BudgetService) SeedBudget(
 		if err != nil {
 			return nil, fmt.Errorf("failed to upsert budget for phase %s: %w", idx.WBSPhaseCode, err)
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit budget transaction: %w", err)
 	}
 
 	overallConfidence := 0.0

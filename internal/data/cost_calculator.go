@@ -4,6 +4,9 @@ package data
 // Aggregates NationalCostIndices × RegionalMultiplier × GSF, with foundation and
 // stories adjustments applied. Shared by budget tools and market-aware cost features.
 func CalculateProjectCost(gsf float64, foundation string, stories int, region string) int64 {
+	if gsf <= 0 {
+		return 0
+	}
 	baseCostPerSqFt := TotalNationalCostPerSqFtCents()
 
 	// Apply regional multiplier
@@ -41,6 +44,12 @@ func CalculateProjectCostByPhase(gsf float64, foundation string, stories int, re
 // CalculateProjectCostWithSeason estimates project cost with seasonal material indices.
 // Uses the start month to determine which seasonal factors apply to each phase.
 func CalculateProjectCostWithSeason(gsf float64, foundation string, stories int, region string, startMonth int) int64 {
+	if gsf <= 0 {
+		return 0
+	}
+	if startMonth < 1 || startMonth > 12 {
+		startMonth = 1
+	}
 	regionalMult := 1.0
 	if m, ok := RegionalMultipliers()[region]; ok {
 		regionalMult = m

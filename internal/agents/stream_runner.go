@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colton/futurebuild/internal/agents/tools"
@@ -61,14 +62,14 @@ func (r *StreamAgentRunner) RunStreaming(
 		}
 
 		// Collect the full response while streaming deltas to the caller
-		var fullText string
+		var textBuf strings.Builder
 		var rawContent []ai.ContentPart
 		var toolCalls []ai.ToolUseBlock
 		var stopReason string
 
 		for chunk := range stream {
 			if chunk.Text != "" {
-				fullText += chunk.Text
+				textBuf.WriteString(chunk.Text)
 				// Forward text delta to the caller
 				select {
 				case out <- ai.StreamChunk{Text: chunk.Text}:
@@ -93,6 +94,7 @@ func (r *StreamAgentRunner) RunStreaming(
 			}
 		}
 
+		fullText := textBuf.String()
 		// Build raw content from accumulated text
 		if fullText != "" {
 			rawContent = append([]ai.ContentPart{{Text: fullText}}, rawContent...)
@@ -130,14 +132,14 @@ func (r *StreamAgentRunner) RunStreaming(
 				toolResults = append(toolResults, ai.ContentPart{
 					ToolResult: &ai.ToolResultBlock{
 						ToolUseID: tc.ID,
-						Content:   fmt.Sprintf(`{"error":"%s"}`, execErr.Error()),
+						Content:   safeErrorJSON(execErr),
 						IsError:   true,
 					},
 				})
 				select {
 				case out <- ai.StreamChunk{ToolResult: &ai.ToolResultBlock{
 					ToolUseID: tc.ID,
-					Content:   fmt.Sprintf(`{"error":"%s"}`, execErr.Error()),
+					Content:   safeErrorJSON(execErr),
 					IsError:   true,
 				}}:
 				case <-ctx.Done():

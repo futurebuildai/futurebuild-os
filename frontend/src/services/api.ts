@@ -832,9 +832,9 @@ export const api = {
 
             // Manual fetch since http wrapper doesn't support FormData directly
             const headers: Record<string, string> = {};
-            const tokenResponse = localStorage.getItem('fb_auth_token'); // Mock token if not configured
-            if (tokenResponse) {
-                headers['Authorization'] = `Bearer ${tokenResponse}`;
+            const token = getAuthToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
 
             const response = await fetch('/api/v1/vision/extract', {
