@@ -222,8 +222,9 @@ func (c *Config) Validate() error {
 		return errors.New("DATABASE_URL environment variable is required")
 	}
 	// Phase 12: JWT_SECRET is no longer required — Clerk uses JWKS (RS256).
-	// CLERK_ISSUER_URL is required for JWKS-based JWT validation.
-	if c.ClerkIssuerURL == "" {
+	// CLERK_ISSUER_URL is required for JWKS-based JWT validation,
+	// unless DEV_AUTH_BYPASS is enabled (demo/development mode).
+	if c.ClerkIssuerURL == "" && os.Getenv("DEV_AUTH_BYPASS") != "true" {
 		return errors.New("CLERK_ISSUER_URL environment variable is required")
 	}
 	return nil
