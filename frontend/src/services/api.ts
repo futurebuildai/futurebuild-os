@@ -13,12 +13,14 @@
  * Does NOT import from store to prevent circular dependencies.
  */
 
-import { get, post, put, del } from './http';
+import { get, post, put, del, getAuthToken } from './http';
 import type { CorrectionEvent } from '../types/corrections';
 import type { GanttData, Contact, CreateContactRequest, CreateContactResponse, BulkCreateContactsResponse, AssignmentRow, InvoiceExtraction, Thread as ApiThread, CompletionReport } from '../types/models';
 import type { InvoiceStatus } from '../types/enums';
 import type { UserRole } from '../types/enums';
 import type { PortfolioFeedResponse, ActionResponse } from '../types/feed';
+import type { MaterialEstimate, BudgetEstimate, ProjectMaterial, ProjectBudget, CreateMaterialRequest, MaterialUpdateRequest, BudgetSeedRequest } from '../types/materials';
+import type { SchedulePreviewRequest, SchedulePreviewResponse, ScenarioComparisonRequest, ScenarioComparisonResponse } from '../types/schedule';
 
 // ============================================================================
 // Auth Types
@@ -129,6 +131,10 @@ export interface OnboardProcessResponse {
     next_priority_field?: string;
     /** Interrogator gate status. Controls when schedule generation is allowed. */
     status?: 'gathering' | 'clarifying' | 'satisfied' | 'error';
+    /** Material estimates extracted from blueprint or computed from project attributes. */
+    material_estimates?: MaterialEstimate[];
+    /** Budget estimate computed from material estimates. */
+    budget_estimate?: BudgetEstimate;
 }
 
 /**
@@ -181,6 +187,150 @@ export interface ChatResponse {
 export interface ChatArtifact {
     type: 'invoice' | 'budget' | 'gantt' | 'table';
     data: InvoiceExtraction | GanttData | Record<string, unknown>;
+}
+
+/**
+ * A single chunk from a streaming chat response.
+ */
+export interface ChatStreamChunk {
+    text?: string;
+    tool_use?: { id: string; name: string; input: Record<string, unknown> };
+    tool_result?: { tool_use_id: string; content: string; is_error: boolean };
+    done?: boolean;
+    stop_reason?: string;
+    thread_id?: string;
+    error?: string;
+}
+
+/**
+ * Streaming chat connection using fetch + ReadableStream for SSE.
+ * Provides an async-iterable interface for consuming chunks.
+ */
+export class ChatStream {
+    private controller: AbortController;
+    private _onChunk: ((chunk: ChatStreamChunk) => void) | null = null;
+    private _onError: ((err: Error) => void) | null = null;
+    private _onDone: (() => void) | null = null;
+    private started = false;
+
+    constructor(
+        private projectId: string,
+        private threadId: string,
+        private message: string,
+    ) {
+        this.controller = new AbortController();
+    }
+
+    /** Register a callback for each text/tool chunk. */
+    onChunk(cb: (chunk: ChatStreamChunk) => void): this {
+        this._onChunk = cb;
+        return this;
+    }
+
+    /** Register a callback for errors. */
+    onError(cb: (err: Error) => void): this {
+        this._onError = cb;
+        return this;
+    }
+
+    /** Register a callback for stream completion. */
+    onDone(cb: () => void): this {
+        this._onDone = cb;
+        return this;
+    }
+
+    /** Start the streaming connection. */
+    async start(): Promise<void> {
+        if (this.started) return;
+        this.started = true;
+
+        const token = getAuthToken();
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        try {
+            const resp = await fetch(
+                `/api/v1/projects/${this.projectId}/chat/stream`,
+                {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        thread_id: this.threadId,
+                        message: this.message,
+                    }),
+                    signal: this.controller.signal,
+                },
+            );
+
+            if (!resp.ok) {
+                throw new Error(`Stream failed: ${String(resp.status)}`);
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) throw new Error('No response body');
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    // Flush any residual bytes from the streaming decoder
+                    buffer += decoder.decode();
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // Parse SSE events from buffer
+                const events = buffer.split('\n\n');
+                buffer = events.pop() ?? '';
+
+                for (const event of events) {
+                    if (!event.trim()) continue;
+
+                    // Concatenate all data: lines (SSE spec allows multi-line data)
+                    const dataLines: string[] = [];
+                    for (const line of event.split('\n')) {
+                        if (line.startsWith('data:')) {
+                            dataLines.push(line.slice(5).trim());
+                        }
+                    }
+
+                    const data = dataLines.join('\n');
+                    if (!data) continue;
+
+                    try {
+                        const chunk = JSON.parse(data) as ChatStreamChunk;
+                        this._onChunk?.(chunk);
+
+                        if (chunk.done) {
+                            this._onDone?.();
+                            return;
+                        }
+                    } catch {
+                        // Skip unparseable events (comments, keepalives)
+                    }
+                }
+            }
+
+            this._onDone?.();
+        } catch (err) {
+            if ((err as Error).name !== 'AbortError') {
+                this._onError?.(err as Error);
+            }
+        }
+    }
+
+    /** Abort the stream. */
+    abort(): void {
+        this.controller.abort();
+    }
 }
 
 // ============================================================================
@@ -376,6 +526,15 @@ export const api = {
                 `/projects/${projectId}/threads/${threadId}/messages?limit=${String(limit)}`
             );
         },
+
+        /**
+         * Stream a chat response via SSE.
+         * Returns an object with an EventSource-like interface for consuming
+         * text deltas, tool events, and completion signals.
+         */
+        stream(projectId: string, threadId: string, message: string): ChatStream {
+            return new ChatStream(projectId, threadId, message);
+        },
     },
 
     /**
@@ -405,6 +564,21 @@ export const api = {
          */
         generate(projectId: string): Promise<GanttData> {
             return post<GanttData>(`/projects/${projectId}/schedule/generate`);
+        },
+
+        /**
+         * Generate an instant schedule preview from onboarding data.
+         * No project required — runs physics pipeline in-memory.
+         */
+        preview(req: SchedulePreviewRequest): Promise<SchedulePreviewResponse> {
+            return post<SchedulePreviewResponse>('/schedule/preview', req);
+        },
+
+        /**
+         * Compare multiple schedule scenarios (what-if analysis).
+         */
+        compare(req: ScenarioComparisonRequest): Promise<ScenarioComparisonResponse> {
+            return post<ScenarioComparisonResponse>('/schedule/compare', req);
         },
     },
 
@@ -711,6 +885,31 @@ export const api = {
         updatePhysics(data: UpdatePhysicsRequest): Promise<PhysicsConfigResponse> {
             return put<PhysicsConfigResponse>('/org/settings/physics', data);
         },
+
+        /** Get agent configuration for the org. */
+        getAgents(): Promise<AgentSettingsResponse> {
+            return get<AgentSettingsResponse>('/org/settings/agents');
+        },
+
+        /** Update agent configuration for the org. */
+        updateAgents(data: AgentSettingsResponse): Promise<AgentSettingsResponse> {
+            return put<AgentSettingsResponse>('/org/settings/agents', data);
+        },
+
+        /** Get FB-Brain connection settings. */
+        getBrain(): Promise<BrainConnectionResponse> {
+            return get<BrainConnectionResponse>('/org/settings/brain');
+        },
+
+        /** Update FB-Brain connection URL. */
+        updateBrain(data: { brain_url: string }): Promise<BrainConnectionResponse> {
+            return put<BrainConnectionResponse>('/org/settings/brain', data);
+        },
+
+        /** Regenerate FB-Brain integration key. */
+        regenerateBrainKey(): Promise<{ integration_key: string }> {
+            return post<{ integration_key: string }>('/org/settings/brain/regenerate-key');
+        },
     },
 
     /**
@@ -843,6 +1042,55 @@ export const api = {
          */
         submit(events: CorrectionEvent[]): Promise<void> {
             return post<void>('/corrections', { events });
+        },
+    },
+
+    /**
+     * Material CRUD endpoints.
+     * See internal/api/handlers/material_handler.go
+     */
+    materials: {
+        /** List all materials for a project. */
+        list(projectId: string): Promise<ProjectMaterial[]> {
+            return get<ProjectMaterial[]>(`/projects/${projectId}/materials`);
+        },
+
+        /** Create a material manually. */
+        create(projectId: string, data: CreateMaterialRequest): Promise<ProjectMaterial[]> {
+            return post<ProjectMaterial[]>(`/projects/${projectId}/materials`, data);
+        },
+
+        /** Update a material. */
+        update(projectId: string, materialId: string, data: MaterialUpdateRequest): Promise<ProjectMaterial> {
+            return put<ProjectMaterial>(`/projects/${projectId}/materials/${materialId}`, data);
+        },
+
+        /** Delete a material. */
+        async remove(projectId: string, materialId: string): Promise<void> {
+            await del<undefined>(`/projects/${projectId}/materials/${materialId}`);
+        },
+    },
+
+    /**
+     * Budget endpoints.
+     * See internal/api/handlers/budget_handler.go
+     */
+    budget: {
+        /** Get per-phase budget breakdown. */
+        getBreakdown(projectId: string): Promise<ProjectBudget[]> {
+            return get<ProjectBudget[]>(`/projects/${projectId}/budget`);
+        },
+
+        /** Update a single phase budget estimate. */
+        updatePhase(projectId: string, budgetId: string, estimatedAmountCents: number): Promise<ProjectBudget> {
+            return put<ProjectBudget>(`/projects/${projectId}/budget/${budgetId}`, {
+                estimated_amount_cents: estimatedAmountCents,
+            });
+        },
+
+        /** Seed budget from material estimates. */
+        seed(projectId: string, data: BudgetSeedRequest): Promise<BudgetEstimate> {
+            return post<BudgetEstimate>(`/projects/${projectId}/budget/seed`, data);
         },
     },
 
@@ -992,6 +1240,44 @@ export interface UpdatePhysicsRequest {
     speed_multiplier: number;
     work_days: number[];
     apply_to_existing?: boolean;
+}
+
+// ============================================================================
+// Agent Settings Types
+// ============================================================================
+
+export interface AgentSettingsResponse {
+    daily_focus: {
+        enabled: boolean;
+        run_time: string;
+        ai_provider: string;
+        max_focus_cards: number;
+    };
+    procurement: {
+        lead_time_warning_threshold: number;
+        staging_buffer_days: number;
+        default_weather_buffer_days: number;
+    };
+    sub_liaison: {
+        enabled: boolean;
+        confirmation_window: string;
+        auto_resend_after: string;
+    };
+    chat: {
+        ai_provider: string;
+        max_tool_calls: number;
+    };
+}
+
+export interface BrainConnectionResponse {
+    id: string;
+    org_id: string;
+    brain_url: string;
+    integration_key: string;
+    status: string;
+    last_sync_at: string | null;
+    platforms: Array<{ name: string; type: string; status: string }>;
+    updated_at: string;
 }
 
 // ============================================================================

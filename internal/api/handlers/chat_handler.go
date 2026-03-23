@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,14 +16,20 @@ import (
 	"github.com/google/uuid"
 )
 
+// ChatProcessor defines the interface for processing chat requests.
+// Satisfied by both *chat.Orchestrator (regex-based) and *chat.ClaudeOrchestrator (Claude-powered).
+type ChatProcessor interface {
+	ProcessRequest(ctx context.Context, userID uuid.UUID, orgID uuid.UUID, req chat.ChatRequest) (*chat.ChatResponse, error)
+}
+
 // ChatHandler handles chat API requests.
 // See PRODUCTION_PLAN.md Step 43.4
 type ChatHandler struct {
-	orchestrator *chat.Orchestrator
+	orchestrator ChatProcessor
 }
 
 // NewChatHandler creates a new ChatHandler with the given orchestrator.
-func NewChatHandler(orchestrator *chat.Orchestrator) *ChatHandler {
+func NewChatHandler(orchestrator ChatProcessor) *ChatHandler {
 	return &ChatHandler{orchestrator: orchestrator}
 }
 

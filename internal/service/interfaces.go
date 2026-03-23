@@ -120,6 +120,41 @@ type GitHubServicer interface {
 	PostPRComment(ctx context.Context, owner, repo string, prNumber int, body string) error
 }
 
+// MaterialServicer defines the contract for material extraction and management.
+type MaterialServicer interface {
+	ExtractMaterials(ctx context.Context, imageData []byte, mimeType string) ([]models.MaterialEstimate, error)
+	EstimateFromProjectAttributes(ctx context.Context, gsf float64, stories int, foundationType string, bedrooms int, bathrooms int, region string) ([]models.MaterialEstimate, error)
+	SaveMaterials(ctx context.Context, projectID uuid.UUID, materials []models.MaterialEstimate) error
+	ListMaterials(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProjectMaterial, error)
+	UpdateMaterial(ctx context.Context, materialID, orgID uuid.UUID, updates models.MaterialUpdateRequest) (*models.ProjectMaterial, error)
+	DeleteMaterial(ctx context.Context, materialID, orgID uuid.UUID) error
+}
+
+// BudgetServicer defines the contract for budget management and financial summaries.
+type BudgetServicer interface {
+	SeedBudget(ctx context.Context, projectID uuid.UUID, materials []models.MaterialEstimate, gsf float64, foundationType string, stories int, regionalMultiplier float64) (*models.BudgetEstimate, error)
+	GetBudgetBreakdown(ctx context.Context, projectID, orgID uuid.UUID) ([]models.ProjectBudget, error)
+	UpdateBudgetPhase(ctx context.Context, budgetID, orgID uuid.UUID, estimatedCents int64) (*models.ProjectBudget, error)
+	GetFinancialSummary(ctx context.Context, projectID, orgID uuid.UUID) (*FinancialSummary, error)
+	GetGlobalFinancialSummary(ctx context.Context, orgID uuid.UUID) (*FinancialSummary, error)
+}
+
+// DelayCascadeServicer defines the contract for predictive delay propagation analysis.
+type DelayCascadeServicer interface {
+	SimulateDelayCascade(ctx context.Context, projectID, orgID, taskID uuid.UUID, slipDays int) (*DelayCascade, error)
+}
+
+// ResourceConflictServicer defines the contract for cross-project resource conflict detection.
+type ResourceConflictServicer interface {
+	DetectConflicts(ctx context.Context, orgID uuid.UUID) ([]ResourceConflict, error)
+}
+
+// CalibrationServicer defines the contract for schedule calibration from historical data.
+type CalibrationServicer interface {
+	CalibrateFromCompletion(ctx context.Context, projectID, orgID uuid.UUID) (int, error)
+	GetOrgMultiplierMap(ctx context.Context, orgID uuid.UUID) (map[string]float64, error)
+}
+
 // FeedServicer defines the contract for portfolio feed operations.
 // See FRONTEND_V2_SPEC.md §5.1, §5.5
 // Note: Primary definition is in feed_service.go with the implementation.

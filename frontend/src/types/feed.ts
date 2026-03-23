@@ -27,6 +27,12 @@ export type FeedCardType =
     | 'calibration_drift'
     | 'milestone'
     | 'welcome'
+    // Agent approval card types (human-in-the-loop)
+    | 'agent_approval'
+    | 'agent_recommendation'
+    | 'change_order'
+    | 'delay_mitigation'
+    | 'draft_message'
     // Integration card types (FB-Brain cross-system flows)
     | 'material_quote_prompt'
     | 'material_quote_review'

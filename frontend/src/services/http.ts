@@ -91,6 +91,14 @@ export function setTokenGetter(getter: () => string | null): void {
 }
 
 /**
+ * Returns the current auth token or null.
+ * Used by SSE/streaming endpoints that need to send auth headers manually.
+ */
+export function getAuthToken(): string | null {
+    return tokenGetter ? tokenGetter() : null;
+}
+
+/**
  * Configures the 401 handler callback.
  * Called once at application bootstrap to avoid circular dependencies.
  *

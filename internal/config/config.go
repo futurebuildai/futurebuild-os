@@ -92,6 +92,16 @@ type Config struct {
 	GitHubWebhookSecret string // GITHUB_WEBHOOK_SECRET - HMAC verification
 	GitHubPAT           string // GITHUB_PAT - API authentication
 
+	// Anthropic/Claude configuration for agentic layer.
+	// Claude Opus 4.6 sits alongside Gemini — handles reasoning about
+	// critical path, budget, onboarding, and chat intelligence.
+	AnthropicAPIKey string // ANTHROPIC_API_KEY
+	ClaudeModelID   string // CLAUDE_MODEL_ID (default: claude-opus-4-6-20250918)
+
+	// FB-Brain connection for cross-system integration.
+	BrainURL            string // FB_BRAIN_URL
+	BrainIntegrationKey string // FB_BRAIN_INTEGRATION_KEY
+
 	Worker WorkerConfig
 }
 
@@ -181,6 +191,10 @@ func LoadConfig() (*Config, error) {
 		ClerkSecretKey:             os.Getenv("CLERK_SECRET_KEY"),
 		GitHubWebhookSecret:        os.Getenv("GITHUB_WEBHOOK_SECRET"),
 		GitHubPAT:                  os.Getenv("GITHUB_PAT"),
+		AnthropicAPIKey:            os.Getenv("ANTHROPIC_API_KEY"),
+		ClaudeModelID:              getEnvOrDefault("CLAUDE_MODEL_ID", "claude-opus-4-6-20250918"),
+		BrainURL:                   os.Getenv("FB_BRAIN_URL"),
+		BrainIntegrationKey:        os.Getenv("FB_BRAIN_INTEGRATION_KEY"),
 		Worker: WorkerConfig{
 			Concurrency: 10,
 			QueuePriorities: map[string]int{

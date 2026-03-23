@@ -18,12 +18,19 @@ import (
 // ScheduleService handles schedule recalculation via CPM.
 // See BACKEND_SCOPE.md Section 3.4 (Schedule Recalculator)
 type ScheduleService struct {
-	db *pgxpool.Pool
+	db             *pgxpool.Pool
+	calibrationSvc CalibrationServicer
 }
 
 // NewScheduleService creates a new ScheduleService instance.
 func NewScheduleService(db *pgxpool.Pool) *ScheduleService {
 	return &ScheduleService{db: db}
+}
+
+// WithCalibration injects the CalibrationService for applying org-learned duration multipliers.
+func (s *ScheduleService) WithCalibration(svc CalibrationServicer) *ScheduleService {
+	s.calibrationSvc = svc
+	return s
 }
 
 // ProjectScheduleSummary represents a high-level schedule overview.
@@ -150,7 +157,20 @@ func (s *ScheduleService) RecalculateSchedule(ctx context.Context, projectID, or
 		return nil, fmt.Errorf("failed to fetch dependencies: %w", err)
 	}
 
-	// Step 3.5: Fetch material constraints from procurement_items
+	// Step 3.5: Apply org-learned duration multipliers if CalibrationService is configured.
+	// Adjusts calculated_duration by org-specific historical performance ratios.
+	if s.calibrationSvc != nil {
+		multiplierMap, mErr := s.calibrationSvc.GetOrgMultiplierMap(ctx, orgID)
+		if mErr == nil && len(multiplierMap) > 0 {
+			for i, t := range tasks {
+				if m, ok := multiplierMap[t.WBSCode]; ok && t.ManualOverrideDays == nil {
+					tasks[i].CalculatedDuration *= m
+				}
+			}
+		}
+	}
+
+	// Step 3.6: Fetch material constraints from procurement_items
 	// See PRODUCTION_PLAN.md Step 46 (MRP Feedback Loop)
 	materialConstraints, err := s.getMaterialConstraints(ctx, projectID)
 	if err != nil {

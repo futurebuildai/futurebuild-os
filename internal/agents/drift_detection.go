@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 )
 
 // See FRONTEND_V2_SPEC.md §11.2 — Passive Drift Detection
@@ -51,9 +53,10 @@ type DriftRepository interface {
 // DriftDetectionAgent analyzes actual vs. predicted task durations and emits
 // calibration_drift feed cards when sustained deviation is detected.
 type DriftDetectionAgent struct {
-	repo       DriftRepository
-	clock      clock.Clock
-	feedWriter FeedWriter
+	repo        DriftRepository
+	clock       clock.Clock
+	feedWriter  FeedWriter
+	asynqClient *asynq.Client
 }
 
 // NewDriftDetectionAgent creates a new drift detection agent.
@@ -64,6 +67,12 @@ func NewDriftDetectionAgent(repo DriftRepository, clk clock.Clock) *DriftDetecti
 // WithFeedWriter injects the optional feed card writer.
 func (a *DriftDetectionAgent) WithFeedWriter(fw FeedWriter) *DriftDetectionAgent {
 	a.feedWriter = fw
+	return a
+}
+
+// WithAsynqClient injects the asynq client for enqueuing delay cascade tasks.
+func (a *DriftDetectionAgent) WithAsynqClient(c *asynq.Client) *DriftDetectionAgent {
+	a.asynqClient = c
 	return a
 }
 
@@ -153,6 +162,22 @@ func (a *DriftDetectionAgent) Execute(ctx context.Context) error {
 			return nil // Don't stop processing other projects
 		}
 		cardsWritten++
+
+		// When crew is slower than predicted, enqueue delay cascade analysis
+		// to show cascading impact on downstream tasks and project end date.
+		if allSlower && a.asynqClient != nil {
+			lastTask := tasks[len(tasks)-1]
+			avgSlipDays := int(math.Round((avgRatio - 1.0) * lastTask.PredictedDuration))
+			if avgSlipDays > 0 {
+				cascadeTask, cErr := newDelayCascadeTask(projectID, orgID, lastTask.TaskID, avgSlipDays)
+				if cErr == nil {
+					if _, enqErr := a.asynqClient.EnqueueContext(ctx, cascadeTask); enqErr != nil {
+						slog.Warn("drift detection: failed to enqueue delay cascade", "project_id", projectID, "error", enqErr)
+					}
+				}
+			}
+		}
+
 		return nil
 	})
 
@@ -162,5 +187,24 @@ func (a *DriftDetectionAgent) Execute(ctx context.Context) error {
 
 	slog.Info("drift detection complete", "cards_written", cardsWritten)
 	return nil
+}
+
+// newDelayCascadeTask creates a delay cascade asynq task without importing worker package.
+func newDelayCascadeTask(projectID, orgID, taskID uuid.UUID, slipDays int) (*asynq.Task, error) {
+	payload, err := json.Marshal(struct {
+		ProjectID uuid.UUID `json:"project_id"`
+		OrgID     uuid.UUID `json:"org_id"`
+		TaskID    uuid.UUID `json:"task_id"`
+		SlipDays  int       `json:"slip_days"`
+	}{
+		ProjectID: projectID,
+		OrgID:     orgID,
+		TaskID:    taskID,
+		SlipDays:  slipDays,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask("task:delay_cascade", payload, asynq.Queue("default")), nil
 }
 

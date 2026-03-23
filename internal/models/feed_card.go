@@ -32,6 +32,13 @@ const (
 	FeedCardMilestone           FeedCardType = "milestone"
 	FeedCardWelcome             FeedCardType = "welcome"
 
+	// Agent approval card types (human-in-the-loop)
+	FeedCardAgentApproval    FeedCardType = "agent_approval"       // Agent requests human approval for an action
+	FeedCardAgentRecommend   FeedCardType = "agent_recommendation" // Agent recommends action (informational)
+	FeedCardChangeOrder      FeedCardType = "change_order"         // Non-standard change requiring approval
+	FeedCardDelayMitigation  FeedCardType = "delay_mitigation"     // Delay response options
+	FeedCardDraftMessage     FeedCardType = "draft_message"        // Claude-drafted message for review
+
 	// Integration card types (FB-Brain cross-system flows)
 	FeedCardMaterialQuotePrompt  FeedCardType = "material_quote_prompt"
 	FeedCardMaterialQuoteReview  FeedCardType = "material_quote_review"

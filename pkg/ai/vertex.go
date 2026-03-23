@@ -17,7 +17,7 @@ const (
 	// New models for Tribunal
 	ModelTypeFlashPreview ModelType = "flash-preview" // gemini-3.0-flash-preview
 	ModelTypeCodeAssist   ModelType = "code-assist"   // gemini-code-assist
-	ModelTypeOpus         ModelType = "opus"          // claude-4.5-opus
+	ModelTypeOpus         ModelType = "opus"          // claude-opus-4-6
 )
 
 // =============================================================================
@@ -142,6 +142,25 @@ func (vc *VertexClient) GenerateEmbedding(ctx context.Context, text string) ([]f
 	}
 
 	return resp.Embeddings[0].Values, nil
+}
+
+// StreamGenerateContent provides a streaming-compatible interface for Vertex.
+// Collects the full response and sends it as a single chunk (Vertex streaming optional).
+func (vc *VertexClient) StreamGenerateContent(ctx context.Context, req GenerateRequest) (<-chan StreamChunk, error) {
+	resp, err := vc.GenerateContent(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan StreamChunk, 2)
+	go func() {
+		defer close(out)
+		if resp.Text != "" {
+			out <- StreamChunk{Text: resp.Text}
+		}
+		out <- StreamChunk{Done: true, StopReason: "end_turn"}
+	}()
+	return out, nil
 }
 
 // Close releases resources used by the client.

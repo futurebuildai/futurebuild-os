@@ -152,7 +152,8 @@ export interface ChatMessage {
  */
 export interface ActionCard {
     id: string;
-    type: 'invoice_approval' | 'schedule_change' | 'material_order' | 'confirmation' | 'general';
+    type: 'invoice_approval' | 'schedule_change' | 'material_order' | 'confirmation' | 'general'
+        | 'draft_message' | 'agent_approval' | 'agent_recommendation' | 'change_order' | 'delay_mitigation';
     title: string;
     summary: string;
     status: 'pending' | 'approved' | 'denied' | 'edited';

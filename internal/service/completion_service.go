@@ -10,6 +10,7 @@ import (
 	"github.com/colton/futurebuild/internal/models"
 	"github.com/colton/futurebuild/pkg/types"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,12 +18,19 @@ import (
 
 // CompletionService handles project completion lifecycle operations.
 type CompletionService struct {
-	db *pgxpool.Pool
+	db          *pgxpool.Pool
+	asynqClient *asynq.Client
 }
 
 // NewCompletionService creates a new CompletionService.
 func NewCompletionService(db *pgxpool.Pool) *CompletionService {
 	return &CompletionService{db: db}
+}
+
+// WithAsynqClient injects the asynq client for enqueuing post-completion calibration tasks.
+func (s *CompletionService) WithAsynqClient(c *asynq.Client) *CompletionService {
+	s.asynqClient = c
+	return s
 }
 
 // CompleteProject transitions a project to Completed status and generates a CompletionReport.
@@ -126,6 +134,22 @@ func (s *CompletionService) CompleteProject(ctx context.Context, projectID, orgI
 	}
 
 	slog.Info("project completed", "project_id", projectID, "completed_by", userID, "report_id", report.ID)
+
+	// Enqueue post-completion calibration to update org-level duration multipliers.
+	// Non-blocking: calibration failure should not affect completion.
+	if s.asynqClient != nil {
+		payload, err := json.Marshal(struct {
+			ProjectID uuid.UUID `json:"project_id"`
+			OrgID     uuid.UUID `json:"org_id"`
+		}{ProjectID: projectID, OrgID: orgID})
+		if err == nil {
+			task := asynq.NewTask("task:calibrate_on_completion", payload, asynq.Queue("default"))
+			if _, err := s.asynqClient.Enqueue(task); err != nil {
+				slog.Warn("failed to enqueue calibration task", "project_id", projectID, "error", err)
+			}
+		}
+	}
+
 	return report, nil
 }
 

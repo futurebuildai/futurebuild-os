@@ -12,13 +12,14 @@ FutureBuild is an AI-powered construction project management platform. It uses t
 |-------|------------|
 | Backend | Go 1.24+, Chi Router, PostgreSQL 15+ (pgvector), Redis (Asynq) |
 | Frontend | Lit 3.0, TypeScript 5.0+ (Strict Mode), Vite, Signals (@lit-labs/preact-signals) |
-| AI | Google Vertex AI (Gemini 2.5 Flash/Pro) |
+| AI | Google Vertex AI (Gemini 2.5 Flash/Pro) + Anthropic Claude Opus (chat orchestration) |
 | Auth | Clerk (main app), Magic link email (portal contacts), JWT tokens |
 
 **Hard Constraints:**
 - NO React, NO ORMs (use raw SQL/pgx), NO Python logic (Go only)
 - Database is the source of truth; agents are stateless calculators
 - All TypeScript must compile with `noImplicitAny` enabled
+- Frontend uses `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` — strictest TS settings
 
 ## Build & Development Commands
 
@@ -32,13 +33,16 @@ go run ./cmd/api
 # Frontend only
 npm --prefix frontend run dev
 
-# Audit (lint + type check)
+# Audit (lint + type check — runs go vet + frontend build)
 make audit
 
 # Unit tests (excludes integration)
 make test
 
-# Integration tests (requires running DB)
+# Run a single Go test
+go test -v ./internal/chat/... -run TestOrchestrator
+
+# Integration tests (requires running DB, uses testcontainers-go)
 make test-integration
 
 # Contract validation (Go/TS type parity)
@@ -49,72 +53,100 @@ npm --prefix frontend run lint
 npm --prefix frontend run lint:fix
 npm --prefix frontend run format
 
-# Database migrations
+# Database migrations (golang-migrate, 6-digit zero-padded sequential)
 make migrate-up
 make migrate-down
 make migrate-create name=<migration_name>
 
-# Background worker
+# Background worker (Asynq cron jobs)
 make run-worker
 
+# Seed demo data
+make seed-demo
+
 # Shadow Protocol (documentation enforcement)
-npm run shadow:scaffold  # Generate missing shadow docs
-npm run shadow:check     # Verify all source files have shadow docs
+npm run shadow:scaffold
+npm run shadow:check
 ```
+
+## Entry Points
+
+| Binary | Path | Purpose |
+|--------|------|---------|
+| API Server | `cmd/api/main.go` | HTTP server, Chi router, all API endpoints |
+| Worker | `cmd/worker/main.go` | Asynq cron jobs (daily briefings, procurement, drift detection) |
+| Demo Seed | `cmd/seed-demo/main.go` | Idempotent demo data seeder |
+
+The API server supports `--readiness-check` flag for CI/CD health probes (runs probes and exits).
 
 ## Architecture
 
-### Backend Structure (`internal/`)
+### Backend (`internal/`)
 
-- **`api/handlers/`** - HTTP handlers (Chi router endpoints)
-- **`chat/`** - Chat orchestrator, intent classification, message persistence
-- **`physics/`** - CPM scheduler (forward/backward pass), DHSM duration calculator, SWIM weather model
-- **`agents/`** - Autonomous agents: DailyFocus, Procurement, SubLiaison, InboundProcessor
-- **`service/`** - Business logic services (Auth, Schedule, Vision, Weather, etc.)
-- **`models/`** - Domain models (Project, Task, WBS, Financial, Communication)
-- **`worker/`** - Asynq job handlers and schedulers
-- **`middleware/`** - Auth middleware, rate limiting
-- **`platform/`** - Cross-cutting concerns (metrics, DB transactions)
+- **`server/server.go`** — Single-file server setup (~800 lines). All route registration, handler wiring, and middleware stack. Services are constructed first, then handlers, then routes. Features are conditionally initialized (fail-closed: missing config disables the feature, doesn't crash).
+- **`api/handlers/`** — HTTP handlers. Pattern: struct with service dependencies, methods return `http.HandlerFunc`.
+- **`chat/`** — Dual chat orchestrator:
+  - `orchestrator.go` — Regex-based intent classification (fallback)
+  - `claude_orchestrator.go` — Claude Opus with tool use (primary when `ANTHROPIC_API_KEY` set)
+  - Commands return `(text, *Artifact, error)` for rich UI rendering
+- **`physics/`** — CPM scheduler (forward/backward pass), DHSM duration calculator, SWIM weather model. Deterministic with golden master tests.
+- **`agents/`** — Autonomous agents (DailyFocus, Procurement, SubLiaison). Each has a standard and Claude-powered variant.
+- **`service/`** — Business logic. Services use pgxpool directly with raw SQL. Interfaces in `internal/service/interfaces.go`.
+- **`models/`** — Domain models (Project, Task, WBS, Financial, Communication, FeedCard)
+- **`worker/`** — Asynq job handlers, task type definitions in `payloads.go`, cron schedules in `scheduler.go`
+- **`middleware/`** — Auth (Clerk JWT via JWKS), role/permission checks, rate limiting, dev auth bypass (`DEV_AUTH_BYPASS=true`)
+- **`config/`** — Environment-based config with `godotenv`. See `.env.example` for all variables.
+- **`readiness/`** — Per-service health probes (DB, Clerk, Redis, Vertex, S3, notification providers)
 
-### Frontend Structure (`frontend/src/`)
+### Frontend (`frontend/src/`)
 
-- **`components/`** - Lit components organized by domain:
-  - `base/` - FBElement base class, error boundary
-  - `layout/` - 3-panel shell (left/center/right panels)
-  - `chat/` - Message list, input bar, action cards
-  - `artifacts/` - Gantt, Budget, Invoice renderers
-  - `agent/` - Agent activity log
-  - `views/` - Page-level view components
-- **`services/`** - API client, WebSocket/SSE handlers
-- **`store/`** - Signals-based reactive state
-- **`types/`** - TypeScript interfaces matching Go `pkg/types` (Rosetta Stone)
+**Component hierarchy:** All components extend `FBElement` (shared styles, `emit()` helper). View/page components extend `FBViewElement` (viewport containment, `onViewActive()` lifecycle hook). Views manage their own scroll — the window NEVER scrolls.
 
-### Key Architectural Patterns
+- **`components/`** — Lit web components organized by domain (layout, chat, artifacts, agent, views, settings)
+- **`services/`** — API client, WebSocket/SSE handlers
+- **`store/`** — Signals-based reactive state (`@lit-labs/preact-signals`)
+- **`types/`** — TypeScript interfaces matching Go `pkg/types/` (Rosetta Stone)
 
-1. **Rosetta Stone Type System**: Go types in `pkg/types/` and TypeScript types in `frontend/src/types/` must stay in sync. Run `make contract-test` to verify parity.
+**Path alias:** `@/*` maps to `./src/*` (configured in tsconfig.json). Import as `import { X } from '@/components/base/FBElement'`.
 
-2. **Chat-First UI**: 3-panel "Agent Command Center" - Left (projects/threads), Center (chat), Right (artifacts). Users interact via conversation; visual artifacts render inline.
+**Component naming:** Tag names use `fb-` prefix (e.g., `fb-my-component`). Files match class names (e.g., `FBElement.ts`).
 
-3. **Physics Engine**: CPM scheduling with DHSM duration multipliers and SWIM weather adjustments for pre-dry-in phases. Deterministic calculations with golden master tests.
+### AI Integration (`pkg/ai/`)
 
-4. **Service Interfaces**: Core services (Weather, Vision, Directory, Notification) are interface-defined in `internal/service/interfaces.go` with mock implementations for testing.
+Vendor-agnostic abstraction with `Client` interface supporting `GenerateContent()` and `GenerateEmbedding()`.
 
-5. **Shadow Protocol**: Every source file must have a corresponding `.md` documentation file in `frontend/shadow/` or `backend/shadow/`. Run `npm run shadow:check` to verify compliance.
+- **`vertex.go`** — Vertex AI (Gemini) for vision, embeddings, general generation
+- **`anthropic.go`** — Claude Opus for chat orchestration, reasoning, tool use
+- **`factory.go`** — `NewFactory(vertexProjectID, vertexLocation, anthropicKey)` creates clients by provider
+- **`types.go`** — Core types: `GenerateRequest`, `GenerateResponse`, `ContentPart` (text, images, tool use/results)
 
-## Testing
+Both providers run simultaneously — Vertex for vision/embeddings, Claude for chat/reasoning.
 
-```bash
-# Run specific Go test
-go test -v ./internal/chat/... -run TestOrchestrator
+### Rosetta Stone Type System
 
-# Run frontend type check
-npm --prefix frontend run build
+Go types in `pkg/types/` ↔ TypeScript types in `frontend/src/types/` must stay in sync.
 
-# Integration tests use testcontainers-go
-go test -v -tags=integration ./test/integration/...
-```
+**Contract test pipeline:** `make contract-test` runs:
+1. Go test generates JSON samples from Go structs → `internal/contract_validation/samples/*.json`
+2. Frontend tests validate TS types can parse those JSON samples
 
-Test fixtures are in `test/fixtures/` and `test/testdata/`. Frontend fixtures are in `frontend/src/fixtures/`.
+Verified types: Forecast, Contact, InvoiceExtraction, GanttData.
+
+### Worker / Async Jobs
+
+Asynq (Redis-backed) with typed task payloads in `internal/worker/payloads.go`.
+
+Key cron schedules: 05:00 UTC procurement, 06:00 UTC daily briefing, 07:00 UTC drift detection, 23:00 UTC expire actions.
+
+Patterns: idempotency checks before processing, circuit breakers for optional features, notification dampening (72h throttle).
+
+### Auth Model
+
+Two separate auth systems:
+- **Clerk** — Main app users. JWT validated via JWKS. Middleware: `RequireAuth`, `RequireRole`, `RequirePermission` (scope-based RBAC)
+- **Magic Link** — Portal contacts (field workers). Rate-limited. Separate endpoints under `/api/v1/portal/auth/`
+- **API Key** — FB-Brain integration endpoints under `/api/v1/integration/`
+- **Dev bypass** — `DEV_AUTH_BYPASS=true` skips Clerk validation for local development
 
 ## Git Workflow
 
@@ -143,4 +175,4 @@ The repo uses specialized AI skills (in `skills/`):
 
 ## Current State
 
-Phase 8 (Production Readiness) is complete. Step 63 (Shadow Site & Protocol) is complete. Current focus is Phase 9 (FutureShade - The Intelligence Layer). See `planning/ROADMAP.md` for detailed status.
+Phase 8 (Production Readiness) is complete. Current focus is Phase 9 (FutureShade - The Intelligence Layer). Migrations are at `000076`. See `planning/ROADMAP.md` for detailed status.

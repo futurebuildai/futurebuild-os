@@ -9,7 +9,7 @@
  * Collects all inputs needed for initial deterministic schedule generation
  * through AI document extraction and natural conversation.
  */
-import { html, css, TemplateResult } from 'lit';
+import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { effect } from '@preact/signals-core';
 import { SignalWatcher } from '@lit-labs/preact-signals';
@@ -23,12 +23,15 @@ import {
     resetOnboarding,
     uploadedPdfUrl,
     hasDocumentUploaded,
+    schedulePreview,
 } from '../../store/onboarding-store';
 
 import '../features/onboarding/fb-onboarding-chat';
 import '../features/onboarding/fb-onboarding-steps';
 import '../features/onboarding/fb-engine-calibration';
 import '../features/onboarding/fb-interrogator-wizard';
+import '../features/onboarding/fb-onboard-schedule-preview';
+import '../features/onboarding/fb-onboard-progress-selector';
 
 @customElement('fb-view-onboarding')
 export class FBViewOnboarding extends SignalWatcher(FBViewElement) {
@@ -241,6 +244,10 @@ export class FBViewOnboarding extends SignalWatcher(FBViewElement) {
                         <fb-onboarding-chat
                             @project-created=${(e: CustomEvent<{ projectId: string }>): void => { void this._handleProjectCreated(e); }}
                         ></fb-onboarding-chat>
+                        <fb-onboard-progress-selector></fb-onboard-progress-selector>
+                        ${schedulePreview.value ? html`
+                            <fb-onboard-schedule-preview></fb-onboard-schedule-preview>
+                        ` : nothing}
                     </div>
                 `}
             </div>

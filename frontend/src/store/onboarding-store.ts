@@ -8,6 +8,8 @@
 
 import { signal, computed } from '@preact/signals-core';
 import type { CreateProjectRequest, LongLeadItem } from '../services/api';
+import type { MaterialEstimate, BudgetEstimate } from '../types/materials';
+import type { SchedulePreviewResponse, CompletedPhaseInput } from '../types/schedule';
 
 // ============================================================================
 // Types
@@ -53,7 +55,7 @@ export interface BoundingBox {
 /**
  * Onboarding stages for horizontal progress bar.
  */
-export type OnboardingStage = 'upload' | 'extract' | 'details' | 'review';
+export type OnboardingStage = 'upload' | 'extract' | 'details' | 'review' | 'team_setup';
 
 // ============================================================================
 // Core State Signals
@@ -130,6 +132,45 @@ export const readyToCreate = signal<boolean>(false);
  */
 export const interrogatorStatus = signal<InterrogatorStatus>('gathering');
 
+/**
+ * Extracted material estimates from blueprint or project attribute formulas.
+ * Populated by the Interrogator agent response.
+ */
+export const extractedMaterials = signal<MaterialEstimate[]>([]);
+
+/**
+ * Budget estimate computed from material estimates.
+ * Populated by the Interrogator agent response.
+ */
+export const budgetEstimate = signal<BudgetEstimate | null>(null);
+
+/**
+ * Instant schedule preview generated from onboarding data.
+ * Populated after P0 fields (sqft, foundation, start_date) are captured.
+ */
+export const schedulePreview = signal<SchedulePreviewResponse | null>(null);
+
+/**
+ * Whether this is an in-progress project (already under construction).
+ */
+export const isInProgressProject = signal<boolean>(false);
+
+/**
+ * Completed phases for in-progress projects.
+ * Each entry records the WBS code and actual completion date.
+ */
+export const completedPhases = signal<CompletedPhaseInput[]>([]);
+
+/**
+ * Created project ID. Set after project creation to enable team setup handoff.
+ */
+export const createdProjectId = signal<string>('');
+
+/**
+ * Whether the onboarding is in team setup stage (post-project-creation).
+ */
+export const isTeamSetupStage = signal<boolean>(false);
+
 // ============================================================================
 // Computed Values
 // ============================================================================
@@ -148,6 +189,9 @@ export const isReadyToCreate = computed(() => {
  * Computed from state: upload → extract → details → review
  */
 export const currentStage = computed<OnboardingStage>(() => {
+    // Team setup stage takes priority (post-project-creation)
+    if (isTeamSetupStage.value) return 'team_setup';
+
     const v = onboardingValues.value;
     const msgs = onboardingMessages.value;
     const processing = isProcessing.value;
@@ -279,9 +323,20 @@ export function resetOnboarding(): void {
     extractedProcurement.value = [];
     hasDocumentUploaded.value = false;
     pdfHighlights.value = [];
+    // Revoke previous object URL to prevent memory leak
+    if (uploadedPdfUrl.value) {
+        URL.revokeObjectURL(uploadedPdfUrl.value);
+    }
     uploadedPdfUrl.value = '';
     readyToCreate.value = false;
     interrogatorStatus.value = 'gathering';
+    extractedMaterials.value = [];
+    budgetEstimate.value = null;
+    schedulePreview.value = null;
+    isInProgressProject.value = false;
+    completedPhases.value = [];
+    createdProjectId.value = '';
+    isTeamSetupStage.value = false;
 }
 
 /**
@@ -324,4 +379,54 @@ export function setReadyToCreate(ready: boolean): void {
  */
 export function setInterrogatorStatus(status: InterrogatorStatus): void {
     interrogatorStatus.value = status;
+}
+
+/**
+ * Apply material estimates from the Interrogator agent response.
+ */
+export function applyMaterialEstimates(materials: MaterialEstimate[]): void {
+    extractedMaterials.value = materials;
+}
+
+/**
+ * Apply budget estimate from the Interrogator agent response.
+ */
+export function applyBudgetEstimate(estimate: BudgetEstimate): void {
+    budgetEstimate.value = estimate;
+}
+
+/**
+ * Apply schedule preview from the preview service.
+ */
+export function applySchedulePreview(preview: SchedulePreviewResponse): void {
+    schedulePreview.value = preview;
+}
+
+/**
+ * Mark the project as in-progress (already under construction).
+ */
+export function setInProgressProject(inProgress: boolean): void {
+    isInProgressProject.value = inProgress;
+}
+
+/**
+ * Set completed phases for in-progress project onboarding.
+ */
+export function setCompletedPhases(phases: CompletedPhaseInput[]): void {
+    completedPhases.value = phases;
+}
+
+/**
+ * Transition to team setup stage after project creation.
+ */
+export function transitionToTeamSetup(projectId: string): void {
+    createdProjectId.value = projectId;
+    isTeamSetupStage.value = true;
+}
+
+/**
+ * Complete the team setup stage and finish onboarding.
+ */
+export function completeTeamSetup(): void {
+    isTeamSetupStage.value = false;
 }

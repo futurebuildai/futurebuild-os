@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/colton/futurebuild/pkg/ai"
 	"github.com/colton/futurebuild/pkg/clock"
 	"github.com/colton/futurebuild/pkg/types"
+	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 )
 
 // MaxConcurrentProjects limits concurrent AI/DB calls to prevent thundering herds.
@@ -26,15 +29,17 @@ const MaxConcurrentProjects = 10
 // Critical Blocker A Remediation: Added geocoder and directory dependencies
 // P1 Scalability Fix: Uses streaming + worker pool for O(1) memory at scale
 type DailyFocusAgent struct {
-	projects   ProjectRepository // Abstraction for streaming (replaces *service.ProjectService)
-	schedule   *service.ScheduleService
-	weather    types.WeatherService
-	notifier   types.NotificationService
-	aiClient   ai.Client
-	clock      clock.Clock
-	geocoder   types.GeocodingService // Blocker A: Address → lat/long
-	directory  types.DirectoryService // Blocker A: PM email lookup
-	feedWriter FeedWriter             // V2: writes daily_briefing cards to portfolio feed
+	projects    ProjectRepository // Abstraction for streaming (replaces *service.ProjectService)
+	schedule    *service.ScheduleService
+	weather     types.WeatherService
+	notifier    types.NotificationService
+	aiClient    ai.Client
+	clock       clock.Clock
+	geocoder    types.GeocodingService // Blocker A: Address → lat/long
+	directory   types.DirectoryService // Blocker A: PM email lookup
+	feedWriter  FeedWriter             // V2: writes daily_briefing cards to portfolio feed
+	claudeRunner *AgentRunner          // Phase 6: Claude reasoning for actionable recommendations
+	asynqClient *asynq.Client          // Feature 4: Enqueue briefing notifications
 }
 
 // NewDailyFocusAgent creates a new agent instance.
@@ -84,6 +89,12 @@ func NewDailyFocusAgentWithService(
 // WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
 func (a *DailyFocusAgent) WithFeedWriter(fw FeedWriter) *DailyFocusAgent {
 	a.feedWriter = fw
+	return a
+}
+
+// WithAsynqClient sets the Asynq client for enqueuing follow-up tasks (briefing notifications).
+func (a *DailyFocusAgent) WithAsynqClient(client *asynq.Client) *DailyFocusAgent {
+	a.asynqClient = client
 	return a
 }
 
@@ -184,26 +195,38 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 		return fmt.Errorf("failed to fetch relevant tasks: %w", err)
 	}
 
-	// 3. Synthesize AI Prompt
-	prompt := a.buildPrompt(p, forecast, tasks)
-
-	// 4. Generate Content
-	// Graceful degradation: if AI client is unavailable, log warning and skip generation
+	// 3. Generate briefing — try Claude first, fall back to Gemini text generation
 	var briefing string
-	if a.aiClient != nil {
-		// L7 Vendor Abstraction: Use ai.NewTextRequest instead of genai.Part
-		req := ai.NewTextRequest(ai.ModelTypeFlash, prompt)
-		resp, err := a.aiClient.GenerateContent(ctx, req)
-		if err != nil {
-			return fmt.Errorf("AI generation failed: %w", err)
+	if a.claudeRunner != nil && a.feedWriter != nil {
+		// Phase 6: Claude-powered daily focus with actionable approval cards.
+		// Claude calls tools to create approval cards + generates briefing text.
+		claudeBriefing, claudeErr := a.processProjectWithClaude(ctx, p, tasks)
+		if claudeErr != nil {
+			slog.Warn("claude daily focus failed, falling back to gemini",
+				"project_id", p.ID, "error", claudeErr)
+			// Fall through to legacy path below
+		} else {
+			briefing = claudeBriefing
 		}
-		briefing = resp.Text
-	} else {
-		slog.Warn("AI client not available for project, skipping briefing generation", "project_id", p.ID)
-		briefing = "[AI Unavailable] Manual briefing required. Please review project schedule and weather conditions."
 	}
 
-	// 5. Deliver - Critical Blocker A Remediation: Dynamic PM email lookup
+	// Legacy path: Gemini text generation (also used as fallback)
+	if briefing == "" {
+		prompt := a.buildPrompt(p, forecast, tasks)
+		if a.aiClient != nil {
+			req := ai.NewTextRequest(ai.ModelTypeFlash, prompt)
+			resp, err := a.aiClient.GenerateContent(ctx, req)
+			if err != nil {
+				return fmt.Errorf("AI generation failed: %w", err)
+			}
+			briefing = resp.Text
+		} else {
+			slog.Warn("AI client not available for project, skipping briefing generation", "project_id", p.ID)
+			briefing = "[AI Unavailable] Manual briefing required. Please review project schedule and weather conditions."
+		}
+	}
+
+	// 4. Deliver - Critical Blocker A Remediation: Dynamic PM email lookup
 	slog.Info("DAILY BRIEFING generated", "project_name", p.Name)
 
 	// Look up Project Manager contact via DirectoryService (fallback to generic)
@@ -221,7 +244,27 @@ func (a *DailyFocusAgent) processProject(ctx context.Context, p models.Project) 
 
 	// V2 Feed: Write daily_briefing card to portfolio feed
 	if a.feedWriter != nil {
-		a.writeDailyBriefingCard(ctx, p, briefing, tasks)
+		if a.claudeRunner != nil {
+			a.writeDailyBriefingCardWithClaude(ctx, p, briefing, tasks)
+		} else {
+			a.writeDailyBriefingCard(ctx, p, briefing, tasks)
+		}
+	}
+
+	// Feature 12: Detect upcoming inspections and write feed cards
+	if a.feedWriter != nil {
+		a.detectUpcomingInspections(ctx, p, tasks)
+	}
+
+	// Feature 4: Enqueue briefing push notification
+	if a.asynqClient != nil {
+		summary := extractBriefingSummary(briefing)
+		task, err := NewDailyBriefingNotificationTask(p.ID, p.OrgID, summary)
+		if err == nil {
+			if _, err := a.asynqClient.Enqueue(task); err != nil {
+				slog.Warn("failed to enqueue briefing notification", "project_id", p.ID, "error", err)
+			}
+		}
 	}
 
 	return nil
@@ -319,3 +362,140 @@ Generate a concise "Morning Briefing" for the site team.
 		w.HighTempC, w.LowTempC, w.PrecipitationMM, w.PrecipitationProbability*100, w.Conditions,
 		taskContext)
 }
+
+// NewDailyBriefingNotificationTask creates a task payload for briefing push notification.
+// Local helper to avoid circular import with worker package.
+func NewDailyBriefingNotificationTask(projectID, orgID uuid.UUID, summary string) (*asynq.Task, error) {
+	payload, err := json.Marshal(map[string]interface{}{
+		"project_id": projectID,
+		"org_id":     orgID,
+		"card_id":    uuid.New(), // placeholder
+		"summary":    summary,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask("task:daily_briefing_notification", payload, asynq.Queue("default")), nil
+}
+
+// extractBriefingSummary extracts the first 2-3 sentences from a briefing for notification body.
+func extractBriefingSummary(briefing string) string {
+	lines := strings.Split(briefing, "\n")
+	var sentences []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "-") {
+			continue
+		}
+		sentences = append(sentences, trimmed)
+		if len(sentences) >= 2 {
+			break
+		}
+	}
+	if len(sentences) == 0 {
+		return "Your daily briefing is ready. Check the feed for details."
+	}
+	return strings.Join(sentences, " ")
+}
+
+// detectUpcomingInspections identifies inspection tasks starting within 10 business days
+// and writes feed cards alerting the PM. See Feature 12.
+func (a *DailyFocusAgent) detectUpcomingInspections(ctx context.Context, p models.Project, tasks []models.ProjectTask) {
+	today := a.clock.Now().Truncate(24 * time.Hour)
+
+	for _, t := range tasks {
+		if !t.IsInspection {
+			continue
+		}
+		if t.PlannedStart == nil {
+			continue
+		}
+		// Skip completed inspections
+		if string(t.Status) == "Completed" || string(t.Status) == "complete" {
+			continue
+		}
+
+		daysUntil := int(t.PlannedStart.Sub(today).Hours() / 24)
+
+		if daysUntil < 0 || daysUntil > 10 {
+			continue
+		}
+
+		var priority int
+		var headline, body string
+		agentSource := "DailyFocusAgent"
+
+		if daysUntil <= 5 {
+			// Urgent: schedule inspection now
+			priority = models.FeedCardPriorityUrgent
+			headline = fmt.Sprintf("Schedule inspection: %s in %d days", t.Name, daysUntil)
+			body = fmt.Sprintf("Inspection \"%s\" (WBS %s) is scheduled to start on %s — %d business days from now. "+
+				"Contact your inspector to confirm the appointment.",
+				t.Name, t.WBSCode, t.PlannedStart.Format("Jan 02"), daysUntil)
+
+			// Check if prerequisite tasks are complete (simplified check)
+			body += a.checkInspectionPrereqs(tasks, t)
+		} else {
+			// Advisory: prepare for inspection
+			priority = models.FeedCardPriorityNormal
+			headline = fmt.Sprintf("Prepare for inspection: %s in %d days", t.Name, daysUntil)
+			body = fmt.Sprintf("Inspection \"%s\" (WBS %s) is coming up on %s. "+
+				"Ensure all prerequisite work is completed and the site is ready.",
+				t.Name, t.WBSCode, t.PlannedStart.Format("Jan 02"))
+		}
+
+		card := &models.FeedCard{
+			OrgID:       p.OrgID,
+			ProjectID:   p.ID,
+			CardType:    models.FeedCardInspectionUpcoming,
+			Priority:    priority,
+			Headline:    headline,
+			Body:        body,
+			Horizon:     models.FeedCardHorizonThisWeek,
+			AgentSource: &agentSource,
+			TaskID:      &t.ID,
+			Actions: []models.FeedCardAction{
+				{ID: "view_schedule", Label: "View Schedule", Style: "primary"},
+				{ID: "dismiss", Label: "Dismiss", Style: "secondary"},
+			},
+		}
+
+		if err := a.feedWriter.WriteCard(ctx, card); err != nil {
+			slog.Error("failed to write inspection feed card", "project_id", p.ID, "task_id", t.ID, "error", err)
+		}
+	}
+}
+
+// checkInspectionPrereqs checks if predecessor tasks are complete and adds warnings.
+func (a *DailyFocusAgent) checkInspectionPrereqs(allTasks []models.ProjectTask, inspection models.ProjectTask) string {
+	// Build a map of task names to check if immediate predecessor tasks are complete
+	// This is a simplified check — full dependency graph would require task deps query
+	inspWBS := inspection.WBSCode
+	if inspWBS == "" {
+		return ""
+	}
+
+	var blockers []string
+	for _, t := range allTasks {
+		if t.ID == inspection.ID {
+			continue
+		}
+		// Check tasks in the same phase that aren't inspections and aren't complete
+		if !t.IsInspection && t.WBSCode != "" && string(t.Status) != "Completed" && string(t.Status) != "complete" {
+			// Simple heuristic: non-inspection tasks with lower WBS code in same phase
+			if len(t.WBSCode) > 0 && len(inspWBS) > 0 && t.WBSCode[0] == inspWBS[0] && t.WBSCode < inspWBS {
+				blockers = append(blockers, t.Name)
+			}
+		}
+	}
+
+	if len(blockers) == 0 {
+		return ""
+	}
+	if len(blockers) > 3 {
+		blockers = blockers[:3]
+	}
+	return fmt.Sprintf("\n\n**Prerequisite tasks still in progress:** %s", strings.Join(blockers, ", "))
+}
+
+

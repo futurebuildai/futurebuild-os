@@ -18,6 +18,7 @@ import (
 // See FRONTEND_V2_SPEC.md §5.1, §5.2
 type FeedHandler struct {
 	feedService        *service.FeedService
+	agentActionService *service.AgentActionService
 	integrationClient  *IntegrationClient
 }
 
@@ -27,6 +28,12 @@ func NewFeedHandler(fs *service.FeedService) *FeedHandler {
 		feedService:       fs,
 		integrationClient: NewIntegrationClient(),
 	}
+}
+
+// WithAgentActionService injects the agent action service for approval/rejection handling.
+func (h *FeedHandler) WithAgentActionService(aas *service.AgentActionService) *FeedHandler {
+	h.agentActionService = aas
+	return h
 }
 
 // GetFeed handles GET /api/v1/portfolio/feed.
@@ -463,6 +470,73 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		} else {
 			resp.Message = "Delivery confirmed"
 		}
+
+	// ── Agent approval actions (human-in-the-loop) ──
+
+	case "approve_agent_action":
+		if h.agentActionService == nil {
+			http.Error(w, "Agent actions not configured", http.StatusNotImplemented)
+			return
+		}
+		userID, parseErr := uuid.Parse(claims.UserID)
+		if parseErr != nil {
+			http.Error(w, "Invalid user ID", http.StatusInternalServerError)
+			return
+		}
+		// Look up pending action by card ID
+		pendingAction, lookupErr := h.agentActionService.GetPendingByCardID(ctx, orgID, cardID)
+		if lookupErr != nil {
+			slog.Error("feed: pending action lookup failed", "error", lookupErr, "card_id", cardID)
+			http.Error(w, "Failed to find pending action", http.StatusInternalServerError)
+			return
+		}
+		if pendingAction == nil {
+			http.Error(w, "No pending action found for this card", http.StatusNotFound)
+			return
+		}
+		approvalResult, approveErr := h.agentActionService.ApproveAction(ctx, orgID, pendingAction.ID, userID)
+		if approveErr != nil {
+			slog.Error("feed: approve agent action failed", "error", approveErr, "action_id", pendingAction.ID)
+			http.Error(w, "Failed to approve action: "+approveErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Effect = "dismiss"
+		resp.Message = "Action approved"
+		if approvalResult.ExecutionError != "" {
+			resp.Message = "Approved, but execution had an error: " + approvalResult.ExecutionError
+		}
+
+	case "reject_agent_action":
+		if h.agentActionService == nil {
+			http.Error(w, "Agent actions not configured", http.StatusNotImplemented)
+			return
+		}
+		userID, parseErr := uuid.Parse(claims.UserID)
+		if parseErr != nil {
+			http.Error(w, "Invalid user ID", http.StatusInternalServerError)
+			return
+		}
+		pendingAction, lookupErr := h.agentActionService.GetPendingByCardID(ctx, orgID, cardID)
+		if lookupErr != nil {
+			slog.Error("feed: pending action lookup failed", "error", lookupErr, "card_id", cardID)
+			http.Error(w, "Failed to find pending action", http.StatusInternalServerError)
+			return
+		}
+		if pendingAction == nil {
+			http.Error(w, "No pending action found for this card", http.StatusNotFound)
+			return
+		}
+		reason := ""
+		if r, ok := req.Payload["reason"].(string); ok {
+			reason = r
+		}
+		if rejectErr := h.agentActionService.RejectAction(ctx, orgID, pendingAction.ID, userID, reason); rejectErr != nil {
+			slog.Error("feed: reject agent action failed", "error", rejectErr, "action_id", pendingAction.ID)
+			http.Error(w, "Failed to reject action: "+rejectErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Effect = "dismiss"
+		resp.Message = "Action rejected"
 
 	default:
 		slog.Info("feed: unhandled action", "action_id", req.ActionID, "card_id", req.CardID, "org_id", orgID)

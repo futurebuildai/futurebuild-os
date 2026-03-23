@@ -10,7 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/colton/futurebuild/internal/adapters"
 	"github.com/colton/futurebuild/internal/agents"
+	"github.com/colton/futurebuild/internal/agents/tools"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/futureshade"
 	"github.com/colton/futurebuild/internal/futureshade/gateway"
@@ -90,6 +92,37 @@ func main() {
 		directoryService, // Critical Blocker A
 	).WithFeedWriter(feedService) // V2 Feed: Write daily_briefing cards
 
+	// Agent action service for human-in-the-loop approval (worker needs this for approval cards)
+	agentActionService := service.NewAgentActionService(dbPool, feedService)
+
+	// Claude-powered reasoning layer (optional — graceful degradation to Gemini)
+	if cfg.AnthropicAPIKey != "" {
+		claudeModelMap := map[ai.ModelType]string{
+			ai.ModelTypeOpus: cfg.ClaudeModelID,
+		}
+		claudeClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, claudeModelMap)
+
+		// Build tool registry for autonomous agents
+		toolRegistry := tools.NewRegistry()
+		tools.RegisterScheduleTools(toolRegistry, scheduleService)
+		tools.RegisterProjectTools(toolRegistry, projectService, weatherService)
+		tools.RegisterCommunicationTools(toolRegistry, directoryService, notificationService)
+		tools.RegisterFeedTools(toolRegistry, feedService, agentActionService)
+
+		agentRunner := agents.NewAgentRunner(claudeClient, toolRegistry)
+
+		// Wire Claude reasoning to autonomous agents
+		dailyFocusAgent.WithClaudeRunner(agentRunner)
+
+		// Wire tool runner for executing approved agent actions
+		actionRunner := tools.NewActionRunnerAdapter(toolRegistry)
+		agentActionService.WithToolRunner(adapters.NewActionToolAdapter(actionRunner))
+
+		log.Printf("INFO: Claude-powered agents ENABLED (%d tools registered)", len(toolRegistry.Definitions()))
+	} else {
+		log.Println("INFO: Claude-powered agents DISABLED (set ANTHROPIC_API_KEY to enable, falling back to Gemini)")
+	}
+
 	// Procurement Agent for long-lead item monitoring
 	// See PRODUCTION_PLAN.md Step 46, 49
 	// Config Decoupling: Load ProcurementConfig from environment (defaults if not set)
@@ -123,11 +156,21 @@ func main() {
 	// Initialize Gateway Repository for execution logs
 	executionRepo := gateway.NewRepository(dbPool)
 
+	// Intelligence services for worker handlers (Features 1, 5, 6)
+	delayCascadeService := service.NewDelayCascadeService(dbPool, feedService)
+	calibrationService := service.NewCalibrationService(dbPool)
+	resourceConflictService := service.NewResourceConflictService(dbPool, feedService)
+
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler
 	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock).
 		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig).
-		WithDriftDetection(driftAgent)
+		WithDriftDetection(driftAgent).
+		WithAgentActionExpiry(agentActionService).
+		WithBriefingNotification(notificationService, directoryService).
+		WithDelayCascade(delayCascadeService).
+		WithCalibration(calibrationService).
+		WithResourceConflict(resourceConflictService)
 
 	// 7.5 Automated PR Review: Initialize GitHub service and Tribunal integration
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -171,6 +214,16 @@ func main() {
 		log.Fatalf("could not register drift detection cron: %v", err)
 	}
 
+	// Human-in-the-loop: Expire stale pending actions at 23:00 UTC daily
+	if _, err := scheduler.RegisterEntry("0 23 * * *", worker.NewExpireAgentActionsTask()); err != nil {
+		log.Fatalf("could not register expire agent actions cron: %v", err)
+	}
+
+	// Feature 6: Weekly cross-project resource conflict scan (Monday 08:00 UTC)
+	if _, err := scheduler.RegisterEntry("0 8 * * 1", worker.NewResourceConflictScanTask()); err != nil {
+		log.Fatalf("could not register resource conflict scan cron: %v", err)
+	}
+
 	// 9. Initialize Worker Server (The Processor)
 	// L7 Config: Use configured priorities. Default to 10 concurrency if not set (though config loader sets default)
 	concurrency := 10
@@ -196,6 +249,16 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeReviewPR, workerHandler.HandleReviewPR)
 	// V2 Phase 7: Passive drift detection
 	srv.RegisterHandlerFunc(worker.TypeDriftDetection, workerHandler.HandleDriftDetection)
+	// Human-in-the-loop: Expire stale pending agent actions
+	srv.RegisterHandlerFunc(worker.TypeExpireAgentActions, workerHandler.HandleExpireAgentActions)
+	// Feature 4: Daily briefing push notification
+	srv.RegisterHandlerFunc(worker.TypeDailyBriefingNotification, workerHandler.HandleDailyBriefingNotification)
+	// Feature 1: Predictive delay propagation
+	srv.RegisterHandlerFunc(worker.TypeDelayCascade, workerHandler.HandleDelayCascade)
+	// Feature 5: Calibrate org multipliers on project completion
+	srv.RegisterHandlerFunc(worker.TypeCalibrateOnCompletion, workerHandler.HandleCalibrateOnCompletion)
+	// Feature 6: Weekly resource conflict scan
+	srv.RegisterHandlerFunc(worker.TypeResourceConflictScan, workerHandler.HandleResourceConflictScan)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

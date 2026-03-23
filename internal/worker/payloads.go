@@ -18,6 +18,11 @@ const (
 	TypeSkillExecution          = "task:skill_execution" // FutureShade Action Bridge
 	TypeReviewPR                = "task:review_pr"       // Automated PR Review
 	TypeDriftDetection          = "task:drift_detection"  // V2 Phase 7: Passive drift detection
+	TypeExpireAgentActions      = "task:expire_agent_actions" // Human-in-the-loop: cleanup expired pending actions
+	TypeDailyBriefingNotification = "task:daily_briefing_notification" // Push notification after morning briefing
+	TypeDelayCascade            = "task:delay_cascade"       // Predictive delay propagation analysis
+	TypeCalibrateOnCompletion   = "task:calibrate_on_completion" // Calibrate org multipliers after project completion
+	TypeResourceConflictScan    = "task:resource_conflict_scan" // Weekly cross-project resource conflict detection
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -120,4 +125,76 @@ func NewReviewPRTask(payload ReviewPRPayload) (*asynq.Task, error) {
 // See FRONTEND_V2_SPEC.md §11.2
 func NewDriftDetectionTask() *asynq.Task {
 	return asynq.NewTask(TypeDriftDetection, nil)
+}
+
+// NewExpireAgentActionsTask creates a task for cleaning up expired pending actions.
+func NewExpireAgentActionsTask() *asynq.Task {
+	return asynq.NewTask(TypeExpireAgentActions, nil)
+}
+
+// DailyBriefingNotificationPayload contains notification data for morning briefing push.
+type DailyBriefingNotificationPayload struct {
+	ProjectID uuid.UUID `json:"project_id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	CardID    uuid.UUID `json:"card_id"`
+	Summary   string    `json:"summary"`
+}
+
+// NewDailyBriefingNotificationTask creates a task for sending morning briefing notifications.
+func NewDailyBriefingNotificationTask(projectID, orgID, cardID uuid.UUID, summary string) (*asynq.Task, error) {
+	payload, err := json.Marshal(DailyBriefingNotificationPayload{
+		ProjectID: projectID,
+		OrgID:     orgID,
+		CardID:    cardID,
+		Summary:   summary,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeDailyBriefingNotification, payload, asynq.Queue("default")), nil
+}
+
+// DelayCascadePayload contains data for delay propagation analysis.
+type DelayCascadePayload struct {
+	ProjectID uuid.UUID `json:"project_id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	TaskID    uuid.UUID `json:"task_id"`
+	SlipDays  int       `json:"slip_days"`
+}
+
+// NewDelayCascadeTask creates a task for delay cascade analysis.
+func NewDelayCascadeTask(projectID, orgID, taskID uuid.UUID, slipDays int) (*asynq.Task, error) {
+	payload, err := json.Marshal(DelayCascadePayload{
+		ProjectID: projectID,
+		OrgID:     orgID,
+		TaskID:    taskID,
+		SlipDays:  slipDays,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeDelayCascade, payload, asynq.Queue("default")), nil
+}
+
+// CalibrateOnCompletionPayload contains data for post-completion calibration.
+type CalibrateOnCompletionPayload struct {
+	ProjectID uuid.UUID `json:"project_id"`
+	OrgID     uuid.UUID `json:"org_id"`
+}
+
+// NewCalibrateOnCompletionTask creates a task for calibrating org multipliers after completion.
+func NewCalibrateOnCompletionTask(projectID, orgID uuid.UUID) (*asynq.Task, error) {
+	payload, err := json.Marshal(CalibrateOnCompletionPayload{
+		ProjectID: projectID,
+		OrgID:     orgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeCalibrateOnCompletion, payload, asynq.Queue("default")), nil
+}
+
+// NewResourceConflictScanTask creates a weekly task for cross-project resource conflict detection.
+func NewResourceConflictScanTask() *asynq.Task {
+	return asynq.NewTask(TypeResourceConflictScan, nil)
 }

@@ -38,9 +38,27 @@ type OnboardResponse struct {
 	ExtractedValues    map[string]any     `json:"extracted_values"`
 	ConfidenceScores   map[string]float64 `json:"confidence_scores"`
 	LongLeadItems      []LongLeadItem     `json:"long_lead_items,omitempty"`
+	MaterialEstimates  []MaterialEstimate `json:"material_estimates,omitempty"`
+	BudgetEstimate     *BudgetEstimate    `json:"budget_estimate,omitempty"`
 	ClarifyingQuestion string             `json:"clarifying_question,omitempty"`
 	ReadyToCreate      bool               `json:"ready_to_create"`
 	NextPriorityField  string             `json:"next_priority_field,omitempty"`
+	// Schedule preview: attached after P0 fields are captured
+	SchedulePreview    any                `json:"schedule_preview,omitempty"`
+	// Document region mapping: bounding boxes for extracted fields
+	DocumentRegions    []DocumentRegion   `json:"document_regions,omitempty"`
+}
+
+// DocumentRegion maps an extracted field to a bounding box in the source document.
+// Coordinates are normalized (0-1) relative to the page dimensions.
+type DocumentRegion struct {
+	Field      string  `json:"field"`
+	Page       int     `json:"page"`
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	Width      float64 `json:"width"`
+	Height     float64 `json:"height"`
+	Confidence float64 `json:"confidence"`
 }
 
 // OnboardingSession persists wizard state (optional for MVP).
@@ -61,6 +79,7 @@ type ExtractionResult struct {
 	Values        map[string]any     `json:"values"`
 	Confidence    map[string]float64 `json:"confidence"`
 	LongLeadItems []LongLeadItem     `json:"long_lead_items,omitempty"`
+	Regions       []DocumentRegion   `json:"regions,omitempty"`
 }
 
 // ConfidenceReport provides per-field confidence data so the frontend

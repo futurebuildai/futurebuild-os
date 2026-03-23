@@ -35,8 +35,9 @@ type ProcurementAgent struct {
 	notifier   NotificationEnqueuer
 	batchSize  int
 	config     config.ProcurementConfig // Config decoupling: tunable business rules
-	mutex      pkgsync.DistributedMutex // P0 Reliability Fix: Prevents duplicate execution across replicas
-	feedWriter FeedWriter               // V2: writes procurement cards to portfolio feed
+	mutex        pkgsync.DistributedMutex // P0 Reliability Fix: Prevents duplicate execution across replicas
+	feedWriter   FeedWriter               // V2: writes procurement cards to portfolio feed
+	claudeRunner *AgentRunner             // Claude reasoning for non-standard procurement situations
 }
 
 // DefaultBatchSize is the number of items to batch before flushing.
@@ -91,6 +92,12 @@ func (a *ProcurementAgent) WithBatchSize(size int) *ProcurementAgent {
 // WithFeedWriter sets the feed writer for V2 portfolio feed card generation.
 func (a *ProcurementAgent) WithFeedWriter(fw FeedWriter) *ProcurementAgent {
 	a.feedWriter = fw
+	return a
+}
+
+// WithClaudeRunner sets the AgentRunner for Claude-powered procurement reasoning.
+func (a *ProcurementAgent) WithClaudeRunner(runner *AgentRunner) *ProcurementAgent {
+	a.claudeRunner = runner
 	return a
 }
 
@@ -314,7 +321,11 @@ func (a *ProcurementAgent) flushBatch(ctx context.Context, batch []alertResult) 
 
 	// V2 Feed: Write procurement feed cards for notifiable items
 	if a.feedWriter != nil {
-		a.writeProcurementCards(ctx, resultsToLog)
+		if a.claudeRunner != nil {
+			a.writeProcurementCardsWithClaude(ctx, resultsToLog)
+		} else {
+			a.writeProcurementCards(ctx, resultsToLog)
+		}
 	}
 
 	slog.Debug("batch flushed", "count", len(batch))

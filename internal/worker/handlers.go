@@ -9,14 +9,47 @@ import (
 
 	"github.com/colton/futurebuild/internal/agents"
 	"github.com/colton/futurebuild/internal/futureshade"
+	"github.com/google/uuid"
 	"github.com/colton/futurebuild/internal/futureshade/gateway"
 	"github.com/colton/futurebuild/internal/futureshade/skills"
 	"github.com/colton/futurebuild/internal/futureshade/tribunal"
 	"github.com/colton/futurebuild/internal/service"
 	"github.com/colton/futurebuild/pkg/clock"
+	"github.com/colton/futurebuild/pkg/types"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// AgentActionExpirer expires stale pending actions. Satisfied by *service.AgentActionService.
+type AgentActionExpirer interface {
+	ExpireStaleActions(ctx context.Context) (int, error)
+}
+
+// NotificationServicer sends outbound notifications. Satisfied by notification service.
+type NotificationServicer interface {
+	SendEmail(to string, subject string, body string) error
+	SendSMS(contactID string, message string) error
+}
+
+// DirectoryServicer provides contact lookups. Satisfied by *service.DirectoryService.
+type DirectoryServicer interface {
+	GetProjectManager(ctx context.Context, projectID, orgID uuid.UUID) (*types.Contact, error)
+}
+
+// DelayCascadeServicer runs delay propagation analysis.
+type DelayCascadeServicer interface {
+	SimulateDelayCascade(ctx context.Context, projectID, orgID, taskID uuid.UUID, slipDays int) (*service.DelayCascade, error)
+}
+
+// CalibrationServicer runs calibration from completion.
+type CalibrationServicer interface {
+	CalibrateFromCompletion(ctx context.Context, projectID, orgID uuid.UUID) (int, error)
+}
+
+// ResourceConflictServicer detects cross-project resource conflicts.
+type ResourceConflictServicer interface {
+	DetectAndNotifyAll(ctx context.Context) error
+}
 
 type WorkerHandler struct {
 	focusAgent       *agents.DailyFocusAgent
@@ -33,6 +66,17 @@ type WorkerHandler struct {
 	tribunalRepo   *tribunal.Repository
 	// V2 Phase 7: Passive drift detection (optional - initialized via WithDriftDetection)
 	driftAgent *agents.DriftDetectionAgent
+	// Human-in-the-loop: agent action expiry (optional - initialized via WithAgentActionExpiry)
+	actionExpirer AgentActionExpirer
+	// Feature 4: Morning briefing push notifications
+	notificationService NotificationServicer
+	directoryService    DirectoryServicer
+	// Feature 1: Predictive delay propagation
+	delayCascadeService DelayCascadeServicer
+	// Feature 5: Learned duration intelligence
+	calibrationService CalibrationServicer
+	// Feature 6: Cross-project resource conflict detection
+	resourceConflictService ResourceConflictServicer
 }
 
 func NewWorkerHandler(focusAgent *agents.DailyFocusAgent, procurementAgent *agents.ProcurementAgent, db *pgxpool.Pool, clk clock.Clock) *WorkerHandler {
@@ -66,6 +110,37 @@ func (h *WorkerHandler) WithPRReview(githubService service.GitHubServicer, engin
 // See FRONTEND_V2_SPEC.md §11.2
 func (h *WorkerHandler) WithDriftDetection(agent *agents.DriftDetectionAgent) *WorkerHandler {
 	h.driftAgent = agent
+	return h
+}
+
+// WithAgentActionExpiry configures the handler for expiring stale pending actions.
+func (h *WorkerHandler) WithAgentActionExpiry(expirer AgentActionExpirer) *WorkerHandler {
+	h.actionExpirer = expirer
+	return h
+}
+
+// WithBriefingNotification configures handlers for morning briefing push notifications.
+func (h *WorkerHandler) WithBriefingNotification(notifSvc NotificationServicer, dirSvc DirectoryServicer) *WorkerHandler {
+	h.notificationService = notifSvc
+	h.directoryService = dirSvc
+	return h
+}
+
+// WithDelayCascade configures the handler for predictive delay propagation.
+func (h *WorkerHandler) WithDelayCascade(svc DelayCascadeServicer) *WorkerHandler {
+	h.delayCascadeService = svc
+	return h
+}
+
+// WithCalibration configures the handler for post-completion calibration.
+func (h *WorkerHandler) WithCalibration(svc CalibrationServicer) *WorkerHandler {
+	h.calibrationService = svc
+	return h
+}
+
+// WithResourceConflict configures the handler for cross-project resource conflict detection.
+func (h *WorkerHandler) WithResourceConflict(svc ResourceConflictServicer) *WorkerHandler {
+	h.resourceConflictService = svc
 	return h
 }
 
@@ -185,6 +260,22 @@ func (h *WorkerHandler) logNotification(ctx context.Context, payload Procurement
 	content := fmt.Sprintf("[PROCUREMENT ALERT] %s", payload.Message)
 	_, err := h.db.Exec(ctx, query, content, payload.Timestamp, payload.ItemID, payload.ItemID)
 	return err
+}
+
+// HandleExpireAgentActions cleans up expired pending agent actions.
+// Runs daily to mark stale pending actions as expired so they don't linger in the feed.
+func (h *WorkerHandler) HandleExpireAgentActions(ctx context.Context, task *asynq.Task) error {
+	if h.actionExpirer == nil {
+		slog.Warn("agent action expiry handler not configured, skipping")
+		return nil
+	}
+	slog.Info("Handling Expire Agent Actions Task...")
+	expired, err := h.actionExpirer.ExpireStaleActions(ctx)
+	if err != nil {
+		return fmt.Errorf("expire stale actions failed: %w", err)
+	}
+	slog.Info("Expire Agent Actions Task Completed", "expired_count", expired)
+	return nil
 }
 
 // HandleSkillExecution processes FutureShade skill execution tasks.
@@ -348,6 +439,135 @@ func (h *WorkerHandler) HandleReviewPR(ctx context.Context, task *asynq.Task) er
 	}
 
 	slog.Info("worker/review_pr: completed successfully", logArgs...)
+	return nil
+}
+
+// HandleDailyBriefingNotification sends a push notification to the PM after briefing generation.
+// Applies 24h dampening per project.
+func (h *WorkerHandler) HandleDailyBriefingNotification(ctx context.Context, task *asynq.Task) error {
+	if h.notificationService == nil {
+		slog.Warn("briefing notification handler not configured, skipping")
+		return nil
+	}
+
+	var payload DailyBriefingNotificationPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("invalid briefing notification payload: %w", err)
+	}
+
+	slog.Info("Handling Daily Briefing Notification", "project_id", payload.ProjectID)
+
+	// 24h dampening: check if notification already sent today
+	shouldSend, err := h.shouldSendBriefingNotification(ctx, payload.ProjectID)
+	if err != nil {
+		return fmt.Errorf("dampening check failed: %w", err)
+	}
+	if !shouldSend {
+		slog.Info("Briefing notification dampened (already sent within 24h)", "project_id", payload.ProjectID)
+		return nil
+	}
+
+	// Look up PM email
+	recipientEmail := ""
+	if h.directoryService != nil {
+		contact, lookupErr := h.directoryService.GetProjectManager(ctx, payload.ProjectID, payload.OrgID)
+		if lookupErr == nil && contact != nil {
+			recipientEmail = contact.Email
+		}
+	}
+	if recipientEmail == "" {
+		slog.Warn("No PM email found for briefing notification, skipping", "project_id", payload.ProjectID)
+		return nil
+	}
+
+	// Send email notification
+	subject := "Morning Briefing Ready"
+	body := fmt.Sprintf("Your daily briefing is ready.\n\n%s\n\nView full briefing in your FutureBuild feed.", payload.Summary)
+	if err := h.notificationService.SendEmail(recipientEmail, subject, body); err != nil {
+		return fmt.Errorf("send briefing notification: %w", err)
+	}
+
+	slog.Info("Briefing notification sent", "project_id", payload.ProjectID, "recipient", recipientEmail)
+	return nil
+}
+
+// shouldSendBriefingNotification checks if a briefing notification was already sent in the last 24h.
+func (h *WorkerHandler) shouldSendBriefingNotification(ctx context.Context, projectID uuid.UUID) (bool, error) {
+	query := `
+		SELECT COUNT(*) FROM communication_logs
+		WHERE related_entity_id = $1
+		  AND timestamp > NOW() - INTERVAL '24 hours'
+		  AND direction = 'Outbound'
+		  AND related_entity_type = 'daily_briefing'
+	`
+	var count int
+	err := h.db.QueryRow(ctx, query, projectID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
+// HandleDelayCascade runs predictive delay propagation analysis.
+func (h *WorkerHandler) HandleDelayCascade(ctx context.Context, task *asynq.Task) error {
+	if h.delayCascadeService == nil {
+		slog.Warn("delay cascade handler not configured, skipping")
+		return nil
+	}
+
+	var payload DelayCascadePayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("invalid delay cascade payload: %w", err)
+	}
+
+	slog.Info("Handling Delay Cascade", "project_id", payload.ProjectID, "task_id", payload.TaskID, "slip_days", payload.SlipDays)
+
+	_, err := h.delayCascadeService.SimulateDelayCascade(ctx, payload.ProjectID, payload.OrgID, payload.TaskID, payload.SlipDays)
+	if err != nil {
+		return fmt.Errorf("delay cascade analysis failed: %w", err)
+	}
+
+	slog.Info("Delay Cascade completed", "project_id", payload.ProjectID)
+	return nil
+}
+
+// HandleCalibrateOnCompletion runs calibration after project completion.
+func (h *WorkerHandler) HandleCalibrateOnCompletion(ctx context.Context, task *asynq.Task) error {
+	if h.calibrationService == nil {
+		slog.Warn("calibration handler not configured, skipping")
+		return nil
+	}
+
+	var payload CalibrateOnCompletionPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("invalid calibration payload: %w", err)
+	}
+
+	slog.Info("Handling Calibration on Completion", "project_id", payload.ProjectID)
+
+	count, err := h.calibrationService.CalibrateFromCompletion(ctx, payload.ProjectID, payload.OrgID)
+	if err != nil {
+		return fmt.Errorf("calibration failed: %w", err)
+	}
+
+	slog.Info("Calibration completed", "project_id", payload.ProjectID, "entries", count)
+	return nil
+}
+
+// HandleResourceConflictScan runs weekly cross-project resource conflict detection.
+func (h *WorkerHandler) HandleResourceConflictScan(ctx context.Context, task *asynq.Task) error {
+	if h.resourceConflictService == nil {
+		slog.Warn("resource conflict handler not configured, skipping")
+		return nil
+	}
+
+	slog.Info("Handling Resource Conflict Scan...")
+
+	if err := h.resourceConflictService.DetectAndNotifyAll(ctx); err != nil {
+		return fmt.Errorf("resource conflict scan failed: %w", err)
+	}
+
+	slog.Info("Resource Conflict Scan completed")
 	return nil
 }
 

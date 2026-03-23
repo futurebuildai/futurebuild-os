@@ -23,8 +23,10 @@ import (
 // InterrogatorService implements the onboarding agent that extracts project data
 // from user conversations and documents.
 type InterrogatorService struct {
-	aiClient ai.Client
-	logger   audit.AgentLogger
+	aiClient        ai.Client
+	logger          audit.AgentLogger
+	materialService *MaterialService
+	budgetService   *BudgetService
 }
 
 // NewInterrogatorService creates a new interrogator service.
@@ -33,6 +35,18 @@ func NewInterrogatorService(aiClient ai.Client, logger audit.AgentLogger) *Inter
 		aiClient: aiClient,
 		logger:   logger,
 	}
+}
+
+// WithMaterialService injects the material service for blueprint material extraction.
+func (s *InterrogatorService) WithMaterialService(ms *MaterialService) *InterrogatorService {
+	s.materialService = ms
+	return s
+}
+
+// WithBudgetService injects the budget service for onboarding budget estimates.
+func (s *InterrogatorService) WithBudgetService(bs *BudgetService) *InterrogatorService {
+	s.budgetService = bs
+	return s
 }
 
 // ProcessMessage handles a single turn of the onboarding conversation.
@@ -103,6 +117,11 @@ func (s *InterrogatorService) ProcessMessage(
 		// Include long-lead items in response
 		resp.LongLeadItems = extraction.LongLeadItems
 
+		// Include document regions for PDF overlay highlighting
+		if len(extraction.Regions) > 0 {
+			resp.DocumentRegions = extraction.Regions
+		}
+
 		// Generate a summary message with procurement warnings
 		resp.Reply = s.generateExtractionSummary(extraction)
 	}
@@ -133,6 +152,25 @@ func (s *InterrogatorService) ProcessMessage(
 
 	// Merge with existing state
 	mergedState := s.mergeStates(req.CurrentState, resp.ExtractedValues)
+
+	// Material extraction + budget estimation (runs when we have enough attributes)
+	if s.materialService != nil && s.budgetService != nil {
+		materialEstimates := s.estimateMaterials(ctx, req, mergedState)
+		if len(materialEstimates) > 0 {
+			resp.MaterialEstimates = materialEstimates
+
+			// Compute budget estimate from materials
+			gsf := floatFromState(mergedState, "square_footage")
+			foundation := stringFromState(mergedState, "foundation_type", "slab")
+			stories := intFromState(mergedState, "stories", 1)
+			multiplier := 1.0
+
+			budgetEstimate := s.budgetService.ComputeBudgetEstimate(
+				materialEstimates, gsf, foundation, stories, multiplier,
+			)
+			resp.BudgetEstimate = budgetEstimate
+		}
+	}
 
 	// Check if ready to create (name + address are required)
 	resp.ReadyToCreate = s.checkReadyToCreate(mergedState)
@@ -231,61 +269,24 @@ func (s *InterrogatorService) extractFromDocument(
 
 	// Parse JSON response from Gemini
 	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
-	var extraction struct {
-		Name           string  `json:"name"`
-		Address        string  `json:"address"`
-		SquareFootage  float64 `json:"square_footage"`
-		FoundationType string  `json:"foundation_type"`
-		Stories        int     `json:"stories"`
-		Bedrooms       int     `json:"bedrooms"`
-		Bathrooms      int     `json:"bathrooms"`
-		LongLeadItems  []struct {
-			Name     string `json:"name"`
-			Brand    string `json:"brand"`
-			Model    string `json:"model"`
-			Category string `json:"category"`
-			Notes    string `json:"notes"`
-		} `json:"long_lead_items"`
-		Confidence map[string]float64 `json:"confidence"`
+	extraction, regions := parseExtractionResponse(result.Text)
+	if extraction == nil {
+		return nil, fmt.Errorf("failed to parse extraction result")
 	}
 
-	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
-		return nil, fmt.Errorf("failed to parse extraction result: %w", err)
-	}
-
-	values := make(map[string]any)
-	if extraction.Name != "" {
-		values["name"] = extraction.Name
-	}
-	if extraction.Address != "" {
-		values["address"] = extraction.Address
-	}
-	if extraction.SquareFootage > 0 {
-		values["square_footage"] = extraction.SquareFootage
-	}
-	if extraction.FoundationType != "" {
-		values["foundation_type"] = extraction.FoundationType
-	}
-	if extraction.Stories > 0 {
-		values["stories"] = extraction.Stories
-	}
-	if extraction.Bedrooms > 0 {
-		values["bedrooms"] = extraction.Bedrooms
-	}
-	if extraction.Bathrooms > 0 {
-		values["bathrooms"] = extraction.Bathrooms
-	}
-
-	// Convert extracted long-lead items with lead time estimates
+	values := extractionToValues(extraction)
 	longLeadItems := s.enrichLongLeadItems(extraction.LongLeadItems)
 
-	return &models.ExtractionResult{
+	result2 := &models.ExtractionResult{
 		DocumentURL:   documentURL,
 		ExtractedAt:   time.Now(),
 		Values:        values,
 		Confidence:    extraction.Confidence,
 		LongLeadItems: longLeadItems,
-	}, nil
+	}
+	result2.Regions = regions
+
+	return result2, nil
 }
 
 // extractFromBytes uses Vision API to extract data from inline file bytes.
@@ -317,30 +318,86 @@ func (s *InterrogatorService) extractFromBytes(
 		return nil, fmt.Errorf("AI extraction failed: %w", err)
 	}
 
-	// Parse JSON response from Gemini (same structure as extractFromDocument)
-	// C2 Fix: Use square_footage (matches frontend CreateProjectRequest)
-	var extraction struct {
-		Name           string  `json:"name"`
-		Address        string  `json:"address"`
-		SquareFootage  float64 `json:"square_footage"`
-		FoundationType string  `json:"foundation_type"`
-		Stories        int     `json:"stories"`
-		Bedrooms       int     `json:"bedrooms"`
-		Bathrooms      int     `json:"bathrooms"`
-		LongLeadItems  []struct {
-			Name     string `json:"name"`
-			Brand    string `json:"brand"`
-			Model    string `json:"model"`
-			Category string `json:"category"`
-			Notes    string `json:"notes"`
-		} `json:"long_lead_items"`
-		Confidence map[string]float64 `json:"confidence"`
+	extraction, regions := parseExtractionResponse(result.Text)
+	if extraction == nil {
+		return nil, fmt.Errorf("failed to parse extraction result")
 	}
 
-	if err := json.Unmarshal([]byte(result.Text), &extraction); err != nil {
-		return nil, fmt.Errorf("failed to parse extraction result: %w", err)
+	values := extractionToValues(extraction)
+	longLeadItems := s.enrichLongLeadItems(extraction.LongLeadItems)
+
+	result2 := &models.ExtractionResult{
+		DocumentURL:   fmt.Sprintf("inline:%s", fileName),
+		ExtractedAt:   time.Now(),
+		Values:        values,
+		Confidence:    extraction.Confidence,
+		LongLeadItems: longLeadItems,
+	}
+	result2.Regions = regions
+
+	return result2, nil
+}
+
+// blueprintExtraction holds the parsed AI extraction response.
+type blueprintExtraction struct {
+	Name           string  `json:"name"`
+	Address        string  `json:"address"`
+	SquareFootage  float64 `json:"square_footage"`
+	FoundationType string  `json:"foundation_type"`
+	Stories        int     `json:"stories"`
+	Bedrooms       int     `json:"bedrooms"`
+	Bathrooms      int     `json:"bathrooms"`
+	LongLeadItems  []struct {
+		Name     string `json:"name"`
+		Brand    string `json:"brand"`
+		Model    string `json:"model"`
+		Category string `json:"category"`
+		Notes    string `json:"notes"`
+	} `json:"long_lead_items"`
+	Confidence map[string]float64 `json:"confidence"`
+	Regions    []struct {
+		Field  string  `json:"field"`
+		Page   int     `json:"page"`
+		X      float64 `json:"x"`
+		Y      float64 `json:"y"`
+		Width  float64 `json:"width"`
+		Height float64 `json:"height"`
+	} `json:"regions"`
+}
+
+// parseExtractionResponse parses the AI JSON response and extracts document regions.
+func parseExtractionResponse(text string) (*blueprintExtraction, []models.DocumentRegion) {
+	jsonText := stripMarkdownCodeBlock(text)
+
+	var extraction blueprintExtraction
+	if err := json.Unmarshal([]byte(jsonText), &extraction); err != nil {
+		slog.Warn("extraction_parse_failed", "error", err.Error())
+		return nil, nil
 	}
 
+	// Convert raw regions to DocumentRegion models
+	var regions []models.DocumentRegion
+	for _, r := range extraction.Regions {
+		conf := 0.0
+		if c, ok := extraction.Confidence[r.Field]; ok {
+			conf = c
+		}
+		regions = append(regions, models.DocumentRegion{
+			Field:      r.Field,
+			Page:       r.Page,
+			X:          r.X,
+			Y:          r.Y,
+			Width:      r.Width,
+			Height:     r.Height,
+			Confidence: conf,
+		})
+	}
+
+	return &extraction, regions
+}
+
+// extractionToValues converts a blueprintExtraction to a map of field values.
+func extractionToValues(extraction *blueprintExtraction) map[string]any {
 	values := make(map[string]any)
 	if extraction.Name != "" {
 		values["name"] = extraction.Name
@@ -363,17 +420,7 @@ func (s *InterrogatorService) extractFromBytes(
 	if extraction.Bathrooms > 0 {
 		values["bathrooms"] = extraction.Bathrooms
 	}
-
-	// Convert extracted long-lead items with lead time estimates
-	longLeadItems := s.enrichLongLeadItems(extraction.LongLeadItems)
-
-	return &models.ExtractionResult{
-		DocumentURL:   fmt.Sprintf("inline:%s", fileName),
-		ExtractedAt:   time.Now(),
-		Values:        values,
-		Confidence:    extraction.Confidence,
-		LongLeadItems: longLeadItems,
-	}, nil
+	return values
 }
 
 // parseUserMessage extracts structured data from natural language.
@@ -487,12 +534,12 @@ func (s *InterrogatorService) generateExtractionSummary(extraction *models.Extra
 	if foundation, ok := extraction.Values["foundation_type"].(string); ok && foundation != "" {
 		sb.WriteString(fmt.Sprintf("**Foundation**: %s\n", strings.Title(foundation)))
 	}
-	if stories, ok := extraction.Values["stories"].(int); ok && stories > 0 {
-		sb.WriteString(fmt.Sprintf("**Stories**: %d\n", stories))
+	if stories, ok := extraction.Values["stories"].(float64); ok && stories > 0 {
+		sb.WriteString(fmt.Sprintf("**Stories**: %d\n", int(stories)))
 	}
-	if bed, ok := extraction.Values["bedrooms"].(int); ok && bed > 0 {
-		if bath, ok := extraction.Values["bathrooms"].(int); ok && bath > 0 {
-			sb.WriteString(fmt.Sprintf("**%d bed / %d bath**\n", bed, bath))
+	if bed, ok := extraction.Values["bedrooms"].(float64); ok && bed > 0 {
+		if bath, ok := extraction.Values["bathrooms"].(float64); ok && bath > 0 {
+			sb.WriteString(fmt.Sprintf("**%d bed / %d bath**\n", int(bed), int(bath)))
 		}
 	}
 
@@ -710,6 +757,100 @@ func estimateLeadTime(brand, category string, leadTimes map[string]int) int {
 	}
 
 	return 4 // Default fallback
+}
+
+// estimateMaterials runs material extraction based on available data.
+// If blueprint data is available, runs AI second-pass extraction.
+// Otherwise, uses formula-based estimation from project attributes.
+func (s *InterrogatorService) estimateMaterials(
+	ctx context.Context,
+	req *models.OnboardRequest,
+	state map[string]interface{},
+) []models.MaterialEstimate {
+	// Try AI extraction if we have document data (second pass)
+	if len(req.DocumentData) > 0 && req.DocumentContentType != "" {
+		estimates, err := s.materialService.ExtractMaterials(ctx, req.DocumentData, req.DocumentContentType)
+		if err != nil {
+			slog.Warn("material_extraction_failed_falling_back",
+				"error", err.Error(),
+			)
+			// Fall through to formula-based estimation
+		} else if len(estimates) > 0 {
+			return estimates
+		}
+	}
+
+	// Formula-based fallback: estimate from project attributes
+	gsf := floatFromState(state, "square_footage")
+	if gsf <= 0 {
+		return nil // Need at least square footage to estimate
+	}
+
+	stories := intFromState(state, "stories", 1)
+	foundation := stringFromState(state, "foundation_type", "slab")
+	bedrooms := intFromState(state, "bedrooms", 3)
+	bathrooms := intFromState(state, "bathrooms", 2)
+
+	estimates, err := s.materialService.EstimateFromProjectAttributes(
+		ctx, gsf, stories, foundation, bedrooms, bathrooms, "",
+	)
+	if err != nil {
+		slog.Warn("material_estimation_failed",
+			"error", err.Error(),
+			"gsf", gsf,
+		)
+		return nil
+	}
+
+	return estimates
+}
+
+// floatFromState extracts a float64 from the merged state map.
+func floatFromState(state map[string]interface{}, key string) float64 {
+	v, ok := state[key]
+	if !ok {
+		return 0
+	}
+	switch val := v.(type) {
+	case float64:
+		return val
+	case int:
+		return float64(val)
+	case json.Number:
+		f, _ := val.Float64()
+		return f
+	}
+	return 0
+}
+
+// intFromState extracts an int from the merged state map with a default.
+func intFromState(state map[string]interface{}, key string, defaultVal int) int {
+	v, ok := state[key]
+	if !ok {
+		return defaultVal
+	}
+	switch val := v.(type) {
+	case float64:
+		return int(val)
+	case int:
+		return val
+	case json.Number:
+		i, _ := val.Int64()
+		return int(i)
+	}
+	return defaultVal
+}
+
+// stringFromState extracts a string from the merged state map with a default.
+func stringFromState(state map[string]interface{}, key string, defaultVal string) string {
+	v, ok := state[key]
+	if !ok {
+		return defaultVal
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return defaultVal
 }
 
 // categoryToWBS maps long-lead item categories to their typical WBS codes.

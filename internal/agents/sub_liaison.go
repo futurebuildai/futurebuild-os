@@ -30,11 +30,12 @@ var (
 // See PRODUCTION_PLAN.md Step 47
 // Refactored for deterministic simulation: PRODUCTION_PLAN.md Step 49
 type SubLiaisonAgent struct {
-	db         *pgxpool.Pool
-	directory  DirectoryService
-	notifier   NotificationService
-	clock      clock.Clock
-	feedWriter FeedWriter // V2: writes sub_confirmation/sub_unconfirmed cards
+	db           *pgxpool.Pool
+	directory    DirectoryService
+	notifier     NotificationService
+	clock        clock.Clock
+	feedWriter   FeedWriter   // V2: writes sub_confirmation/sub_unconfirmed cards
+	claudeRunner *AgentRunner // Claude reasoning for nuanced SMS understanding
 }
 
 // DirectoryService defines contact lookup operations.
@@ -59,6 +60,12 @@ func NewSubLiaisonAgent(db *pgxpool.Pool, directory DirectoryService, notifier N
 		notifier:  notifier,
 		clock:     clk,
 	}
+}
+
+// WithClaudeRunner sets the AgentRunner for Claude-powered message understanding.
+func (a *SubLiaisonAgent) WithClaudeRunner(runner *AgentRunner) *SubLiaisonAgent {
+	a.claudeRunner = runner
+	return a
 }
 
 // WithFeedWriter sets the feed writer for V2 portfolio feed card generation.

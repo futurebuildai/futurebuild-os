@@ -31,12 +31,15 @@ func (s InvoiceStatus) IsEditable() bool {
 // See DATA_SPINE_SPEC.md Section 4.1
 // MONETARY PRECISION: All amounts stored as int64 cents to prevent IEEE 754 float drift.
 type ProjectBudget struct {
-	ID                   uuid.UUID `json:"id" db:"id"`
-	ProjectID            uuid.UUID `json:"project_id" db:"project_id"`
-	WBSPhaseID           string    `json:"wbs_phase_id" db:"wbs_phase_id"`
-	EstimatedAmountCents int64     `json:"estimated_amount_cents" db:"estimated_amount_cents"`
-	CommittedAmountCents int64     `json:"committed_amount_cents" db:"committed_amount_cents"`
-	ActualAmountCents    int64     `json:"actual_amount_cents" db:"actual_amount_cents"`
+	ID                   uuid.UUID      `json:"id" db:"id"`
+	ProjectID            uuid.UUID      `json:"project_id" db:"project_id"`
+	WBSPhaseID           string         `json:"wbs_phase_id" db:"wbs_phase_id"`
+	EstimatedAmountCents int64          `json:"estimated_amount_cents" db:"estimated_amount_cents"`
+	CommittedAmountCents int64          `json:"committed_amount_cents" db:"committed_amount_cents"`
+	ActualAmountCents    int64          `json:"actual_amount_cents" db:"actual_amount_cents"`
+	Source               MaterialSource `json:"source,omitempty" db:"source"`
+	Confidence           float64        `json:"confidence,omitempty" db:"confidence"`
+	IsLocked             bool           `json:"is_locked" db:"is_locked"`
 }
 
 // LineItem represents a single entry in an invoice.

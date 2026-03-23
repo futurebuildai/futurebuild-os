@@ -28,6 +28,16 @@ Look for specific brands, models, and specifications for items that typically ha
 - Custom millwork: Cabinetry notes, specialty woodwork
 - Special finishes: Stone, tile with specific sourcing
 
+DOCUMENT REGION MAPPING:
+For each extracted field, identify where on the document you found it.
+Provide a bounding box with normalized coordinates (0.0 to 1.0) relative to page dimensions:
+- page: page number (1-based)
+- x: left edge of region (0.0 = left, 1.0 = right)
+- y: top edge of region (0.0 = top, 1.0 = bottom)
+- width: width of region (0.0 to 1.0)
+- height: height of region (0.0 to 1.0)
+Only include regions for fields you can locate on the document. Skip regions for inferred values.
+
 RESPOND IN JSON FORMAT ONLY:
 {
   "name": "string or null",
@@ -54,12 +64,23 @@ RESPOND IN JSON FORMAT ONLY:
     "stories": 0.0-1.0,
     "bedrooms": 0.0-1.0,
     "bathrooms": 0.0-1.0
-  }
+  },
+  "regions": [
+    {
+      "field": "field_name",
+      "page": 1,
+      "x": 0.0,
+      "y": 0.0,
+      "width": 0.1,
+      "height": 0.05
+    }
+  ]
 }
 
 For fields you cannot determine, use null and set confidence to 0.
 For fields you're uncertain about, set confidence between 0.5-0.8.
-Return an empty array for long_lead_items if none are found.`
+Return an empty array for long_lead_items if none are found.
+Return an empty array for regions if no document locations can be identified.`
 }
 
 // MessageParsingPrompt returns the prompt for natural language parsing.
@@ -117,6 +138,55 @@ func ClarifyingQuestionPrompt(field string, extractedValue any, confidence float
 		return fmt.Sprintf(template, extractedValue)
 	}
 	return ""
+}
+
+// MaterialExtractionPrompt returns the prompt for second-pass material/quantity extraction.
+// Called after BlueprintExtractionPrompt succeeds, focuses on extracting detailed
+// material lists with quantities, specifications, and WBS phase mapping.
+func MaterialExtractionPrompt() string {
+	return `You are a construction estimator performing a material takeoff from architectural plans.
+Extract every identifiable material, product, or equipment item with quantities where possible.
+
+For each material, provide:
+- name: Descriptive material name (e.g., "2×6 SPF Wall Studs", "R-38 Blown Fiberglass Insulation")
+- category: One of: structural, framing, roofing, siding, insulation, drywall, flooring, plumbing, electrical, hvac, millwork, finishes, fixtures, appliances
+- wbs_phase_code: WBS phase (7.x=Site Prep, 8.x=Foundation, 9.x=Framing, 10.x=Rough-Ins, 11.x=Insulation/Drywall, 12.x=Interior Finishes, 13.x=Exterior, 14.x=Commissioning)
+- quantity: Estimated quantity as a number. Use your best estimate from dimensions shown. Use null if truly indeterminate.
+- unit: Unit of measure (sqft, lf, ea, cy, bf, gal, bundle, sheet, roll, ton, lb)
+- brand: Brand name if specified on plans (e.g., "Marvin", "Carrier")
+- model: Model number if specified
+- notes: Relevant specifications (size, gauge, rating, finish)
+- confidence: 0.0-1.0 confidence in this extraction
+
+EXTRACTION PRIORITIES:
+1. Items explicitly called out in schedules/specifications on the plans
+2. Items identifiable from dimensions (e.g., concrete volume from slab dimensions)
+3. Items implied by room counts and fixture schedules
+4. Standard items that can be estimated from plan dimensions
+
+QUANTITY CALCULATION TIPS:
+- Concrete: Calculate from dimensions shown (L×W×D / 27 for cubic yards)
+- Framing lumber: Count studs at 16" OC or 24" OC from wall lengths
+- Drywall: Calculate from wall heights and room perimeters
+- Roofing: Calculate from roof plan dimensions + pitch factor
+- Windows/Doors: Count from schedules or elevations
+
+RESPOND IN JSON FORMAT ONLY:
+{
+  "materials": [
+    {
+      "name": "material description with specs",
+      "category": "category",
+      "wbs_phase_code": "8.x",
+      "quantity": 42.0,
+      "unit": "cy",
+      "brand": "brand or null",
+      "model": "model or null",
+      "notes": "4000 PSI, pump mix",
+      "confidence": 0.75
+    }
+  ]
+}`
 }
 
 // LongLeadItemsPrompt returns the prompt for extracting procurement items with lead times.

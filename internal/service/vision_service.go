@@ -400,3 +400,56 @@ func (s *VisionService) downloadImage(ctx context.Context, url string) ([]byte, 
 
 	return data, mimeType, nil
 }
+
+// ProgressClassification is the result of classifying a construction progress photo.
+type ProgressClassification struct {
+	DetectedPhase    string   `json:"detected_phase"`
+	WBSCode          string   `json:"wbs_code"`
+	Confidence       float64  `json:"confidence"`
+	VisibleElements  []string `json:"visible_elements"`
+	EstimatedPercent int      `json:"estimated_percent"`
+	Recommendations  []string `json:"recommendations"`
+}
+
+// ClassifyProgressPhoto analyzes a construction site photo and classifies it
+// to a WBS phase with an estimated completion percentage.
+func (s *VisionService) ClassifyProgressPhoto(ctx context.Context, imageBytes []byte, mimeType string) (*ProgressClassification, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("vision client not configured")
+	}
+
+	resp, err := s.client.GenerateContent(ctx, ai.GenerateRequest{
+		Model: ai.ModelTypeFlash,
+		Parts: []ai.ContentPart{
+			{Text: prompts.ProgressPhotoClassificationPrompt},
+			{Data: imageBytes, MimeType: mimeType},
+		},
+		Temperature: 0.2,
+		MaxTokens:   1024,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("vision classify: %w", err)
+	}
+
+	if resp.Text == "" {
+		return nil, fmt.Errorf("empty response from vision model")
+	}
+
+	// Parse structured JSON response
+	var classification ProgressClassification
+	text := resp.Text
+	// Strip markdown code fences if present
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+
+	if err := json.Unmarshal([]byte(text), &classification); err != nil {
+		slog.Warn("vision classify: failed to parse structured response, attempting best-effort",
+			"raw", text, "error", err)
+		return nil, fmt.Errorf("parse classification response: %w", err)
+	}
+
+	return &classification, nil
+}
+

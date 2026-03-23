@@ -8,6 +8,7 @@ import (
 
 	"github.com/colton/futurebuild/internal/adapters"
 	"github.com/colton/futurebuild/internal/agents"
+	"github.com/colton/futurebuild/internal/agents/tools"
 	"github.com/colton/futurebuild/internal/api/handlers"
 	"github.com/colton/futurebuild/internal/audit"
 	"github.com/colton/futurebuild/internal/auth"
@@ -59,9 +60,18 @@ type Server struct {
 	CompletionHandler      *handlers.CompletionHandler      // Project Completion: complete + report
 	ReadinessHandler       *handlers.ReadinessHandler       // Integration readiness checks
 	FeedHandler            *handlers.FeedHandler            // V2: Portfolio feed endpoint
+	AgentHandler           *handlers.AgentHandler           // Agent pending actions
+	AgentConfigHandler     *handlers.AgentConfigHandler     // Agent settings admin UI
+	BrainSettingsHandler   *handlers.BrainSettingsHandler   // FB-Brain connection settings
+	MaterialHandler        *handlers.MaterialHandler        // Material extraction + CRUD
+	BudgetHandler          *handlers.BudgetHandler          // Budget seeding + financial summaries
 	ContactHandler         *handlers.ContactHandler         // V2: Contact CRUD + assignments
 	VisionHandler          *handlers.VisionHandler          // Sprint 2.1: Vision Pipeline extract endpoint
 	IntegrationHandler     *handlers.IntegrationHandler     // FB-Brain integration webhook receiver
+	PreviewHandler         *handlers.PreviewHandler         // Schedule preview + scenario comparison
+	StreamChatHandler      *handlers.StreamChatHandler      // Feature 3: Streaming chat SSE
+	ProgressPhotoHandler   *handlers.ProgressPhotoHandler   // Feature 10: Photo progress verification
+	PolicyHandler          *handlers.PolicyHandler          // Feature 8: Autopilot policy engine
 	AuthMiddleware         *middleware.AuthMiddleware
 	DevAuthMiddleware      *middleware.DevAuthMiddleware // Dev-only auth bypass for integration demos
 	PortalRateLimiter      *middleware.IPRateLimiter     // Phase 12: Rate limiter for portal auth endpoints
@@ -129,7 +139,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		chat.DefaultCircuitBreakerConfig().FailureThreshold,
 		chat.DefaultCircuitBreakerConfig().OpenTimeout)
 
-	chatOrchestrator, err := chat.NewOrchestrator(
+	// Regex-based orchestrator (always available as fallback)
+	regexOrch, err := chat.NewOrchestrator(
 		messageStore, scheduleService, scheduleService, invoiceService, dlq,
 		wal,
 		circuitBreaker,
@@ -137,7 +148,10 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	if err != nil {
 		panic(fmt.Sprintf("CRITICAL: Failed to initialize Chat Orchestrator: %v", err))
 	}
-	chatHandler := handlers.NewChatHandler(chatOrchestrator)
+
+	// Chat handler initialized with regex orchestrator by default.
+	// Upgraded to Claude orchestrator after notificationService/feedService are ready (see below).
+	chatHandler := handlers.NewChatHandler(regexOrch)
 
 	// Initialize notification service based on environment.
 	// Provider selection controlled by NOTIFICATION_PROVIDER env var:
@@ -174,11 +188,65 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		visionHandler = handlers.NewVisionHandler(visionService, db) // Sprint 2.1: Vision Pipeline
 	}
 
+	// Material extraction and budget planning services
+	materialService := service.NewMaterialService(db, aiClient, cfg)
+	budgetService := service.NewBudgetService(db, cfg)
+	materialHandler := handlers.NewMaterialHandler(materialService)
+	budgetHandler := handlers.NewBudgetHandler(budgetService, materialService)
+
 	// V2: Portfolio feed service (created early for agent injection)
 	feedService := service.NewFeedService(db)
 
+	// Agent action service for human-in-the-loop approval system
+	agentActionService := service.NewAgentActionService(db, feedService)
+
 	// Wire feedService into ProjectHandler for setup_team card generation
 	projectHandler.WithFeedService(feedService)
+
+	// New intelligence services (Features 1, 5, 6, 8)
+	delayCascadeService := service.NewDelayCascadeService(db, feedService)
+	calibrationService := service.NewCalibrationService(db)
+	resourceConflictService := service.NewResourceConflictService(db, feedService)
+	policyEngine := service.NewPolicyEngine(db)
+	_ = resourceConflictService // Used by worker; available here for future API endpoints
+
+	// Wire calibration into schedule services (Feature 5)
+	scheduleService.WithCalibration(calibrationService)
+	// previewService.WithCalibration wired after previewService is created (below)
+
+	// Policy handler (Feature 8)
+	policyHandler := handlers.NewPolicyHandler(policyEngine)
+
+	// Progress photo handler (Feature 10)
+	var progressPhotoHandler *handlers.ProgressPhotoHandler
+	if aiClient != nil {
+		agentLogger := audit.NewPgxAgentLogger(db)
+		visionSvc := service.NewVisionService(aiClient, agentLogger)
+		progressPhotoHandler = handlers.NewProgressPhotoHandler(visionSvc, feedService)
+	}
+
+	// Streaming chat handler (Feature 3) — initialized after Claude orchestrator
+	var streamChatHandler *handlers.StreamChatHandler
+
+	// Upgrade to Claude-powered orchestrator if API key is configured.
+	// Must happen after notificationService and feedService are initialized.
+	if cfg.AnthropicAPIKey != "" {
+		claudeOrch, toolRegistry := initClaudeOrchestrator(cfg, db, messageStore, scheduleService, projectService, directoryService, notificationService, feedService, agentActionService, threadService, budgetService, delayCascadeService, policyEngine)
+		chatHandler = handlers.NewChatHandler(claudeOrch)
+
+		// Wire streaming runner (Feature 3)
+		claudeModelMap := map[ai.ModelType]string{ai.ModelTypeOpus: cfg.ClaudeModelID}
+		claudeStreamClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, claudeModelMap)
+		streamRunner := agents.NewStreamAgentRunner(claudeStreamClient, toolRegistry)
+		claudeOrch.WithStreamRunner(streamRunner)
+		streamChatHandler = handlers.NewStreamChatHandler(claudeOrch)
+
+		// Wire tool runner for executing approved agent actions
+		actionRunner := tools.NewActionRunnerAdapter(toolRegistry)
+		agentActionService.WithToolRunner(adapters.NewActionToolAdapter(actionRunner))
+
+		fmt.Println("Chat: Upgraded to Claude-powered orchestrator (Opus 4.6)")
+	}
 
 	inboundProcessor := agents.NewInboundProcessor(
 		db,
@@ -254,6 +322,18 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 
 	// V2: Portfolio feed handler (feedService created earlier for agent injection)
 	feedHandler := handlers.NewFeedHandler(feedService)
+	feedHandler.WithAgentActionService(agentActionService)
+
+	// Agent pending actions handler
+	agentHandler := handlers.NewAgentHandler(agentActionService)
+
+	// Agent settings admin UI
+	agentConfigService := service.NewAgentConfigService(db)
+	agentConfigHandler := handlers.NewAgentConfigHandler(agentConfigService)
+
+	// FB-Brain connection settings
+	brainConnectionService := service.NewBrainConnectionService(db)
+	brainSettingsHandler := handlers.NewBrainSettingsHandler(brainConnectionService)
 
 	// V2: Contact CRUD + project phase assignments
 	contactHandler := handlers.NewContactHandler(db)
@@ -276,6 +356,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		readiness.NewS3Probe(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey),
 	}
 
+	// Add Anthropic probe if API key is configured
+	if cfg.AnthropicAPIKey != "" {
+		readinessCheckers = append(readinessCheckers, readiness.NewAnthropicProbe(cfg.AnthropicAPIKey))
+	}
+
 	// Add notification probes based on provider selection
 	switch cfg.NotificationProvider {
 	case "bird":
@@ -291,6 +376,12 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	readinessService := readiness.NewService(15*time.Second, readinessCheckers...)
 	readinessHandler := handlers.NewReadinessHandler(readinessService, cfg.Environment)
 
+	// Schedule Preview Service: instant schedule generation from onboarding data
+	// No DB required — runs physics pipeline in-memory
+	previewService := service.NewSchedulePreviewService(nil, config.PhysicsConfig{})
+	previewService.WithCalibration(calibrationService) // Feature 5: Learned duration intelligence
+	previewHandler := handlers.NewPreviewHandler(previewService)
+
 	// See PHASE_11_PRD.md Step 75: The Interrogator Agent
 	// C5 Fix: Guard against nil AI client (onboarding requires Gemini Vision API)
 	var onboardingHandler *handlers.OnboardingHandler
@@ -298,7 +389,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		// Instantiate the PgxAgentLogger for the AI agents
 		agentLogger := audit.NewPgxAgentLogger(db)
 
-		interrogatorService := service.NewInterrogatorService(aiClient, agentLogger)
+		interrogatorService := service.NewInterrogatorService(aiClient, agentLogger).
+			WithMaterialService(materialService).
+			WithBudgetService(budgetService)
 		onboardingHandler = handlers.NewOnboardingHandler(interrogatorService)
 	}
 
@@ -331,9 +424,18 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		CompletionHandler:      completionHandler,      // Project Completion
 		ReadinessHandler:       readinessHandler,       // Integration readiness checks
 		FeedHandler:            feedHandler,            // V2: Portfolio feed
+		AgentHandler:           agentHandler,           // Agent pending actions
+		AgentConfigHandler:     agentConfigHandler,     // Agent settings admin UI
+		BrainSettingsHandler:   brainSettingsHandler,   // FB-Brain connection settings
+		MaterialHandler:        materialHandler,        // Material extraction + CRUD
+		BudgetHandler:          budgetHandler,          // Budget seeding + financial summaries
 		ContactHandler:         contactHandler,         // V2: Contact CRUD + assignments
 		VisionHandler:          visionHandler,          // Sprint 2.1: Vision Pipeline extract
 		IntegrationHandler:     integrationHandler,     // FB-Brain integration
+		PreviewHandler:         previewHandler,         // Schedule preview + scenarios
+		StreamChatHandler:      streamChatHandler,      // Feature 3: Streaming chat SSE
+		ProgressPhotoHandler:   progressPhotoHandler,   // Feature 10: Photo progress verification
+		PolicyHandler:          policyHandler,           // Feature 8: Autopilot policy engine
 		AuthMiddleware:         authMiddleware,
 		DevAuthMiddleware:      devAuthMiddleware,
 		PortalRateLimiter:      portalRateLimiter,
@@ -460,6 +562,15 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireAuth)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/physics", s.ConfigHandler.GetPhysics)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/physics", s.ConfigHandler.UpdatePhysics)
+
+			// Agent settings (Admin only)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Get("/agents", s.AgentConfigHandler.GetAgentSettings)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/agents", s.AgentConfigHandler.UpdateAgentSettings)
+
+			// FB-Brain connection settings (Admin only)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Get("/brain", s.BrainSettingsHandler.GetBrainConnection)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/brain", s.BrainSettingsHandler.UpdateBrainConnection)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Post("/brain/regenerate-key", s.BrainSettingsHandler.RegenerateKey)
 		})
 
 		// V2: Portfolio feed — aggregated feed cards across all projects
@@ -509,6 +620,24 @@ func (s *Server) routes() {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/bulk", s.ContactHandler.BulkCreateAssignments)
 			})
 
+			// Material CRUD endpoints
+			r.Route("/{id}/materials", func(r chi.Router) {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/", s.MaterialHandler.ListMaterials)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/", s.MaterialHandler.CreateMaterial)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Put("/{materialId}", s.MaterialHandler.UpdateMaterial)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Delete("/{materialId}", s.MaterialHandler.DeleteMaterial)
+			})
+
+			// Budget endpoints
+			r.Route("/{id}/budget", func(r chi.Router) {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/", s.BudgetHandler.GetBudgetBreakdown)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Put("/{budgetId}", s.BudgetHandler.UpdateBudgetPhase)
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/seed", s.BudgetHandler.SeedBudget)
+			})
+
+			// Financial summary (project-level)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/financials/summary", s.BudgetHandler.GetFinancialSummary)
+
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Put("/{task_id}", s.TaskHandler.UpdateTask)
@@ -525,6 +654,16 @@ func (s *Server) routes() {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/{threadId}/unarchive", s.ThreadHandler.UnarchiveThread)
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatRead)).Get("/{threadId}/messages", s.ThreadHandler.GetThreadMessages)
 			})
+
+			// Feature 3: Streaming chat SSE
+			if s.StreamChatHandler != nil {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/{id}/chat/stream", s.StreamChatHandler.HandleStreamChat)
+			}
+
+			// Feature 10: Photo progress verification
+			if s.ProgressPhotoHandler != nil {
+				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{id}/progress/photo", s.ProgressPhotoHandler.HandleUpload())
+			}
 		})
 		// See STEP_84_FIELD_FEEDBACK.md: Vision analysis status polling
 		// M1 Fix: Requires auth + budget:read scope (field users need to see analysis results)
@@ -535,6 +674,12 @@ func (s *Server) routes() {
 			if s.VisionHandler != nil {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeDocumentWrite)).Post("/extract", s.VisionHandler.ExtractDocument)
 			}
+		})
+
+		// Global financial summary (cross-project aggregation)
+		r.Route("/financials", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/summary", s.BudgetHandler.GetGlobalSummary)
 		})
 
 		// See PHASE_13_PRD.md Steps 82-83: Invoice CRUD + Approval
@@ -562,6 +707,14 @@ func (s *Server) routes() {
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeChatWrite)).Post("/", s.ChatHandler.HandleChat)
 		})
 
+		// Feature 8: Autopilot policy engine (Admin only)
+		r.Route("/org/policies", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
+			r.Get("/", s.PolicyHandler.ListPolicies())
+			r.Put("/{actionType}", s.PolicyHandler.UpsertPolicy())
+		})
+
 		// See PHASE_11_PRD.md Step 75: Interrogator Agent
 		// L7: Auth required, rate-limited to prevent AI API abuse
 		// C5 Fix: Only register route if AI client is configured
@@ -572,6 +725,20 @@ func (s *Server) routes() {
 			if s.OnboardingHandler != nil {
 				r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectCreate)).Post("/onboard", s.OnboardingHandler.HandleOnboard)
 			}
+		})
+
+		// Schedule Preview: instant schedule generation from onboarding data
+		// Authenticated but no project scope required (pre-creation)
+		r.Route("/schedule", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.Post("/preview", s.PreviewHandler.GeneratePreview())
+			r.Post("/compare", s.PreviewHandler.CompareScenarios())
+		})
+
+		// Agent pending actions: list actions awaiting human approval
+		r.Route("/agents", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/pending", s.AgentHandler.ListPendingActions)
 		})
 
 		// See PRODUCTION_PLAN.md Step 48: Inbound Webhook Endpoints
@@ -689,6 +856,53 @@ func (s *Server) HandleAIHealthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status": "healthy"}`))
+}
+
+// initClaudeOrchestrator creates the Claude-powered chat orchestrator with all tools registered.
+// Returns both the orchestrator and the tool registry (needed for action execution on approval).
+// This is the "Project Native Intelligence" layer — Claude Opus 4.6 with tool use.
+func initClaudeOrchestrator(
+	cfg *config.Config,
+	db *pgxpool.Pool,
+	messageStore chat.MessagePersister,
+	scheduleSvc *service.ScheduleService,
+	projectSvc *service.ProjectService,
+	directorySvc *service.DirectoryService,
+	notifSvc types.NotificationService,
+	feedSvc *service.FeedService,
+	agentActionSvc *service.AgentActionService,
+	threadSvc *service.ThreadService,
+	budgetSvc *service.BudgetService,
+	cascadeSvc *service.DelayCascadeService,
+	policyEngine *service.PolicyEngine,
+) (*chat.ClaudeOrchestrator, *tools.Registry) {
+	// Create Anthropic client
+	modelMap := map[ai.ModelType]string{
+		ai.ModelTypeOpus: cfg.ClaudeModelID,
+	}
+	claudeClient := ai.NewAnthropicClient(cfg.AnthropicAPIKey, modelMap)
+
+	// Build tool registry
+	registry := tools.NewRegistry()
+	tools.RegisterScheduleTools(registry, scheduleSvc)
+	tools.RegisterProjectTools(registry, projectSvc, nil) // weather wired later if available
+	tools.RegisterCommunicationTools(registry, directorySvc, notifSvc)
+	tools.RegisterFeedTools(registry, feedSvc, agentActionSvc)
+
+	// Feature 2: Schedule simulation tools (what-if analysis)
+	tools.RegisterSimulationTools(registry, db, cascadeSvc)
+
+	// Feature 7: Budget guardrail tools
+	tools.RegisterBudgetTools(registry, budgetSvc)
+
+	// Feature 11: Market-aware cost tools
+	tools.RegisterMarketTools(registry)
+
+	fmt.Printf("Claude Tools: %d tools registered\n", len(registry.Definitions()))
+
+	orch := chat.NewClaudeOrchestrator(messageStore, claudeClient, registry).
+		WithHistory(threadSvc)
+	return orch, registry
 }
 
 // securityHeaders adds standard HTTP security headers to every response.

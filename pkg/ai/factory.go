@@ -41,12 +41,11 @@ func (f *Factory) NewClient(ctx context.Context, provider Provider) (Client, err
 			return nil, fmt.Errorf("anthropic api key not configured")
 		}
 		modelMap := map[ModelType]string{
-			ModelTypeOpus: "claude-3-opus-20240229", // Fallback if 4.5 not available
+			ModelTypeOpus: "claude-opus-4-6-20250918",
 		}
 
-		// P2 Fix: Prioritize 4.5 if env var is set, or if we want to default to a placeholder
-		// Ideally we use a real ID once announced.
-		if v := os.Getenv("CLAUDE_OPUS_MODEL_ID"); v != "" {
+		// Allow override via env var for testing different models
+		if v := os.Getenv("CLAUDE_MODEL_ID"); v != "" {
 			modelMap[ModelTypeOpus] = v
 		}
 
