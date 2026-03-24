@@ -8,6 +8,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // =============================================================================
@@ -176,6 +177,20 @@ type StreamingClient interface {
 	// StreamGenerateContent streams response chunks as they're generated.
 	StreamGenerateContent(ctx context.Context, req GenerateRequest) (<-chan StreamChunk, error)
 }
+
+// NoOpClient is a stub AI client that returns errors for all operations.
+// Used when AI credentials are not configured (demo/development mode).
+type NoOpClient struct{}
+
+func (n *NoOpClient) GenerateContent(_ context.Context, _ GenerateRequest) (GenerateResponse, error) {
+	return GenerateResponse{}, fmt.Errorf("AI not configured: no Vertex AI or Anthropic credentials provided")
+}
+
+func (n *NoOpClient) GenerateEmbedding(_ context.Context, _ string) ([]float32, error) {
+	return nil, fmt.Errorf("AI not configured: no Vertex AI credentials provided")
+}
+
+func (n *NoOpClient) Close() error { return nil }
 
 // NewTextRequest creates a simple text-only GenerateRequest.
 // Convenience function for common use cases.

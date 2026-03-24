@@ -84,17 +84,26 @@ func main() {
 		}()
 	}
 
-	// Initialize Vertex AI Client
-	modelIDs := map[ai.ModelType]string{
-		ai.ModelTypeFlash:     cfg.VertexModelFlashID,
-		ai.ModelTypePro:       cfg.VertexModelProID,
-		ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
+	// Initialize Vertex AI Client (optional — falls back to NoOp for demo/dev)
+	var aiClient ai.Client
+	if cfg.VertexProjectID != "" {
+		modelIDs := map[ai.ModelType]string{
+			ai.ModelTypeFlash:     cfg.VertexModelFlashID,
+			ai.ModelTypePro:       cfg.VertexModelProID,
+			ai.ModelTypeEmbedding: cfg.VertexModelEmbeddingID,
+		}
+		vc, err := ai.NewVertexClient(ctx, cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
+		if err != nil {
+			log.Printf("WARNING: Failed to initialize Vertex AI client: %v — AI features disabled", err)
+			aiClient = &ai.NoOpClient{}
+		} else {
+			aiClient = vc
+			defer vc.Close()
+		}
+	} else {
+		log.Println("WARNING: VERTEX_PROJECT_ID not set — AI features disabled")
+		aiClient = &ai.NoOpClient{}
 	}
-	aiClient, err := ai.NewVertexClient(ctx, cfg.VertexProjectID, cfg.VertexLocation, modelIDs)
-	if err != nil {
-		log.Fatalf("Failed to initialize Vertex AI client: %v", err)
-	}
-	defer aiClient.Close()
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
