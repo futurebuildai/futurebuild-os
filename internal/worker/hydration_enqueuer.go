@@ -17,7 +17,7 @@ type AsynqHydrationEnqueuer struct {
 // NewAsynqHydrationEnqueuer creates a new hydration enqueuer.
 func NewAsynqHydrationEnqueuer(redisAddr string) *AsynqHydrationEnqueuer {
 	return &AsynqHydrationEnqueuer{
-		client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr}),
+		client: asynq.NewClient(ParseRedisOpt(redisAddr)),
 	}
 }
 

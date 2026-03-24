@@ -20,7 +20,7 @@ func NewScheduler(redisAddr string) *Scheduler {
 	}
 
 	scheduler := asynq.NewScheduler(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		ParseRedisOpt(redisAddr),
 		&asynq.SchedulerOpts{
 			Location: loc,
 			PostEnqueueFunc: func(info *asynq.TaskInfo, err error) {

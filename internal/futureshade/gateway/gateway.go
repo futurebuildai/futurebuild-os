@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/colton/futurebuild/internal/futureshade"
@@ -22,6 +23,16 @@ type PlanAction struct {
 // RemediationPlan represents a Tribunal-generated plan of actions.
 type RemediationPlan struct {
 	Actions []PlanAction `json:"actions"`
+}
+
+// parseRedisOpt parses a Redis connection string (URL or host:port) into asynq options.
+func parseRedisOpt(redisAddr string) asynq.RedisConnOpt {
+	opt, err := asynq.ParseRedisURI(redisAddr)
+	if err != nil {
+		log.Printf("WARNING: Could not parse Redis URL %q, falling back to Addr: %v", redisAddr, err)
+		return asynq.RedisClientOpt{Addr: redisAddr}
+	}
+	return opt
 }
 
 // ExecutionGateway connects Tribunal decisions to skill execution via Asynq workers.
@@ -44,7 +55,7 @@ func NewExecutionGateway(
 		config:   config,
 		registry: registry,
 		repo:     repo,
-		client:   asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr}),
+		client:   asynq.NewClient(parseRedisOpt(redisAddr)),
 	}
 }
 

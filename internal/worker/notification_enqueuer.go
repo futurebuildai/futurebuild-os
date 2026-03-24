@@ -25,7 +25,7 @@ type AsynqNotificationEnqueuer struct {
 // NewAsynqNotificationEnqueuer creates a new notification enqueuer.
 func NewAsynqNotificationEnqueuer(redisAddr string) *AsynqNotificationEnqueuer {
 	return &AsynqNotificationEnqueuer{
-		client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr}),
+		client: asynq.NewClient(ParseRedisOpt(redisAddr)),
 	}
 }
 

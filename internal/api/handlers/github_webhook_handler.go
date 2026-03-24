@@ -31,7 +31,7 @@ type GitHubWebhookHandler struct {
 func NewGitHubWebhookHandler(webhookSecret, redisAddr string) *GitHubWebhookHandler {
 	return &GitHubWebhookHandler{
 		webhookSecret: webhookSecret,
-		asynqClient:   asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr}),
+		asynqClient:   asynq.NewClient(worker.ParseRedisOpt(redisAddr)),
 	}
 }
 

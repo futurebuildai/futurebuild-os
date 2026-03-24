@@ -2,10 +2,22 @@ package worker
 
 import (
 	"context"
+	"log"
 	"log/slog"
 
 	"github.com/hibiken/asynq"
 )
+
+// ParseRedisOpt parses a Redis connection string (URL or host:port) into asynq options.
+// Supports both redis://user:pass@host:port format and plain host:port format.
+func ParseRedisOpt(redisAddr string) asynq.RedisConnOpt {
+	opt, err := asynq.ParseRedisURI(redisAddr)
+	if err != nil {
+		log.Printf("WARNING: Could not parse Redis URL %q, falling back to Addr: %v", redisAddr, err)
+		return asynq.RedisClientOpt{Addr: redisAddr}
+	}
+	return opt
+}
 
 // Server wraps the asynq.Server
 type Server struct {
@@ -16,7 +28,7 @@ type Server struct {
 // NewServer creates a new worker server instance
 func NewServer(redisAddr string, concurrency int, queues map[string]int) *Server {
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		ParseRedisOpt(redisAddr),
 		asynq.Config{
 			Concurrency: concurrency,
 			Queues:      queues,

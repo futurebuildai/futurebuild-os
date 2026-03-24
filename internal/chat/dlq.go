@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/colton/futurebuild/internal/models"
+	"github.com/colton/futurebuild/internal/worker"
 	"github.com/hibiken/asynq"
 )
 
@@ -28,7 +29,7 @@ type AsynqDLQ struct {
 // redisAddr should match the worker's Redis connection (e.g., "localhost:6379").
 func NewAsynqDLQ(redisAddr string) *AsynqDLQ {
 	return &AsynqDLQ{
-		client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr}),
+		client: asynq.NewClient(worker.ParseRedisOpt(redisAddr)),
 	}
 }
 
