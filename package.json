@@ -8,9 +8,7 @@
   "scripts": {
     "dev": "concurrently \"go run ./cmd/api\" \"npm --prefix frontend run dev\"",
     "lint": "npm --prefix frontend run lint",
-    "test": "npm --prefix frontend run test && go test ./...",
-    "shadow:scaffold": "node scripts/shadow/scaffold.js",
-    "shadow:check": "node scripts/shadow/check.js"
+    "test": "npm --prefix frontend run test && go test ./..."
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -15,7 +15,6 @@ import (
 	"github.com/colton/futurebuild/internal/chat"
 	"github.com/colton/futurebuild/internal/config"
 	"github.com/colton/futurebuild/internal/futureshade"
-	"github.com/colton/futurebuild/internal/futureshade/shadow"
 	"github.com/colton/futurebuild/internal/futureshade/tribunal"
 	"github.com/colton/futurebuild/internal/middleware"
 	"github.com/colton/futurebuild/internal/readiness"
@@ -43,7 +42,6 @@ type Server struct {
 	WebhookHandler         *handlers.WebhookHandler         // See PRODUCTION_PLAN.md Step 48
 	FutureShadeHandler     *handlers.FutureShadeHandler     // See FUTURESHADE_INIT_specs.md
 	TribunalHandler        *handlers.TribunalHandler        // See SHADOW_VIEWER_specs.md
-	ShadowHandler          *handlers.ShadowHandler          // See SHADOW_VIEWER_specs.md
 	InviteHandler          *handlers.InviteHandler          // See LAUNCH_STRATEGY.md Task B2
 	UserHandler            *handlers.UserHandler            // See LAUNCH_PLAN.md User Profile Endpoint
 	PortalHandler          *handlers.PortalHandler          // See LAUNCH_PLAN.md P2: Field Portal
@@ -284,11 +282,9 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	futureShadeService := futureshade.NewService(futureShadeConfig)
 	futureShadeHandler := handlers.NewFutureShadeHandler(futureShadeService)
 
-	// See SHADOW_VIEWER_specs.md: Tribunal and ShadowDocs handlers
+	// See SHADOW_VIEWER_specs.md: Tribunal handlers
 	tribunalRepo := tribunal.NewRepository(db)
 	tribunalHandler := handlers.NewTribunalHandler(tribunalRepo)
-	shadowService := shadow.NewDocsService(cfg.ProjectRoot)
-	shadowHandler := handlers.NewShadowHandler(shadowService)
 
 	// See LAUNCH_STRATEGY.md Task B2: User Invite Flow
 	// ClerkClient is nil when CLERK_SECRET_KEY is not set (Clerk user creation disabled).
@@ -406,7 +402,6 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		WebhookHandler:         webhookHandler,         // See PRODUCTION_PLAN.md Step 48
 		FutureShadeHandler:     futureShadeHandler,     // See FUTURESHADE_INIT_specs.md
 		TribunalHandler:        tribunalHandler,        // See SHADOW_VIEWER_specs.md
-		ShadowHandler:          shadowHandler,          // See SHADOW_VIEWER_specs.md
 		InviteHandler:          inviteHandler,          // See LAUNCH_STRATEGY.md Task B2
 		UserHandler:            userHandler,            // See LAUNCH_PLAN.md User Profile Endpoint
 		PortalHandler:          portalHandler,          // See LAUNCH_PLAN.md P2: Field Portal
@@ -767,14 +762,6 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
 			r.Get("/decisions", s.TribunalHandler.ListDecisions)
 			r.Get("/decisions/{id}", s.TribunalHandler.GetDecision)
-		})
-
-		// See SHADOW_VIEWER_specs.md Section 3.2: ShadowDocs endpoints (Admin only)
-		r.Route("/shadow", func(r chi.Router) {
-			r.Use(s.AuthMiddleware.RequireAuth)
-			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
-			r.Get("/docs/tree", s.ShadowHandler.GetTree)
-			r.Get("/docs/content", s.ShadowHandler.GetContent)
 		})
 
 		// Integration Readiness: deep health checks for all 3P services (Admin only).
