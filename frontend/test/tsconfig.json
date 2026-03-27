@@ -1,0 +1,9 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "types": ["sinon"],
+        "rootDir": "..",
+        "noEmit": true
+    },
+    "include": [".", "../src"]
+}
