@@ -362,7 +362,7 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Card not found", http.StatusNotFound)
 			return
 		}
-		flowResp, err := h.integrationClient.StartMaterialsFlow(orgID.String(), card.ProjectID.String(), cardID.String())
+		flowResp, err := h.integrationClient.StartMaterialsFlow(ctx, orgID.String(), card.ProjectID.String(), cardID.String())
 		if err != nil {
 			slog.Error("feed: start materials flow failed", "error", err)
 			http.Error(w, "Failed to request material quote: "+err.Error(), http.StatusInternalServerError)
@@ -392,7 +392,7 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "rfq_id required", http.StatusBadRequest)
 			return
 		}
-		flowResp, err := h.integrationClient.ApproveMaterialsQuote(rfqID)
+		flowResp, err := h.integrationClient.ApproveMaterialsQuote(ctx, rfqID)
 		if err != nil {
 			slog.Error("feed: approve materials quote failed", "error", err)
 			http.Error(w, "Failed to approve quote: "+err.Error(), http.StatusInternalServerError)
@@ -408,7 +408,7 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Card not found", http.StatusNotFound)
 			return
 		}
-		flowResp, err := h.integrationClient.StartLaborFlow(orgID.String(), card.ProjectID.String(), cardID.String())
+		flowResp, err := h.integrationClient.StartLaborFlow(ctx, orgID.String(), card.ProjectID.String(), cardID.String())
 		if err != nil {
 			slog.Error("feed: start labor flow failed", "error", err)
 			http.Error(w, "Failed to send labor RFQ: "+err.Error(), http.StatusInternalServerError)
@@ -437,7 +437,7 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "rfq_id required", http.StatusBadRequest)
 			return
 		}
-		flowResp, err := h.integrationClient.ApproveLaborBid(rfqID)
+		flowResp, err := h.integrationClient.ApproveLaborBid(ctx, rfqID)
 		if err != nil {
 			slog.Error("feed: approve labor bid failed", "error", err)
 			http.Error(w, "Failed to approve bid: "+err.Error(), http.StatusInternalServerError)
@@ -459,7 +459,7 @@ func (h *FeedHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			resp.Message = "Delivery confirmed"
 			break
 		}
-		flowResp, err := h.integrationClient.ConfirmDelivery(rfqID)
+		flowResp, err := h.integrationClient.ConfirmDelivery(ctx, rfqID)
 		if err != nil {
 			slog.Error("feed: confirm delivery failed", "error", err)
 		}

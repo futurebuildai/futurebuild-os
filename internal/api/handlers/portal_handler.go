@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -286,4 +287,77 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 // respondError writes an error JSON response.
 func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
+}
+
+// HandleUploadVoiceMemo accepts an audio file upload and metadata.
+// POST /api/v1/portal/voice-memos
+// Phase 18: See FRONTEND_SCOPE.md §15.2 (Voice-First Field Portal)
+func (h *PortalHandler) HandleUploadVoiceMemo(w http.ResponseWriter, r *http.Request) {
+	const maxUploadSize = 25 << 20 // 25MB max for voice memos
+
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		slog.Warn("portal: voice memo upload too large or invalid", "error", err)
+		respondError(w, http.StatusBadRequest, "file too large or invalid form (max 25MB)")
+		return
+	}
+
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "missing audio field")
+		return
+	}
+	defer file.Close()
+
+	// Validate MIME type
+	mimeType := header.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "audio/webm"
+	}
+	validAudioTypes := []string{"audio/webm", "audio/wav", "audio/mp4", "audio/ogg", "audio/mpeg"}
+	isValid := false
+	for _, t := range validAudioTypes {
+		if t == mimeType {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
+		respondError(w, http.StatusBadRequest, "unsupported audio type; accepted: webm, wav, mp4, ogg, mpeg")
+		return
+	}
+
+	// Read audio bytes
+	audioBytes, err := io.ReadAll(file)
+	if err != nil {
+		slog.Error("portal: failed to read voice memo", "error", err)
+		respondError(w, http.StatusInternalServerError, "failed to read audio file")
+		return
+	}
+
+	// Parse optional metadata
+	metadataStr := r.FormValue("metadata")
+	var metadata map[string]string
+	if metadataStr != "" {
+		if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid metadata JSON")
+			return
+		}
+	}
+
+	memoID := uuid.New()
+	slog.Info("portal: voice memo uploaded",
+		"memo_id", memoID,
+		"size_bytes", len(audioBytes),
+		"mime_type", mimeType,
+	)
+
+	// TODO Phase 18: Store audio in S3 and enqueue Asynq voice transcription job.
+	// For now, acknowledge receipt. The worker (voice_transcription.go) will
+	// download from S3, send to Vertex AI, and save the transcript.
+
+	respondJSON(w, http.StatusAccepted, map[string]interface{}{
+		"id":      memoID.String(),
+		"status":  "queued",
+		"message": "Voice memo received and queued for transcription",
+	})
 }

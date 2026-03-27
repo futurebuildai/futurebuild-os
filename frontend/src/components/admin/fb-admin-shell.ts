@@ -9,12 +9,16 @@ import { FBElement } from '../base/FBElement';
 import './fb-admin-sidebar';
 import './fb-admin-dashboard';
 import '../views/fb-view-admin-invites';
+import '../views/fb-view-employees';
+import '../views/fb-view-fleet';
+import '../views/fb-view-corporate';
 import '../shadow/shadow-layout';
 import '../settings/fb-settings-agents';
 import '../settings/fb-settings-brain';
 import '../feedback/fb-toast-container';
 
-type AdminRoute = 'dashboard' | 'invitations' | 'shadow' | 'agents' | 'brain';
+type AdminRoute = 'dashboard' | 'invitations' | 'shadow' | 'agents' | 'brain'
+    | 'employees' | 'fleet' | 'corporate';
 
 @customElement('fb-admin-shell')
 export class FBAdminShell extends FBElement {
@@ -76,6 +80,12 @@ export class FBAdminShell extends FBElement {
             this._route = 'agents';
         } else if (path === '/admin/brain') {
             this._route = 'brain';
+        } else if (path === '/admin/employees') {
+            this._route = 'employees';
+        } else if (path === '/admin/fleet') {
+            this._route = 'fleet';
+        } else if (path === '/admin/corporate') {
+            this._route = 'corporate';
         } else {
             this._route = 'dashboard';
         }
@@ -91,6 +101,12 @@ export class FBAdminShell extends FBElement {
                 return html`<fb-settings-agents></fb-settings-agents>`;
             case 'brain':
                 return html`<fb-settings-brain></fb-settings-brain>`;
+            case 'employees':
+                return html`<fb-view-employees></fb-view-employees>`;
+            case 'fleet':
+                return html`<fb-view-fleet></fb-view-fleet>`;
+            case 'corporate':
+                return html`<fb-view-corporate></fb-view-corporate>`;
             default:
                 return html`<fb-admin-dashboard></fb-admin-dashboard>`;
         }

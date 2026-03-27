@@ -21,6 +21,10 @@ import type { UserRole } from '../types/enums';
 import type { PortfolioFeedResponse, ActionResponse } from '../types/feed';
 import type { MaterialEstimate, BudgetEstimate, ProjectMaterial, ProjectBudget, CreateMaterialRequest, MaterialUpdateRequest, BudgetSeedRequest } from '../types/materials';
 import type { SchedulePreviewRequest, SchedulePreviewResponse, ScenarioComparisonRequest, ScenarioComparisonResponse } from '../types/schedule';
+import type { CorporateBudget, GLSyncLog, ARAgingSnapshot } from '../types/corporate';
+import type { Employee, TimeLog, Certification } from '../types/employee';
+import type { FleetAsset, EquipmentAllocation, MaintenanceLog } from '../types/fleet';
+import type { A2AExecutionLog, ActiveAgentConnection } from '../types/a2a';
 
 // ============================================================================
 // Auth Types
@@ -909,6 +913,179 @@ export const api = {
         /** Regenerate FB-Brain integration key. */
         regenerateBrainKey(): Promise<{ integration_key: string }> {
             return post<{ integration_key: string }>('/org/settings/brain/regenerate-key');
+        },
+
+        /** Get active A2A agent connections. Phase 18: FRONTEND_SCOPE.md §15.1 */
+        getBrainAgents(): Promise<ActiveAgentConnection[]> {
+            return get<ActiveAgentConnection[]>('/org/settings/brain/agents');
+        },
+
+        /** Pause an A2A agent. */
+        pauseBrainAgent(agentId: string): Promise<{ status: string }> {
+            return post<{ status: string }>(`/org/settings/brain/agents/${agentId}/pause`);
+        },
+
+        /** Resume an A2A agent. */
+        resumeBrainAgent(agentId: string): Promise<{ status: string }> {
+            return post<{ status: string }>(`/org/settings/brain/agents/${agentId}/resume`);
+        },
+
+        /** Get A2A execution logs. */
+        getBrainLogs(limit = 50): Promise<A2AExecutionLog[]> {
+            return get<A2AExecutionLog[]>(`/org/settings/brain/logs?limit=${limit}`);
+        },
+    },
+
+    /**
+     * Corporate financials endpoints.
+     * Phase 18: See BACKEND_SCOPE.md Section 20.1
+     */
+    corporate: {
+        /** Get corporate budget for a fiscal year/quarter. */
+        getBudget(year: number, quarter: number): Promise<CorporateBudget> {
+            return get<CorporateBudget>(`/corporate/budgets?year=${year}&quarter=${quarter}`);
+        },
+
+        /** Trigger a budget rollup for a fiscal year/quarter. */
+        rollupBudget(year: number, quarter: number): Promise<CorporateBudget> {
+            return post<CorporateBudget>('/corporate/budgets/rollup', { year, quarter });
+        },
+
+        /** Get AR aging snapshot. */
+        getARAging(): Promise<ARAgingSnapshot> {
+            return get<ARAgingSnapshot>('/corporate/ar-aging');
+        },
+
+        /** Get GL sync logs. */
+        getGLSyncLogs(): Promise<GLSyncLog[]> {
+            return get<GLSyncLog[]>('/corporate/gl-sync');
+        },
+
+        /** Create a GL sync log entry. */
+        createGLSync(syncType: string): Promise<GLSyncLog> {
+            return post<GLSyncLog>('/corporate/gl-sync', { sync_type: syncType });
+        },
+    },
+
+    /**
+     * Employee management endpoints.
+     * Phase 18: See BACKEND_SCOPE.md Section 20.2
+     */
+    employees: {
+        /** List employees, optionally filtered by status. */
+        list(status?: string): Promise<Employee[]> {
+            const query = status ? `?status=${encodeURIComponent(status)}` : '';
+            return get<Employee[]>(`/employees${query}`);
+        },
+
+        /** Create a new employee. */
+        create(data: Partial<Employee>): Promise<Employee> {
+            return post<Employee>('/employees', data);
+        },
+
+        /** Get a single employee. */
+        get(id: string): Promise<Employee> {
+            return get<Employee>(`/employees/${id}`);
+        },
+
+        /** Update an employee. */
+        update(id: string, data: Partial<Employee>): Promise<Employee> {
+            return put<Employee>(`/employees/${id}`, data);
+        },
+
+        /** Log time for an employee. */
+        logTime(employeeId: string, data: Partial<TimeLog>): Promise<TimeLog> {
+            return post<TimeLog>(`/employees/${employeeId}/time-logs`, data);
+        },
+
+        /** Get time logs for an employee. */
+        getTimeLogs(employeeId: string): Promise<TimeLog[]> {
+            return get<TimeLog[]>(`/employees/${employeeId}/time-logs`);
+        },
+
+        /** Add a certification for an employee. */
+        addCertification(employeeId: string, data: Partial<Certification>): Promise<Certification> {
+            return post<Certification>(`/employees/${employeeId}/certifications`, data);
+        },
+
+        /** List certifications for an employee. */
+        getCertifications(employeeId: string): Promise<Certification[]> {
+            return get<Certification[]>(`/employees/${employeeId}/certifications`);
+        },
+
+        /** Get expiring certifications across the org. */
+        getExpiringCertifications(withinDays = 30): Promise<Certification[]> {
+            return get<Certification[]>(`/certifications/expiring?within_days=${withinDays}`);
+        },
+
+        /** Approve a time log entry. */
+        approveTimeLog(logId: string): Promise<{ status: string }> {
+            return post<{ status: string }>(`/time-logs/${logId}/approve`);
+        },
+
+        /** Get deterministic labor burden for a project. */
+        getLaborBurden(projectId: string): Promise<{ total_labor_cost_cents: number }> {
+            return get<{ total_labor_cost_cents: number }>(`/projects/${projectId}/labor-burden`);
+        },
+    },
+
+    /**
+     * Fleet / equipment management endpoints.
+     * Phase 18: See BACKEND_SCOPE.md Section 20.3
+     */
+    fleet: {
+        /** List fleet assets, optionally filtered by status and type. */
+        list(status?: string, assetType?: string): Promise<FleetAsset[]> {
+            const params = new URLSearchParams();
+            if (status) params.set('status', status);
+            if (assetType) params.set('asset_type', assetType);
+            const query = params.toString() ? `?${params.toString()}` : '';
+            return get<FleetAsset[]>(`/fleet${query}`);
+        },
+
+        /** Create a new fleet asset. */
+        create(data: Partial<FleetAsset>): Promise<FleetAsset> {
+            return post<FleetAsset>('/fleet', data);
+        },
+
+        /** Get a single fleet asset. */
+        get(id: string): Promise<FleetAsset> {
+            return get<FleetAsset>(`/fleet/${id}`);
+        },
+
+        /** Update a fleet asset. */
+        update(id: string, data: Partial<FleetAsset>): Promise<FleetAsset> {
+            return put<FleetAsset>(`/fleet/${id}`, data);
+        },
+
+        /** Allocate equipment to a project. */
+        allocate(assetId: string, data: Partial<EquipmentAllocation>): Promise<EquipmentAllocation> {
+            return post<EquipmentAllocation>(`/fleet/${assetId}/allocate`, data);
+        },
+
+        /** Check equipment availability for a date range. */
+        checkAvailability(assetId: string, from: string, to: string): Promise<{ available: boolean }> {
+            return get<{ available: boolean }>(`/fleet/${assetId}/availability?from=${from}&to=${to}`);
+        },
+
+        /** Get equipment allocations for a project. */
+        getProjectEquipment(projectId: string): Promise<EquipmentAllocation[]> {
+            return get<EquipmentAllocation[]>(`/projects/${projectId}/equipment`);
+        },
+
+        /** Log maintenance for an asset. */
+        logMaintenance(assetId: string, data: Partial<MaintenanceLog>): Promise<MaintenanceLog> {
+            return post<MaintenanceLog>(`/fleet/${assetId}/maintenance`, data);
+        },
+
+        /** Get maintenance history for an asset. */
+        getMaintenanceHistory(assetId: string): Promise<MaintenanceLog[]> {
+            return get<MaintenanceLog[]>(`/fleet/${assetId}/maintenance`);
+        },
+
+        /** Get upcoming maintenance across the org. */
+        getUpcomingMaintenance(withinDays = 14): Promise<MaintenanceLog[]> {
+            return get<MaintenanceLog[]>(`/maintenance/upcoming?within_days=${withinDays}`);
         },
     },
 

@@ -23,6 +23,10 @@ const (
 	TypeDelayCascade            = "task:delay_cascade"       // Predictive delay propagation analysis
 	TypeCalibrateOnCompletion   = "task:calibrate_on_completion" // Calibrate org multipliers after project completion
 	TypeResourceConflictScan    = "task:resource_conflict_scan" // Weekly cross-project resource conflict detection
+	TypeCorporateRollup         = "task:corporate_rollup"       // Phase 18: Daily corporate budget rollup
+	TypeCertificationAlerts     = "task:certification_alerts"   // Phase 18: Daily certification expiration check
+	TypeMaintenanceReminders    = "task:maintenance_reminders"  // Phase 18: Weekly equipment maintenance reminders
+	TypeVoiceTranscription      = "task:voice_transcription"    // Phase 18: Async voice-to-text processing
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -197,4 +201,36 @@ func NewCalibrateOnCompletionTask(projectID, orgID uuid.UUID) (*asynq.Task, erro
 // NewResourceConflictScanTask creates a weekly task for cross-project resource conflict detection.
 func NewResourceConflictScanTask() *asynq.Task {
 	return asynq.NewTask(TypeResourceConflictScan, nil)
+}
+
+// Phase 18: ERP Transition worker tasks
+// See BACKEND_SCOPE.md Section 20
+
+// NewCorporateRollupTask creates a daily corporate budget rollup task.
+func NewCorporateRollupTask() *asynq.Task {
+	return asynq.NewTask(TypeCorporateRollup, nil)
+}
+
+// NewCertificationAlertsTask creates a daily certification expiration check task.
+func NewCertificationAlertsTask() *asynq.Task {
+	return asynq.NewTask(TypeCertificationAlerts, nil)
+}
+
+// NewMaintenanceRemindersTask creates a weekly equipment maintenance reminder task.
+func NewMaintenanceRemindersTask() *asynq.Task {
+	return asynq.NewTask(TypeMaintenanceReminders, nil)
+}
+
+// NewVoiceTranscriptionTask creates a task for async voice-to-text processing.
+func NewVoiceTranscriptionTask(memoID, orgID uuid.UUID, s3Key, mimeType string) (*asynq.Task, error) {
+	payload, err := json.Marshal(map[string]interface{}{
+		"memo_id":   memoID,
+		"s3_key":    s3Key,
+		"mime_type": mimeType,
+		"org_id":    orgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeVoiceTranscription, payload, asynq.Queue("default")), nil
 }

@@ -174,6 +174,11 @@ func main() {
 
 	// 7. Initialize Worker Handlers
 	// P1 Performance Fix: Pass db and clock for notification handler
+	// Phase 18: ERP services for worker jobs
+	corporateFinancialsSvc := service.NewCorporateFinancialsService(dbPool)
+	employeeSvc := service.NewEmployeeService(dbPool)
+	fleetSvc := service.NewFleetService(dbPool)
+
 	workerHandler := worker.NewWorkerHandler(dailyFocusAgent, procurementAgent, dbPool, realClock).
 		WithSkillExecution(skillRegistry, executionRepo, futureShadeConfig).
 		WithDriftDetection(driftAgent).
@@ -181,7 +186,8 @@ func main() {
 		WithBriefingNotification(notificationService, directoryService).
 		WithDelayCascade(delayCascadeService).
 		WithCalibration(calibrationService).
-		WithResourceConflict(resourceConflictService)
+		WithResourceConflict(resourceConflictService).
+		WithERP(corporateFinancialsSvc, employeeSvc, fleetSvc)
 
 	// 7.5 Automated PR Review: Initialize GitHub service and Tribunal integration
 	// See docs/AUTOMATED_PR_REVIEW_PRD.md
@@ -236,6 +242,20 @@ func main() {
 		log.Fatalf("could not register resource conflict scan cron: %v", err)
 	}
 
+	// Phase 18: ERP cron jobs
+	// Corporate budget rollup — daily at 23:00 UTC
+	if _, err := scheduler.RegisterEntry("0 23 * * *", worker.NewCorporateRollupTask()); err != nil {
+		log.Fatalf("could not register corporate rollup cron: %v", err)
+	}
+	// Certification expiration alerts — daily at 08:00 UTC
+	if _, err := scheduler.RegisterEntry("0 8 * * *", worker.NewCertificationAlertsTask()); err != nil {
+		log.Fatalf("could not register certification alerts cron: %v", err)
+	}
+	// Equipment maintenance reminders — weekly Monday 07:00 UTC
+	if _, err := scheduler.RegisterEntry("0 7 * * 1", worker.NewMaintenanceRemindersTask()); err != nil {
+		log.Fatalf("could not register maintenance reminders cron: %v", err)
+	}
+
 	// 9. Initialize Worker Server (The Processor)
 	// L7 Config: Use configured priorities. Default to 10 concurrency if not set (though config loader sets default)
 	concurrency := 10
@@ -271,6 +291,11 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeCalibrateOnCompletion, workerHandler.HandleCalibrateOnCompletion)
 	// Feature 6: Weekly resource conflict scan
 	srv.RegisterHandlerFunc(worker.TypeResourceConflictScan, workerHandler.HandleResourceConflictScan)
+	// Phase 18: ERP worker handlers
+	srv.RegisterHandlerFunc(worker.TypeCorporateRollup, workerHandler.HandleCorporateRollup)
+	srv.RegisterHandlerFunc(worker.TypeCertificationAlerts, workerHandler.HandleCertificationAlerts)
+	srv.RegisterHandlerFunc(worker.TypeMaintenanceReminders, workerHandler.HandleMaintenanceReminders)
+	srv.RegisterHandlerFunc(worker.TypeVoiceTranscription, workerHandler.HandleVoiceTranscription)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

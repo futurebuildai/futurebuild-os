@@ -155,6 +155,57 @@ type CalibrationServicer interface {
 	GetOrgMultiplierMap(ctx context.Context, orgID uuid.UUID) (map[string]float64, error)
 }
 
+// CorporateFinancialsServicer defines org-wide financial operations.
+// See BACKEND_SCOPE.md Section 20.1
+type CorporateFinancialsServicer interface {
+	RollupCorporateBudget(ctx context.Context, orgID uuid.UUID, fiscalYear, quarter int) (*models.CorporateBudget, error)
+	GetCorporateBudget(ctx context.Context, orgID uuid.UUID, fiscalYear, quarter int) (*models.CorporateBudget, error)
+	CalculateARAging(ctx context.Context, orgID uuid.UUID) (*models.ARAgingSnapshot, error)
+	CreateGLSyncLog(ctx context.Context, orgID uuid.UUID, syncType string) (*models.GLSyncLog, error)
+	ListGLSyncLogs(ctx context.Context, orgID uuid.UUID) ([]models.GLSyncLog, error)
+}
+
+// EmployeeServicer defines workforce management operations.
+// See BACKEND_SCOPE.md Section 20.2
+type EmployeeServicer interface {
+	CreateEmployee(ctx context.Context, orgID uuid.UUID, emp *models.Employee) error
+	GetEmployee(ctx context.Context, employeeID, orgID uuid.UUID) (*models.Employee, error)
+	ListEmployees(ctx context.Context, orgID uuid.UUID, status string) ([]models.Employee, error)
+	UpdateEmployee(ctx context.Context, employeeID, orgID uuid.UUID, emp *models.Employee) (*models.Employee, error)
+	LogTime(ctx context.Context, log *models.TimeLog) error
+	GetTimeLogs(ctx context.Context, employeeID uuid.UUID) ([]models.TimeLog, error)
+	ApproveTimeLog(ctx context.Context, logID, approverID uuid.UUID) error
+	CalculateLaborBurden(ctx context.Context, projectID uuid.UUID) (int64, error)
+	AddCertification(ctx context.Context, cert *models.Certification) error
+	ListCertifications(ctx context.Context, employeeID uuid.UUID) ([]models.Certification, error)
+	GetExpiringCertifications(ctx context.Context, orgID uuid.UUID, withinDays int) ([]models.Certification, error)
+}
+
+// FleetServicer defines equipment and fleet management operations.
+// See BACKEND_SCOPE.md Section 20.3
+type FleetServicer interface {
+	CreateFleetAsset(ctx context.Context, orgID uuid.UUID, asset *models.FleetAsset) error
+	GetFleetAsset(ctx context.Context, assetID, orgID uuid.UUID) (*models.FleetAsset, error)
+	ListFleetAssets(ctx context.Context, orgID uuid.UUID, status, assetType string) ([]models.FleetAsset, error)
+	UpdateFleetAsset(ctx context.Context, assetID, orgID uuid.UUID, asset *models.FleetAsset) (*models.FleetAsset, error)
+	AllocateEquipment(ctx context.Context, alloc *models.EquipmentAllocation) error
+	CheckEquipmentAvailability(ctx context.Context, assetID uuid.UUID, from, to time.Time) (bool, error)
+	GetProjectEquipment(ctx context.Context, projectID, orgID uuid.UUID) ([]models.EquipmentAllocation, error)
+	LogMaintenance(ctx context.Context, log *models.MaintenanceLog) error
+	GetMaintenanceHistory(ctx context.Context, assetID uuid.UUID) ([]models.MaintenanceLog, error)
+	GetUpcomingMaintenance(ctx context.Context, orgID uuid.UUID, withinDays int) ([]models.MaintenanceLog, error)
+}
+
+// A2AServicer defines agent-to-agent logging operations for the OS-to-Brain bridge.
+// See FRONTEND_SCOPE.md Section 15.1
+type A2AServicer interface {
+	LogExecution(ctx context.Context, log *models.A2AExecutionLog) error
+	GetExecutionLogs(ctx context.Context, orgID uuid.UUID, limit int) ([]models.A2AExecutionLog, error)
+	GetActiveAgents(ctx context.Context, orgID uuid.UUID) ([]models.ActiveAgentConnection, error)
+	PauseAgent(ctx context.Context, agentID, orgID uuid.UUID) error
+	ResumeAgent(ctx context.Context, agentID, orgID uuid.UUID) error
+}
+
 // FeedServicer defines the contract for portfolio feed operations.
 // See FRONTEND_V2_SPEC.md §5.1, §5.5
 // Note: Primary definition is in feed_service.go with the implementation.

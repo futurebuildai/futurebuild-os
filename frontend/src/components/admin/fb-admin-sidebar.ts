@@ -288,6 +288,38 @@ export class FBAdminSidebar extends FBElement {
                     </span>
                     FB-Brain
                 </button>
+
+                <div class="section-label">ERP</div>
+                <button
+                    class="nav-item ${this._isActive('/admin/employees') ? 'active' : ''}"
+                    @click=${(): void => { this._navigate('/admin/employees'); }}
+                    aria-label="Employees"
+                >
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </span>
+                    Employees
+                </button>
+                <button
+                    class="nav-item ${this._isActive('/admin/fleet') ? 'active' : ''}"
+                    @click=${(): void => { this._navigate('/admin/fleet'); }}
+                    aria-label="Fleet"
+                >
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                    </span>
+                    Fleet & Equipment
+                </button>
+                <button
+                    class="nav-item ${this._isActive('/admin/corporate') ? 'active' : ''}"
+                    @click=${(): void => { this._navigate('/admin/corporate'); }}
+                    aria-label="Corporate Financials"
+                >
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </span>
+                    Corporate
+                </button>
             </nav>
 
             <div class="back-link">

@@ -78,6 +78,10 @@ type WorkerHandler struct {
 	calibrationService CalibrationServicer
 	// Feature 6: Cross-project resource conflict detection
 	resourceConflictService ResourceConflictServicer
+	// Phase 18: ERP service fields (optional - initialized via WithERP)
+	corporateFinancialsSvc CorporateFinancialsServicer
+	employeeSvc            EmployeeCertServicer
+	fleetSvc               FleetMaintenanceServicer
 }
 
 func NewWorkerHandler(focusAgent *agents.DailyFocusAgent, procurementAgent *agents.ProcurementAgent, db *pgxpool.Pool, clk clock.Clock) *WorkerHandler {
@@ -142,6 +146,15 @@ func (h *WorkerHandler) WithCalibration(svc CalibrationServicer) *WorkerHandler 
 // WithResourceConflict configures the handler for cross-project resource conflict detection.
 func (h *WorkerHandler) WithResourceConflict(svc ResourceConflictServicer) *WorkerHandler {
 	h.resourceConflictService = svc
+	return h
+}
+
+// WithERP configures the handler for Phase 18 ERP worker jobs.
+// See BACKEND_SCOPE.md Section 20 (ERP Transition)
+func (h *WorkerHandler) WithERP(corpSvc CorporateFinancialsServicer, empSvc EmployeeCertServicer, fleetSvc FleetMaintenanceServicer) *WorkerHandler {
+	h.corporateFinancialsSvc = corpSvc
+	h.employeeSvc = empSvc
+	h.fleetSvc = fleetSvc
 	return h
 }
 

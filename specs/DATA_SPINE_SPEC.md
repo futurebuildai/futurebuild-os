@@ -218,3 +218,151 @@ Vector embeddings for RAG-based context retrieval.
 | chunk_content | TEXT | |
 | embedding | VECTOR(768) | Vertex AI text-embedding-004 |
 | metadata | JSONB | Page refs, document type, etc. |
+
+---
+
+## 7. Domain 6: Corporate Financials (Phase 18)
+Migration 000083. All monetary values as BIGINT (cents).
+
+### 7.1 CORPORATE_BUDGETS
+Org-wide budget rollups by fiscal year/quarter.
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| fiscal_year | INT | |
+| quarter | INT (1-4) | |
+| total_estimated_cents | BIGINT | |
+| total_committed_cents | BIGINT | |
+| total_actual_cents | BIGINT | |
+| project_count | INT | |
+| last_rollup_at | TIMESTAMP | |
+UNIQUE(org_id, fiscal_year, quarter)
+
+### 7.2 GL_SYNC_LOGS
+Audit trail for QuickBooks/Xero exports.
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| sync_type | VARCHAR(50) | |
+| status | VARCHAR(20) | |
+| records_synced | INT | |
+| error_message | TEXT | |
+| synced_at | TIMESTAMP | |
+
+### 7.3 AR_AGING_SNAPSHOTS
+Cash flow aging buckets.
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| snapshot_date | DATE | |
+| current_cents | BIGINT | 0-30 days |
+| days_30_cents | BIGINT | 30-60 days |
+| days_60_cents | BIGINT | 60-90 days |
+| days_90_plus_cents | BIGINT | 90+ days |
+| total_receivable_cents | BIGINT | |
+UNIQUE(org_id, snapshot_date)
+
+## 8. Domain 7: HR & Employees (Phase 18)
+Migration 000084.
+
+### 8.1 EMPLOYEES
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| employee_number | VARCHAR(50) | UNIQUE(org_id, employee_number) |
+| status | VARCHAR(20) | active/on_leave/terminated |
+| pay_rate_cents | BIGINT | |
+| pay_type | VARCHAR(10) | hourly/salary |
+| classification | VARCHAR(100) | Trade classification |
+
+### 8.2 TIME_LOGS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| employee_id | UUID (FK) | |
+| project_id | UUID (FK) | |
+| hours_worked | DECIMAL(5,2) | |
+| overtime_hours | DECIMAL(5,2) | |
+| approved | BOOLEAN | |
+
+### 8.3 CERTIFICATIONS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| employee_id | UUID (FK) | |
+| cert_type | VARCHAR(100) | e.g., OSHA-30, Crane Operator |
+| expiration_date | DATE | |
+| status | VARCHAR(20) | valid/expiring_soon/expired |
+
+### 8.4 PREVAILING_WAGE_RATES
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| region | VARCHAR(100) | |
+| classification | VARCHAR(100) | |
+| hourly_rate_cents | BIGINT | |
+| fringe_benefit_cents | BIGINT | |
+UNIQUE(org_id, region, classification, effective_date)
+
+## 9. Domain 8: Fleet & Equipment (Phase 18)
+Migration 000085. Requires `btree_gist` PostgreSQL extension.
+
+### 9.1 FLEET_ASSETS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| asset_number | VARCHAR(50) | UNIQUE(org_id, asset_number) |
+| status | VARCHAR(20) | available/in_use/maintenance/retired |
+| purchase_cost_cents | BIGINT | |
+| current_value_cents | BIGINT | |
+
+### 9.2 EQUIPMENT_ALLOCATIONS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| asset_id | UUID (FK) | |
+| project_id | UUID (FK) | |
+| allocated_from | DATE | |
+| allocated_to | DATE | |
+| status | VARCHAR(20) | planned/active/completed/cancelled |
+EXCLUDE USING GIST — prevents double-booking (same asset, overlapping date ranges, status IN ('planned','active'))
+
+### 9.3 MAINTENANCE_LOGS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| asset_id | UUID (FK) | |
+| maintenance_type | VARCHAR(50) | |
+| scheduled_date | DATE | |
+| cost_cents | BIGINT | |
+
+## 10. Domain 9: A2A Logging (Phase 18)
+Migration 000086.
+
+### 10.1 A2A_EXECUTION_LOGS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| workflow_id | VARCHAR(100) | |
+| source_system | VARCHAR(100) | |
+| target_system | VARCHAR(100) | |
+| payload | JSONB | |
+| status | VARCHAR(20) | |
+| duration_ms | INT | |
+
+### 10.2 ACTIVE_AGENT_CONNECTIONS
+| Field | Type | Description |
+|---|---|---|
+| id | UUID (PK) | |
+| org_id | UUID (FK) | |
+| agent_name | VARCHAR(100) | UNIQUE(org_id, agent_name) |
+| status | VARCHAR(20) | active/paused/error |
+| execution_count | INT | |
+| error_count | INT | |

@@ -1129,3 +1129,68 @@ template() {
 ---
 
 *Document Version: 1.1.0*
+
+---
+
+## 15. OS-to-Brain UI Bridge & ERP Admin Views
+
+**Phase 18 Implementation Status: Complete**
+
+### 15.1 `<fb-settings-brain>` — Tabbed Integration Hub
+FutureBuild OS users require a native "Integration & Analytics Hub" to monitor the System of Connection without leaving their Execution OS.
+- **Component:** `frontend/src/components/settings/fb-settings-brain.ts`
+- **Internal Structure:** 3-tab pill bar: `[Active Agents]` | `[Integrations]` | `[Execution Logs]`
+- **Active Agents tab:** Lists `ActiveAgentConnection` entries with name, type, execution count, error count, last run timestamp, and pause/resume toggle button per agent.
+- **Integrations tab:** Existing connection status, Brain URL, integration key, connected platforms.
+- **Execution Logs tab:** Table with columns: Time, Action, Source→Target, Status (colored badge), Duration (ms). Loads last 50 logs.
+- **Data:** `api.settings.getBrainAgents()`, `api.settings.getBrainLogs(limit)`, `api.settings.pauseBrainAgent(id)`, `api.settings.resumeBrainAgent(id)`
+
+### 15.2 Voice-First Field Portal
+Mobile-optimized components for field workers in the portal shell (`/portal`).
+
+#### `<fb-portal-voice-input>`
+- **File:** `frontend/src/components/portal/fb-portal-voice-input.ts`
+- **Online mode:** `webkitSpeechRecognition` for live transcription. 72px circular mic button with pulsing glow animation.
+- **Offline mode:** `MediaRecorder` captures audio blobs → IndexedDB via `OfflineQueue`. On reconnect, uploads to `/api/v1/portal/voice-memos`.
+- **Visual states:** idle (green), recording (pulse animation), processing (spinner), offline (amber badge with pending count).
+- **Touch target:** 72px diameter (exceeds 48px WCAG minimum).
+- **Events:** Emits `voice-input` with `{ text, audioBlob, isOffline }`.
+
+#### `<fb-portal-task-list>`
+- **File:** `frontend/src/components/portal/fb-portal-task-list.ts`
+- **Cards:** 64px min-height, glassmorphism background, neon status badges.
+- **"Mark Complete" buttons:** full-width, 48px height, Gable Green background.
+- **Events:** Emits `task-complete` with `{ taskId }`.
+
+#### `OfflineQueue` Service
+- **File:** `frontend/src/services/offline-queue.ts`
+- **IndexedDB:** Database `fb-offline-queue`, store `voice-memos`.
+- **Methods:** `queueVoiceMemo(blob, metadata)`, `getPendingCount()`, `syncPending()`.
+- **Auto-sync:** Registers `window.addEventListener('online', syncPending)`.
+
+#### `<fb-portal-shell>` Enhancement
+- **File:** `frontend/src/components/portal/fb-portal-shell.ts`
+- Added `show-voice` attribute to toggle `<fb-portal-voice-input>` in main content.
+- Added online/offline indicator in header.
+- Base font size set to 16px minimum.
+
+### 15.3 ERP Admin Views
+Three new admin views under `/admin/*` with routing in `fb-admin-shell.ts` and navigation in `fb-admin-sidebar.ts` (ERP section).
+
+#### `<fb-view-employees>` — `/admin/employees`
+- **File:** `frontend/src/components/views/fb-view-employees.ts`
+- Employee table with status filter chips (All/Active/On Leave/Terminated).
+- Certification expiration warning banner.
+- Add Employee form with glassmorphism card.
+
+#### `<fb-view-fleet>` — `/admin/fleet`
+- **File:** `frontend/src/components/views/fb-view-fleet.ts`
+- Responsive asset grid (1-3 columns) with status badges (green/blue/amber/gray).
+- Upcoming maintenance alert bar.
+- Add Asset form.
+
+#### `<fb-view-corporate>` — `/admin/corporate`
+- **File:** `frontend/src/components/views/fb-view-corporate.ts`
+- Quarterly budget rollup (estimated vs committed vs actual) with year/quarter navigation.
+- AR aging horizontal stacked bar (Current/30/60/90+ buckets).
+- GL sync log table. Trigger Rollup button.

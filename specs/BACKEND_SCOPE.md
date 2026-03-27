@@ -1330,3 +1330,34 @@ require (
 
 ### 19.3 SaaS Limits (The Gatekeeper)
 Define the logic: "Before POST /projects: Query COUNT(*) active_projects. If count >= org.project_limit, return 403 Forbidden LIMIT_REACHED."
+
+---
+
+## 20. ERP Domains (Execution & Business OS Expansion)
+
+**Phase 18 Implementation Status: Complete** — Migrations 000083–000086, Go service layer, API handlers, worker jobs, and frontend admin views all implemented.
+
+### 20.1 Corporate Financials
+- **Schema:** `corporate_budgets` (org-wide rollups by fiscal year/quarter), `gl_sync_logs` (QuickBooks/Xero export audit trail), `ar_aging_snapshots` (cash flow aging buckets). All money as BIGINT cents. Migration 000083.
+- **Service:** `CorporateFinancialsService` — `RollupCorporateBudget` aggregates project_budgets into corporate_budgets via UPSERT. `CalculateARAging` buckets invoices into 0-30/30-60/60-90/90+ day aging.
+- **API:** `/api/v1/corporate/budgets`, `/api/v1/corporate/ar-aging`, `/api/v1/corporate/gl-sync`. Admin/PM role required.
+- **Worker:** `TypeCorporateRollup` — daily 23:00 UTC cron iterates all orgs.
+- **Integration Layer:** Provides deterministic standard outputs for the FB-Brain QuickBooks/ERP agents to consume.
+
+### 20.2 HR & Employee Management
+- **Schema:** `employees`, `time_logs`, `certifications`, `prevailing_wage_rates`. UNIQUE(org_id, employee_number). Migration 000084.
+- **Service:** `EmployeeService` — CRUD, `CalculateLaborBurden` (deterministic: `SUM(hours * rate) + SUM(overtime * rate * 1.5)`), `GetExpiringCertifications` (within N days).
+- **API:** `/api/v1/employees/*`, `/api/v1/certifications/expiring`, `/api/v1/time-logs/{id}/approve`, `/api/v1/projects/{id}/labor-burden`.
+- **Worker:** `TypeCertificationAlerts` — daily 08:00 UTC, updates cert status to 'expiring_soon'.
+
+### 20.3 Equipment & Fleet Tracking (EAM)
+- **Schema:** `fleet_assets`, `equipment_allocations` (EXCLUDE USING GIST prevents double-booking via btree_gist extension), `maintenance_logs`. Migration 000085.
+- **Service:** `FleetService` — CRUD, `AllocateEquipment` (pre-checks availability then INSERTs; DB GIST constraint is safety net), `CheckEquipmentAvailability` (daterange overlap query).
+- **CPM Integration:** `ValidateEquipmentConstraints` in `internal/physics/equipment_validator.go` — for WBS 7.x (Site Prep) tasks, validates required equipment types are allocated. Deterministic — no AI.
+- **API:** `/api/v1/fleet/*`, `/api/v1/projects/{id}/equipment`, `/api/v1/maintenance/upcoming`.
+- **Worker:** `TypeMaintenanceReminders` — weekly Monday 07:00 UTC.
+
+### 20.4 A2A Logging
+- **Schema:** `a2a_execution_logs` (workflow audit trail with JSONB payload), `active_agent_connections`. Migration 000086.
+- **Service:** `A2AService` — `LogExecution`, `GetActiveAgents`, `PauseAgent`/`ResumeAgent`.
+- **API:** Wired into `/api/v1/org/settings/brain/agents` and `/brain/logs`.

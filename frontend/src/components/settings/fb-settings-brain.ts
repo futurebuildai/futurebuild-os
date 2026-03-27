@@ -1,15 +1,21 @@
 /**
- * fb-settings-brain — FB-Brain Connection settings page.
+ * fb-settings-brain — FB-Brain Connection + A2A Agent Management.
  *
  * Route: /admin/brain
- * Shows: Brain URL, integration key, status, connected platforms
+ * Tabs: Active Agents | Integrations | Execution Logs
  * Access: Admin only
+ *
+ * Phase 18: Enhanced with tabbed interface per FRONTEND_SCOPE.md §15.1
  */
 import { html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
 import { api } from '../../services/api';
 import type { BrainConnectionResponse } from '../../services/api';
+import type { ActiveAgentConnection } from '../../types/a2a';
+import type { A2AExecutionLog } from '../../types/a2a';
+
+type BrainTab = 'agents' | 'integrations' | 'logs';
 
 @customElement('fb-settings-brain')
 export class FBSettingsBrain extends FBElement {
@@ -18,12 +24,12 @@ export class FBSettingsBrain extends FBElement {
         css`
             :host {
                 display: block;
-                max-width: 640px;
+                max-width: 720px;
                 margin: 0 auto;
                 padding: 32px 16px;
             }
 
-            .header { margin-bottom: 32px; }
+            .header { margin-bottom: 24px; }
 
             .title {
                 font-size: 24px;
@@ -35,6 +41,38 @@ export class FBSettingsBrain extends FBElement {
                 font-size: 14px;
                 color: var(--fb-text-secondary, #8B8D98);
                 margin-top: 4px;
+            }
+
+            /* Tab bar */
+            .tab-bar {
+                display: flex;
+                gap: 4px;
+                margin-bottom: 24px;
+                padding: 4px;
+                background: var(--fb-surface-1, #161821);
+                border-radius: 10px;
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+            }
+
+            .tab-btn {
+                flex: 1;
+                padding: 10px 16px;
+                border: none;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                background: transparent;
+                color: var(--fb-text-secondary, #8B8D98);
+                transition: all 0.15s;
+            }
+
+            .tab-btn:hover { color: var(--fb-text-primary, #F0F0F5); }
+
+            .tab-btn.active {
+                background: var(--fb-surface-2, #1E2029);
+                color: var(--fb-text-primary, #F0F0F5);
+                border-bottom: 2px solid var(--fb-accent, #00FFA3);
             }
 
             .card {
@@ -120,7 +158,7 @@ export class FBSettingsBrain extends FBElement {
 
             .btn-primary {
                 background: var(--fb-accent, #00FFA3);
-                color: #fff;
+                color: #0A0B10;
             }
 
             .btn-primary:hover:not(:disabled) { opacity: 0.9; }
@@ -133,6 +171,29 @@ export class FBSettingsBrain extends FBElement {
             }
 
             .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+            .btn-sm {
+                padding: 4px 12px;
+                font-size: 12px;
+            }
+
+            .btn-toggle {
+                background: rgba(255,255,255,0.05);
+                color: var(--fb-text-secondary, #8B8D98);
+                border: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+            }
+
+            .btn-toggle.active {
+                background: rgba(0, 255, 163, 0.1);
+                color: #00FFA3;
+                border-color: rgba(0, 255, 163, 0.2);
+            }
+
+            .btn-toggle.paused {
+                background: rgba(245, 158, 11, 0.1);
+                color: #f59e0b;
+                border-color: rgba(245, 158, 11, 0.2);
+            }
 
             .actions {
                 display: flex;
@@ -194,13 +255,80 @@ export class FBSettingsBrain extends FBElement {
                 color: #F43F5E;
             }
 
-            .message-warning {
+            /* Agent list */
+            .agent-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px;
+                background: var(--fb-surface-2, #1E2029);
+                border-radius: 8px;
+                font-size: 13px;
+                margin-bottom: 8px;
+            }
+
+            .agent-info { display: flex; flex-direction: column; gap: 4px; }
+            .agent-name { color: var(--fb-text-primary, #F0F0F5); font-weight: 600; }
+            .agent-meta { color: var(--fb-text-secondary, #8B8D98); font-size: 12px; }
+
+            /* Logs table */
+            .logs-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+
+            .logs-table th {
+                text-align: left;
+                padding: 8px 10px;
+                color: var(--fb-text-secondary, #8B8D98);
+                font-weight: 500;
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+            }
+
+            .logs-table td {
+                padding: 8px 10px;
+                color: var(--fb-text-primary, #F0F0F5);
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.03));
+            }
+
+            .logs-table td.mono {
+                font-family: monospace;
+                font-size: 11px;
+            }
+
+            .badge {
+                font-size: 11px;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
+
+            .badge-completed {
+                background: rgba(0, 255, 163, 0.1);
+                color: #00FFA3;
+            }
+
+            .badge-failed {
+                background: rgba(244, 63, 94, 0.1);
+                color: #F43F5E;
+            }
+
+            .badge-pending {
                 background: rgba(245, 158, 11, 0.1);
                 color: #f59e0b;
+            }
+
+            .empty-state {
+                text-align: center;
+                padding: 32px;
+                color: var(--fb-text-secondary, #8B8D98);
+                font-size: 14px;
             }
         `,
     ];
 
+    @state() private _activeTab: BrainTab = 'integrations';
     @state() private _loading = true;
     @state() private _saving = false;
     @state() private _dirty = false;
@@ -208,10 +336,14 @@ export class FBSettingsBrain extends FBElement {
     @state() private _error = '';
     @state() private _conn: BrainConnectionResponse | null = null;
     @state() private _brainURL = '';
+    @state() private _agents: ActiveAgentConnection[] = [];
+    @state() private _logs: A2AExecutionLog[] = [];
 
     override connectedCallback() {
         super.connectedCallback();
         this._loadConnection();
+        this._loadAgents();
+        this._loadLogs();
     }
 
     private async _loadConnection() {
@@ -224,6 +356,22 @@ export class FBSettingsBrain extends FBElement {
             console.warn('[FBSettingsBrain] Failed to load:', err);
         } finally {
             this._loading = false;
+        }
+    }
+
+    private async _loadAgents() {
+        try {
+            this._agents = await api.settings.getBrainAgents();
+        } catch {
+            // A2A service may not be configured yet
+        }
+    }
+
+    private async _loadLogs() {
+        try {
+            this._logs = await api.settings.getBrainLogs(50);
+        } catch {
+            // A2A service may not be configured yet
         }
     }
 
@@ -254,13 +402,23 @@ export class FBSettingsBrain extends FBElement {
         }
     }
 
+    private async _toggleAgent(agentId: string, currentStatus: string) {
+        try {
+            if (currentStatus === 'active') {
+                await api.settings.pauseBrainAgent(agentId);
+            } else {
+                await api.settings.resumeBrainAgent(agentId);
+            }
+            await this._loadAgents();
+        } catch (err) {
+            this._error = err instanceof Error ? err.message : 'Failed to toggle agent';
+        }
+    }
+
     override render() {
         if (this._loading || !this._conn) {
             return html`<div class="header"><div class="title">FB-Brain Connection</div></div><p style="color: var(--fb-text-secondary)">Loading...</p>`;
         }
-
-        const c = this._conn;
-        const statusClass = c.status === 'connected' ? 'connected' : c.status === 'connecting' ? 'connecting' : 'disconnected';
 
         return html`
             <div class="header">
@@ -271,6 +429,55 @@ export class FBSettingsBrain extends FBElement {
             ${this._success ? html`<div class="message message-success">${this._success}</div>` : nothing}
             ${this._error ? html`<div class="message message-error">${this._error}</div>` : nothing}
 
+            <div class="tab-bar">
+                <button class="tab-btn ${this._activeTab === 'agents' ? 'active' : ''}"
+                        @click=${() => { this._activeTab = 'agents'; }}>Active Agents</button>
+                <button class="tab-btn ${this._activeTab === 'integrations' ? 'active' : ''}"
+                        @click=${() => { this._activeTab = 'integrations'; }}>Integrations</button>
+                <button class="tab-btn ${this._activeTab === 'logs' ? 'active' : ''}"
+                        @click=${() => { this._activeTab = 'logs'; }}>Execution Logs</button>
+            </div>
+
+            ${this._activeTab === 'agents' ? this._renderAgentsTab() : nothing}
+            ${this._activeTab === 'integrations' ? this._renderIntegrationsTab() : nothing}
+            ${this._activeTab === 'logs' ? this._renderLogsTab() : nothing}
+        `;
+    }
+
+    private _renderAgentsTab() {
+        if (this._agents.length === 0) {
+            return html`<div class="card"><div class="empty-state">No active agent connections. Configure agents in FB-Brain to see them here.</div></div>`;
+        }
+
+        return html`
+            <div class="card">
+                <div class="card-title">Active Agent Connections</div>
+                ${this._agents.map(a => html`
+                    <div class="agent-item">
+                        <div class="agent-info">
+                            <span class="agent-name">${a.agent_name}</span>
+                            <span class="agent-meta">
+                                ${a.agent_type} &middot;
+                                ${a.execution_count} runs &middot;
+                                ${a.error_count} errors
+                                ${a.last_execution_at ? html` &middot; Last: ${new Date(a.last_execution_at).toLocaleString()}` : nothing}
+                            </span>
+                        </div>
+                        <button class="btn btn-sm btn-toggle ${a.status}"
+                                @click=${() => this._toggleAgent(a.id, a.status)}>
+                            ${a.status === 'active' ? 'Pause' : 'Resume'}
+                        </button>
+                    </div>
+                `)}
+            </div>
+        `;
+    }
+
+    private _renderIntegrationsTab() {
+        const c = this._conn!;
+        const statusClass = c.status === 'connected' ? 'connected' : c.status === 'connecting' ? 'connecting' : 'disconnected';
+
+        return html`
             <div class="card">
                 <div class="card-title">Connection Status</div>
                 <div class="status-row">
@@ -295,7 +502,7 @@ export class FBSettingsBrain extends FBElement {
                 <div class="form-row">
                     <span class="form-label">Integration Key</span>
                     <span class="form-value">${c.integration_key || 'Not generated'}</span>
-                    <button class="btn btn-danger" @click=${this._handleRegenerateKey}>Regenerate</button>
+                    <button class="btn btn-danger btn-sm" @click=${this._handleRegenerateKey}>Regenerate</button>
                 </div>
 
                 ${this._dirty ? html`
@@ -321,6 +528,46 @@ export class FBSettingsBrain extends FBElement {
                 </div>
             ` : nothing}
         `;
+    }
+
+    private _renderLogsTab() {
+        if (this._logs.length === 0) {
+            return html`<div class="card"><div class="empty-state">No execution logs yet. Agent actions will appear here once connected.</div></div>`;
+        }
+
+        return html`
+            <div class="card">
+                <div class="card-title">Execution Logs (Last 50)</div>
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>Source / Target</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${this._logs.map(l => html`
+                            <tr>
+                                <td class="mono">${new Date(l.executed_at).toLocaleString()}</td>
+                                <td>${l.action_type}</td>
+                                <td>${l.source_system} → ${l.target_system}</td>
+                                <td><span class="badge ${this._statusBadgeClass(l.status)}">${l.status}</span></td>
+                                <td class="mono">${l.duration_ms != null ? `${l.duration_ms}ms` : '—'}</td>
+                            </tr>
+                        `)}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    private _statusBadgeClass(status: string): string {
+        if (status === 'completed' || status === 'success') return 'badge-completed';
+        if (status === 'failed' || status === 'error') return 'badge-failed';
+        return 'badge-pending';
     }
 }
 

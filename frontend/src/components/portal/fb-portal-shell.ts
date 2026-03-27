@@ -8,8 +8,10 @@
  * - Main content area
  */
 import { html, css, TemplateResult, nothing } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { FBElement } from '../base/FBElement';
+import './fb-portal-voice-input';
+import './fb-portal-task-list';
 
 /**
  * Portal shell component.
@@ -28,6 +30,8 @@ export class FBPortalShell extends FBElement {
                 background: var(--fb-bg-primary, #000);
                 color: var(--fb-text-primary, #fff);
                 font-family: var(--fb-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+                font-size: 16px;
+                --fb-portal-accent: var(--fb-accent, #00FFA3);
             }
 
             .header {
@@ -93,11 +97,73 @@ export class FBPortalShell extends FBElement {
             .footer-link:hover {
                 text-decoration: underline;
             }
+
+            .offline-indicator {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 4px;
+                background: rgba(245, 158, 11, 0.1);
+                color: #f59e0b;
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            .offline-indicator .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #f59e0b;
+            }
+
+            .online-indicator {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                color: var(--fb-primary, #00FFA3);
+            }
+
+            .online-indicator .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--fb-primary, #00FFA3);
+            }
+
+            .voice-section {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 16px 0;
+                border-bottom: 1px solid var(--fb-border, rgba(255,255,255,0.05));
+                margin-bottom: 16px;
+            }
         `,
     ];
 
     @property({ type: String, attribute: 'project-name' }) projectName = '';
     @property({ type: Boolean }) minimal = false;
+    @property({ type: Boolean, attribute: 'show-voice' }) showVoice = false;
+    @state() private _isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+    override connectedCallback() {
+        super.connectedCallback();
+        window.addEventListener('online', this._handleOnline);
+        window.addEventListener('offline', this._handleOffline);
+    }
+
+    override disconnectedCallback() {
+        super.disconnectedCallback();
+        window.removeEventListener('online', this._handleOnline);
+        window.removeEventListener('offline', this._handleOffline);
+    }
+
+    private _handleOnline = () => { this._isOnline = true; };
+    private _handleOffline = () => { this._isOnline = false; };
 
     override render(): TemplateResult {
         return html`
@@ -111,9 +177,17 @@ export class FBPortalShell extends FBElement {
                 ${!this.minimal && this.projectName
                     ? html`<span class="project-name">${this.projectName}</span>`
                     : nothing}
+                ${this._isOnline
+                    ? html`<span class="online-indicator"><span class="dot"></span>Online</span>`
+                    : html`<span class="offline-indicator"><span class="dot"></span>Offline</span>`}
             </header>
 
             <main class="main">
+                ${this.showVoice ? html`
+                    <div class="voice-section">
+                        <fb-portal-voice-input></fb-portal-voice-input>
+                    </div>
+                ` : nothing}
                 <slot></slot>
             </main>
 

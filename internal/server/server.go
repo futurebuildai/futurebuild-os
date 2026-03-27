@@ -69,8 +69,11 @@ type Server struct {
 	PreviewHandler         *handlers.PreviewHandler         // Schedule preview + scenario comparison
 	StreamChatHandler      *handlers.StreamChatHandler      // Feature 3: Streaming chat SSE
 	ProgressPhotoHandler   *handlers.ProgressPhotoHandler   // Feature 10: Photo progress verification
-	PolicyHandler          *handlers.PolicyHandler          // Feature 8: Autopilot policy engine
-	AuthMiddleware         *middleware.AuthMiddleware
+	PolicyHandler               *handlers.PolicyHandler               // Feature 8: Autopilot policy engine
+	CorporateFinancialsHandler  *handlers.CorporateFinancialsHandler  // Phase 18: Corporate financials (ERP)
+	EmployeeHandler             *handlers.EmployeeHandler             // Phase 18: Employee management (ERP)
+	FleetHandler                *handlers.FleetHandler                // Phase 18: Fleet/equipment management (ERP)
+	AuthMiddleware              *middleware.AuthMiddleware
 	DevAuthMiddleware      *middleware.DevAuthMiddleware // Dev-only auth bypass for integration demos
 	PortalRateLimiter      *middleware.IPRateLimiter     // Phase 12: Rate limiter for portal auth endpoints
 	PublicRateLimiter      *middleware.IPRateLimiter // L7: Rate limiter for public invite/portal action endpoints
@@ -330,6 +333,19 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	brainConnectionService := service.NewBrainConnectionService(db)
 	brainSettingsHandler := handlers.NewBrainSettingsHandler(brainConnectionService)
 
+	// Phase 18: ERP services and handlers — See BACKEND_SCOPE.md Section 20
+	corporateFinancialsService := service.NewCorporateFinancialsService(db)
+	corporateFinancialsHandler := handlers.NewCorporateFinancialsHandler(corporateFinancialsService)
+
+	employeeService := service.NewEmployeeService(db)
+	employeeHandler := handlers.NewEmployeeHandler(employeeService)
+
+	fleetService := service.NewFleetService(db)
+	fleetHandler := handlers.NewFleetHandler(fleetService)
+
+	a2aService := service.NewA2AService(db)
+	brainSettingsHandler.WithA2AService(a2aService)
+
 	// V2: Contact CRUD + project phase assignments
 	contactHandler := handlers.NewContactHandler(db)
 
@@ -429,8 +445,11 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 		PreviewHandler:         previewHandler,         // Schedule preview + scenarios
 		StreamChatHandler:      streamChatHandler,      // Feature 3: Streaming chat SSE
 		ProgressPhotoHandler:   progressPhotoHandler,   // Feature 10: Photo progress verification
-		PolicyHandler:          policyHandler,           // Feature 8: Autopilot policy engine
-		AuthMiddleware:         authMiddleware,
+		PolicyHandler:               policyHandler,               // Feature 8: Autopilot policy engine
+		CorporateFinancialsHandler:  corporateFinancialsHandler,  // Phase 18: Corporate financials
+		EmployeeHandler:             employeeHandler,             // Phase 18: Employee management
+		FleetHandler:                fleetHandler,                // Phase 18: Fleet/equipment management
+		AuthMiddleware:              authMiddleware,
 		DevAuthMiddleware:      devAuthMiddleware,
 		PortalRateLimiter:      portalRateLimiter,
 		PublicRateLimiter:      publicRateLimiter,
@@ -461,9 +480,9 @@ func (s *Server) routes() {
 		// Sprint 6.3 AI health check (public, so frontend can adapt layout pre-login if necessary, or just rely on it)
 		r.Get("/health/ai", s.HandleAIHealthCheck)
 
-		// FB-Brain integration webhook routes (API-key auth, bypasses Clerk)
+		// FB-Brain integration webhook routes (HMAC auth with legacy fallback, bypasses Clerk)
 		r.Route("/integration", func(r chi.Router) {
-			r.Use(s.IntegrationHandler.ValidateAPIKey)
+			r.Use(s.IntegrationHandler.ValidateSignature)
 			r.Post("/feed-card", s.IntegrationHandler.CreateFeedCard)
 			r.Post("/assign-contact", s.IntegrationHandler.AssignContact)
 		})
@@ -498,6 +517,10 @@ func (s *Server) routes() {
 			r.Use(middleware.RateLimit(s.PublicRateLimiter))
 			r.Get("/action/{token}", s.PortalHandler.HandleVerifyActionToken)
 			r.Post("/action/{token}", s.PortalHandler.HandleSubmitAction)
+
+			// Phase 18: Voice memo upload (offline sync target).
+			// See FRONTEND_SCOPE.md §15.2 (Voice-First Field Portal)
+			r.Post("/voice-memos", s.PortalHandler.HandleUploadVoiceMemo)
 
 			// Phase 12: Portal magic-link auth (separate from Clerk).
 			// Contacts use email magic links, not Clerk SSO.
@@ -565,6 +588,12 @@ func (s *Server) routes() {
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Get("/brain", s.BrainSettingsHandler.GetBrainConnection)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Put("/brain", s.BrainSettingsHandler.UpdateBrainConnection)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Post("/brain/regenerate-key", s.BrainSettingsHandler.RegenerateKey)
+
+			// Phase 18: A2A agent/log endpoints — See FRONTEND_SCOPE.md Section 15.1
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Get("/brain/agents", s.BrainSettingsHandler.GetActiveAgents)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Post("/brain/agents/{agentId}/pause", s.BrainSettingsHandler.PauseAgent)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Post("/brain/agents/{agentId}/resume", s.BrainSettingsHandler.ResumeAgent)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeSettingsWrite)).Get("/brain/logs", s.BrainSettingsHandler.GetExecutionLogs)
 		})
 
 		// V2: Portfolio feed — aggregated feed cards across all projects
@@ -631,6 +660,12 @@ func (s *Server) routes() {
 
 			// Financial summary (project-level)
 			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/financials/summary", s.BudgetHandler.GetFinancialSummary)
+
+			// Phase 18: Project labor burden (deterministic) — See BACKEND_SCOPE.md Section 20.2
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/{id}/labor-burden", s.EmployeeHandler.GetLaborBurden)
+
+			// Phase 18: Project equipment allocations — See BACKEND_SCOPE.md Section 20.3
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/equipment", s.FleetHandler.GetProjectEquipment)
 
 			// Task endpoints - See PRODUCTION_PLAN.md Step 32
 			r.Route("/{id}/tasks", func(r chi.Router) {
@@ -707,6 +742,60 @@ func (s *Server) routes() {
 			r.Use(s.AuthMiddleware.RequireRole(types.UserRoleAdmin))
 			r.Get("/", s.PolicyHandler.ListPolicies())
 			r.Put("/{actionType}", s.PolicyHandler.UpsertPolicy())
+		})
+
+		// Phase 18: Corporate Financials (Admin + PM) — See BACKEND_SCOPE.md Section 20.1
+		r.Route("/corporate", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/budgets", s.CorporateFinancialsHandler.GetCorporateBudget)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/budgets/rollup", s.CorporateFinancialsHandler.RollupBudget)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/ar-aging", s.CorporateFinancialsHandler.GetARAging)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetRead)).Get("/gl-sync", s.CorporateFinancialsHandler.ListGLSyncLogs)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/gl-sync", s.CorporateFinancialsHandler.CreateGLSyncLog)
+		})
+
+		// Phase 18: Employee Management — See BACKEND_SCOPE.md Section 20.2
+		r.Route("/employees", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.EmployeeHandler.ListEmployees)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/", s.EmployeeHandler.CreateEmployee)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}", s.EmployeeHandler.GetEmployee)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Put("/{id}", s.EmployeeHandler.UpdateEmployee)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{id}/time-logs", s.EmployeeHandler.LogTime)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/time-logs", s.EmployeeHandler.GetTimeLogs)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/{id}/certifications", s.EmployeeHandler.AddCertification)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/certifications", s.EmployeeHandler.ListCertifications)
+		})
+
+		// Phase 18: Certification compliance alerts
+		r.Route("/certifications", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/expiring", s.EmployeeHandler.GetExpiringCertifications)
+		})
+
+		// Phase 18: Time log approval
+		r.Route("/time-logs", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeBudgetApprove)).Post("/{id}/approve", s.EmployeeHandler.ApproveTimeLog)
+		})
+
+		// Phase 18: Fleet/Equipment Management — See BACKEND_SCOPE.md Section 20.3
+		r.Route("/fleet", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/", s.FleetHandler.ListFleetAssets)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/", s.FleetHandler.CreateFleetAsset)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}", s.FleetHandler.GetFleetAsset)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Put("/{id}", s.FleetHandler.UpdateFleetAsset)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeTaskWrite)).Post("/{id}/allocate", s.FleetHandler.AllocateEquipment)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/availability", s.FleetHandler.CheckAvailability)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeFinanceEdit)).Post("/{id}/maintenance", s.FleetHandler.LogMaintenance)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/{id}/maintenance", s.FleetHandler.GetMaintenanceHistory)
+		})
+
+		// Phase 18: Maintenance alerts
+		r.Route("/maintenance", func(r chi.Router) {
+			r.Use(s.AuthMiddleware.RequireAuth)
+			r.With(s.AuthMiddleware.RequirePermission(auth.ScopeProjectRead)).Get("/upcoming", s.FleetHandler.GetUpcomingMaintenance)
 		})
 
 		// See PHASE_11_PRD.md Step 75: Interrogator Agent

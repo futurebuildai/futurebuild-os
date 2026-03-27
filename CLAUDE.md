@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FutureBuild is an AI-powered construction project management platform. It uses the Residential Construction Path Model (CPM-res1.0) to automate scheduling for residential construction projects, starting from Permit Issued (WBS 5.2).
 
+**Go module:** `github.com/colton/futurebuild`
+
 ## Technology Stack
 
 | Layer | Technology |
@@ -57,6 +59,7 @@ npm --prefix frontend run format
 npm --prefix frontend run format:check
 
 # Database migrations (golang-migrate, 6-digit zero-padded sequential)
+# Migration files live in migrations/ at repo root (e.g., 000083_my_change.up.sql)
 make migrate-up
 make migrate-down
 make migrate-create name=<migration_name>
@@ -66,7 +69,33 @@ make run-worker
 
 # Seed demo data
 make seed-demo
+
+# Verify Docker builds locally before pushing
+make deploy-check
+
+# Auth-specific tests
+make test-auth
 ```
+
+### Local Infrastructure
+
+```bash
+# Start PostgreSQL (pgvector), Redis, and MinIO via docker-compose
+docker-compose up -d db redis minio
+
+# DB is exposed on localhost:5433 (not 5432) to avoid conflicts
+# DATABASE_URL=postgres://fb_user:fb_pass@localhost:5433/futurebuild?sslmode=disable
+```
+
+### Dev Server Ports
+
+| Service | Port | Notes |
+|---------|------|-------|
+| Go API | `APP_PORT` (default 8080) | Set to `8081` in local `.env` for Vite proxy |
+| Vite frontend | 3000 | Proxies `/api` to `http://localhost:8081` |
+| Docker Compose DB | 5433 → 5432 | Host port differs from container port |
+
+**Important:** The Vite config (`frontend/vite.config.ts`) hardcodes the proxy target as `localhost:8081`. Your local `.env` must set `APP_PORT=8081` for `npm run dev` to work correctly.
 
 ## Entry Points
 
@@ -99,6 +128,7 @@ The API server supports `--readiness-check` flag for CI/CD health probes (runs p
 - **`middleware/`** — Auth (Clerk JWT via JWKS), role/permission checks, rate limiting, dev auth bypass
 - **`config/`** — Environment-based config with `godotenv`. See `.env.example` for all variables.
 - **`readiness/`** — Per-service health probes (DB, Clerk, Redis, Vertex, S3, notification providers)
+- Also: `adapters/`, `audit/`, `auth/`, `data/`, `platform/`, `prompts/`, `rag/` — supporting packages for external integrations, auditing, data layer, and RAG
 
 ### Conditional Feature Registration
 
@@ -135,6 +165,8 @@ Vendor-agnostic abstraction with `Client` interface supporting `GenerateContent(
 
 Both providers run simultaneously — Vertex for vision/embeddings, Claude for chat/reasoning.
 
+Other `pkg/` packages: `clock/` (time utilities), `httputil/`, `storage/` (S3 abstraction), `sync/`.
+
 ### Rosetta Stone Type System
 
 Go types in `pkg/types/` ↔ TypeScript types in `frontend/src/types/` must stay in sync.
@@ -168,13 +200,14 @@ Three auth systems:
 |----------|---------|--------------|
 | `DATABASE_URL` | PostgreSQL connection | All |
 | `REDIS_URL` | Asynq task queue + sessions | Worker + API |
+| `APP_PORT` | HTTP listen port (default 8080) | API — set to `8081` for local dev |
 | `CLERK_ISSUER_URL` | JWKS-based JWT validation | API (unless `DEV_AUTH_BYPASS=true`) |
 | `CLERK_SECRET_KEY` | User management / invite flow | Invite flow |
 | `ANTHROPIC_API_KEY` | Claude Opus orchestrator | Chat intelligence (optional — falls back to regex) |
 | `VERTEX_PROJECT_ID` / `VERTEX_LOCATION` | Gemini API | Document analysis, embeddings (optional) |
 | `DEV_AUTH_BYPASS` | Skip JWT validation | Local dev only |
 
-See `.env.example` for the complete list (118 variables with descriptions).
+See `.env.example` for the complete list. **Note:** `CLERK_*` and `ANTHROPIC_API_KEY` are loaded by `internal/config/config.go` but are not yet in `.env.example` — add them to your local `.env` manually.
 
 ## Git Workflow
 
@@ -200,7 +233,10 @@ See `.env.example` for the complete list (118 variables with descriptions).
 | `specs/API_AND_TYPES_SPEC.md` | Shared type definitions (source of truth for Rosetta Stone) |
 | `specs/CPM_RES_MODEL_SPEC.md` | CPM scheduler specification |
 | `specs/GABLE_LBM_DESIGN_SYSTEM.md` | Design tokens, glassmorphism, typography (GableLBM Industrial Dark) |
+| `specs/AGENT_BEHAVIOR_SPEC.md` | Agent autonomy levels, approval flows |
 | `planning/archive/v1_post_permit/ROADMAP.md` | Beta launch roadmap with phase status |
+
+The `specs/` directory contains 50+ specification files including per-feature specs (`STEP_70` through `STEP_93`), FutureShade/Tribunal specs, and agent prompts (`AUDITOR_PROMPT.md`, `BRAIN_PROMPT.md`).
 
 ## Prism Protocol (Dual-Engine Workflow)
 
@@ -210,7 +246,23 @@ The repo uses a two-agent architecture for development:
 
 Skills in `.agent/skills/`: `product_owner`, `system_architect`, `software_tester`, `l7_gatekeeper`
 
-Workflows in `.agent/workflows/`: `prism.md` (main loop), `devteam.md`, `product.md`, `ops.md`, `deploy.md`, `develop-sprint.md`
+Workflows in `.agent/workflows/`: `prism.md` (main loop), `devteam.md`, `product.md`, `ops.md`, `deploy.md`, `develop-sprint.md`, `full-development-cycle.md`, `kit.md`, `L7_gate.md`, `epic-gate-audit.md`, `plan_review`
+
+Guides: `.agent/AGENT_KIT_USER_GUIDE.md` (Brain vs Hands workflow), `.agent/STITCH_MCP_GUIDE.md` (Google Stitch integration)
+
+### Test Organization
+
+- **Unit tests**: Co-located with source files (`*_test.go` in each package)
+- **Integration tests**: `test/integration/` — 16+ test files covering chat, vision, physics, worker, etc. Run with `-tags=integration`
+- **Contract tests**: `internal/contract_validation/` generates JSON samples; `frontend/scripts/validate-contract.js` validates against TS types
+- **Test fixtures**: `test/fixtures/`, `test/testdata/`, `test/testhelpers/`
+- **CPM determinism**: Changes to `internal/physics/` require updating golden master tests (`cpm_determinism_test.go`)
+
+### Deployment
+
+- **Railway config**: `railway.json` (API — health check at `/health`), `railway-worker.json` (Worker)
+- **Entrypoint**: `scripts/entrypoint.sh` runs migrations before API startup; set `READINESS_CHECK_ON_STARTUP=true` for health probes
+- Railway injects `PORT` env var; config falls back: `APP_PORT` → `PORT` → `8080`
 
 ## Current State
 
