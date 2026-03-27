@@ -179,8 +179,8 @@ export class FBLeftNav extends FBElement {
             }
 
             .avatar {
-                width: 36px;
-                height: 36px;
+                width: 44px;
+                height: 44px;
                 border-radius: 50%;
                 background: var(--fb-accent, #00FFA3);
                 color: #fff;

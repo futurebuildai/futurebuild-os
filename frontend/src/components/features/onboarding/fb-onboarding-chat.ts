@@ -126,7 +126,7 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
             .processing-indicator {
                 align-self: flex-start;
                 padding: var(--fb-spacing-sm) var(--fb-spacing-md);
-                color: var(--md-sys-color-secondary);
+                color: var(--md-sys-color-primary);
                 font: var(--md-sys-typescale-body-medium);
                 font-style: italic;
                 display: flex;
@@ -140,7 +140,7 @@ export class FBOnboardingChat extends SignalWatcher(FBElement) {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                background-color: var(--md-sys-color-secondary);
+                background-color: var(--md-sys-color-primary);
                 animation: pulse 1.5s infinite;
             }
 

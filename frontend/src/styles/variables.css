@@ -13,7 +13,7 @@
   --md-sys-color-on-primary-container: #66FFc8;
 
   /* Secondary - Muted Green */
-  --md-sys-color-secondary: #AAF0CF;
+  --md-sys-color-secondary: #161821;
   --md-sys-color-on-secondary: #003822;
   --md-sys-color-secondary-container: #1A3A2A;
   --md-sys-color-on-secondary-container: #C8FFE0;
@@ -51,7 +51,7 @@
   --md-sys-color-surface-container-lowest: #0A0B10; /* Deep Space */
   --md-sys-color-surface-container-low: #0E0F15;
   --md-sys-color-surface-container: #161821;         /* Slate Steel */
-  --md-sys-color-surface-container-high: #1E2029;
+  --md-sys-color-surface-container-high: #161821;
   --md-sys-color-surface-container-highest: #252836;
 
   /* === Industrial Surface Tokens === */
@@ -130,6 +130,9 @@
 
   --fb-border: rgba(255, 255, 255, 0.05);
   --fb-border-light: rgba(255, 255, 255, 0.03);
+
+  --glass-bg: rgba(22, 24, 33, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.05);
 
   --fb-success: #00FFA3;
   --fb-error: #F43F5E;

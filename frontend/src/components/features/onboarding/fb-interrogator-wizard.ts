@@ -305,7 +305,7 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
             .processing-indicator {
                 align-self: flex-start;
                 padding: 6px 12px;
-                color: var(--md-sys-color-secondary);
+                color: var(--md-sys-color-primary);
                 font: var(--md-sys-typescale-body-small);
                 font-style: italic;
                 display: flex;
@@ -319,7 +319,7 @@ export class FBInterrogatorWizard extends SignalWatcher(FBElement) {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                background: var(--md-sys-color-secondary);
+                background: var(--md-sys-color-primary);
                 animation: pulse 1.5s infinite;
             }
 

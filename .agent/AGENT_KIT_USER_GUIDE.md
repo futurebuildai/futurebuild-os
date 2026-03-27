@@ -45,13 +45,17 @@ To move a feature from idea to production, follow these 5 steps:
 *   `/software_tester`: Run browser-based E2E tests.
 *   `/devteam`: (Legacy/Alias) for technical planning.
 
-## 5. Handoff Protocols
+## 5. Handoff Protocols & Concurrency
 
 Context is passed between the Brain and the Hands primarily through:
-1.  **Specification Files:** Stored in `specs/`, these are the source of truth for Claude Code.
-2.  **Terminal Prompts:** Antigravity generates dense instructions that "prime" Claude Code with all necessary context, including absolute file paths to the specs.
-3.  **Remediation Prompts:** If an audit fails, Antigravity generates a specific "fix" prompt to be fed back into Claude Code.
+1.  **Specification Files**: Stored in `specs/`, the source of truth for Claude Code.
+2.  **Terminal Prompts**: Antigravity generates dense instructions priming Claude Code with context.
+3.  **Dual-Terminal Execution**: For concurrent Backend (Go) and Frontend (Lit) work, Antigravity will provide two prompts:
+    - **Terminal 1**: Run `claude -p "[Prompt A]"` for backend/logic implementation.
+    - **Terminal 2**: Run `claude --fork-session -p "[Prompt B]"` for frontend/UI implementation.
+    - *Note*: Using `--fork-session` allows a second session to start with a clean state while inheriting the necessary project context.
 
----
+## 6. Commands & Triggers
+... (rest of the file)
 **Protocol Version:** 1.0.0 (Directive 16)
 **Status:** ACTIVE

@@ -42,6 +42,8 @@ export class FBArtifactActions extends FBElement {
                 cursor: pointer;
                 font-family: inherit;
                 transition: background 0.15s, opacity 0.15s, transform 0.1s;
+                min-height: 44px;
+                min-width: 44px;
             }
 
             .btn:active:not(:disabled) { transform: scale(0.98); }

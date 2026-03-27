@@ -14,6 +14,8 @@ FutureBuild is an AI-powered construction project management platform. It uses t
 | Frontend | Lit 3.0, TypeScript 5.0+ (Strict Mode), Vite, Signals (@lit-labs/preact-signals) |
 | AI | Google Vertex AI (Gemini 2.5 Flash/Pro) + Anthropic Claude Opus (chat orchestration) |
 | Auth | Clerk (main app), Magic link email (portal contacts), JWT tokens |
+| Observability | OpenTelemetry (OTLP/HTTP) |
+| Testing | Testcontainers (PostgreSQL, Redis) for integration tests |
 
 **Hard Constraints:**
 - NO React, NO ORMs (use raw SQL/pgx), NO Python logic (Go only)
@@ -52,6 +54,7 @@ make contract-test
 npm --prefix frontend run lint
 npm --prefix frontend run lint:fix
 npm --prefix frontend run format
+npm --prefix frontend run format:check
 
 # Database migrations (golang-migrate, 6-digit zero-padded sequential)
 make migrate-up
@@ -63,10 +66,6 @@ make run-worker
 
 # Seed demo data
 make seed-demo
-
-# Shadow Protocol (documentation enforcement)
-npm run shadow:scaffold
-npm run shadow:check
 ```
 
 ## Entry Points
@@ -83,26 +82,38 @@ The API server supports `--readiness-check` flag for CI/CD health probes (runs p
 
 ### Backend (`internal/`)
 
-- **`server/server.go`** — Single-file server setup (~800 lines). All route registration, handler wiring, and middleware stack. Services are constructed first, then handlers, then routes. Features are conditionally initialized (fail-closed: missing config disables the feature, doesn't crash).
+- **`server/server.go`** — Single-file server setup (~900 lines). All route registration, handler wiring, and middleware stack. Services are constructed first, then handlers, then routes. Features are conditionally initialized (fail-closed: missing config disables the feature, doesn't crash).
 - **`api/handlers/`** — HTTP handlers. Pattern: struct with service dependencies, methods return `http.HandlerFunc`.
 - **`chat/`** — Dual chat orchestrator:
-  - `orchestrator.go` — Regex-based intent classification (fallback)
+  - `orchestrator.go` — Regex-based intent classification (fallback, always available)
   - `claude_orchestrator.go` — Claude Opus with tool use (primary when `ANTHROPIC_API_KEY` set)
+  - `audit_wal.go` — Write-Ahead Log for audit trail
+  - `circuit_breaker.go` / `dlq.go` — Failure handling with dead letter queue
   - Commands return `(text, *Artifact, error)` for rich UI rendering
-- **`physics/`** — CPM scheduler (forward/backward pass), DHSM duration calculator, SWIM weather model. Deterministic with golden master tests.
+- **`physics/`** — CPM scheduler (forward/backward pass), DHSM duration calculator, SWIM weather model. **Deterministic** — changes require golden master test updates (`cpm_determinism_test.go`).
 - **`agents/`** — Autonomous agents (DailyFocus, Procurement, SubLiaison). Each has a standard and Claude-powered variant.
-- **`service/`** — Business logic. Services use pgxpool directly with raw SQL. Interfaces in `internal/service/interfaces.go`.
+- **`futureshade/`** — Intelligence layer: Tribunal decision engine, shadow execution tracking.
+- **`service/`** — Business logic. Services use `pgxpool.Pool` directly with raw SQL. Interfaces in `internal/service/interfaces.go`.
 - **`models/`** — Domain models (Project, Task, WBS, Financial, Communication, FeedCard)
-- **`worker/`** — Asynq job handlers, task type definitions in `payloads.go`, cron schedules in `scheduler.go`
-- **`middleware/`** — Auth (Clerk JWT via JWKS), role/permission checks, rate limiting, dev auth bypass (`DEV_AUTH_BYPASS=true`)
+- **`worker/`** — Asynq job handlers. Task payloads in `payloads.go`, cron schedules in `scheduler.go`. Runs as separate binary from API server.
+- **`middleware/`** — Auth (Clerk JWT via JWKS), role/permission checks, rate limiting, dev auth bypass
 - **`config/`** — Environment-based config with `godotenv`. See `.env.example` for all variables.
 - **`readiness/`** — Per-service health probes (DB, Clerk, Redis, Vertex, S3, notification providers)
+
+### Conditional Feature Registration
+
+Handlers are only registered in `server.go` if their dependencies are configured:
+- `OnboardingHandler` / `VisionHandler` — require `aiClient != nil`
+- `StreamChatHandler` — requires `AnthropicAPIKey != ""`
+- `GitHubWebhookHandler` — requires `GitHubWebhookSecret != ""`
+
+This means missing an API key won't crash the server — the feature is simply disabled.
 
 ### Frontend (`frontend/src/`)
 
 **Component hierarchy:** All components extend `FBElement` (shared styles, `emit()` helper). View/page components extend `FBViewElement` (viewport containment, `onViewActive()` lifecycle hook). Views manage their own scroll — the window NEVER scrolls.
 
-- **`components/`** — Lit web components organized by domain (layout, chat, artifacts, agent, views, settings)
+- **`components/`** — Lit web components organized by domain (layout, chat, artifacts, agent, views, settings, shadow, portal)
 - **`services/`** — API client, WebSocket/SSE handlers
 - **`store/`** — Signals-based reactive state (`@lit-labs/preact-signals`)
 - **`types/`** — TypeScript interfaces matching Go `pkg/types/` (Rosetta Stone)
@@ -110,6 +121,8 @@ The API server supports `--readiness-check` flag for CI/CD health probes (runs p
 **Path alias:** `@/*` maps to `./src/*` (configured in tsconfig.json). Import as `import { X } from '@/components/base/FBElement'`.
 
 **Component naming:** Tag names use `fb-` prefix (e.g., `fb-my-component`). Files match class names (e.g., `FBElement.ts`).
+
+**Lit decorators:** `experimentalDecorators: true` and `useDefineForClassFields: false` are required for Lit's `@property` decorator.
 
 ### AI Integration (`pkg/ai/`)
 
@@ -128,13 +141,13 @@ Go types in `pkg/types/` ↔ TypeScript types in `frontend/src/types/` must stay
 
 **Contract test pipeline:** `make contract-test` runs:
 1. Go test generates JSON samples from Go structs → `internal/contract_validation/samples/*.json`
-2. Frontend tests validate TS types can parse those JSON samples
+2. Frontend validates TS types can parse those JSON samples (via AJV in `frontend/scripts/validate-contract.js`)
 
-Verified types: Forecast, Contact, InvoiceExtraction, GanttData.
+Verified types: Forecast, Contact, InvoiceExtraction, GanttData. Adding new shared types requires updates in BOTH Go and TS.
 
 ### Worker / Async Jobs
 
-Asynq (Redis-backed) with typed task payloads in `internal/worker/payloads.go`.
+Asynq (Redis-backed) with typed task payloads in `internal/worker/payloads.go`. Runs as a **separate binary** (`cmd/worker/main.go`), not inside the API server.
 
 Key cron schedules: 05:00 UTC procurement, 06:00 UTC daily briefing, 07:00 UTC drift detection, 23:00 UTC expire actions.
 
@@ -142,11 +155,26 @@ Patterns: idempotency checks before processing, circuit breakers for optional fe
 
 ### Auth Model
 
-Two separate auth systems:
+Three auth systems:
 - **Clerk** — Main app users. JWT validated via JWKS. Middleware: `RequireAuth`, `RequireRole`, `RequirePermission` (scope-based RBAC)
 - **Magic Link** — Portal contacts (field workers). Rate-limited. Separate endpoints under `/api/v1/portal/auth/`
 - **API Key** — FB-Brain integration endpoints under `/api/v1/integration/`
-- **Dev bypass** — `DEV_AUTH_BYPASS=true` skips Clerk validation for local development
+
+**Dev bypass:** `DEV_AUTH_BYPASS=true` injects demo claims without Clerk JWT validation. `CLERK_ISSUER_URL` is required unless this is set. NEVER enable in production.
+
+## Critical Environment Variables
+
+| Variable | Purpose | Required For |
+|----------|---------|--------------|
+| `DATABASE_URL` | PostgreSQL connection | All |
+| `REDIS_URL` | Asynq task queue + sessions | Worker + API |
+| `CLERK_ISSUER_URL` | JWKS-based JWT validation | API (unless `DEV_AUTH_BYPASS=true`) |
+| `CLERK_SECRET_KEY` | User management / invite flow | Invite flow |
+| `ANTHROPIC_API_KEY` | Claude Opus orchestrator | Chat intelligence (optional — falls back to regex) |
+| `VERTEX_PROJECT_ID` / `VERTEX_LOCATION` | Gemini API | Document analysis, embeddings (optional) |
+| `DEV_AUTH_BYPASS` | Skip JWT validation | Local dev only |
+
+See `.env.example` for the complete list (118 variables with descriptions).
 
 ## Git Workflow
 
@@ -157,6 +185,11 @@ Two separate auth systems:
 - Direct push to `staging` allowed; `main` requires PR with approval
 - Commits should reference spec sections where applicable (e.g., `// See DATA_SPINE_SPEC.md Section 3.3`)
 
+### Docker Build
+
+- **API** (`Dockerfile`): 3-stage (Node frontend builder → Go backend builder → Alpine runtime). Includes `golang-migrate` binary; `entrypoint.sh` runs migrations before startup. Requires `VITE_CLERK_PUBLISHABLE_KEY` build arg.
+- **Worker** (`Dockerfile.worker`): 2-stage Go-only build. No frontend assets, no migrations.
+
 ## Key Specifications
 
 | Document | Purpose |
@@ -165,17 +198,20 @@ Two separate auth systems:
 | `specs/FRONTEND_SCOPE.md` | Frontend architecture, 3-panel layout, component design |
 | `specs/DATA_SPINE_SPEC.md` | Database schema, domain definitions |
 | `specs/API_AND_TYPES_SPEC.md` | Shared type definitions (source of truth for Rosetta Stone) |
-| `planning/ROADMAP.md` | 69-step implementation plan with current progress |
-| `agent/SYSTEM_PROMPT.md` | Agent behavior and slash commands |
+| `specs/CPM_RES_MODEL_SPEC.md` | CPM scheduler specification |
+| `specs/GABLE_LBM_DESIGN_SYSTEM.md` | Design tokens, glassmorphism, typography (GableLBM Industrial Dark) |
+| `planning/archive/v1_post_permit/ROADMAP.md` | Beta launch roadmap with phase status |
 
-## Prism Protocol Skills
+## Prism Protocol (Dual-Engine Workflow)
 
-The repo uses specialized AI skills (in `skills/`):
-- `/product` - PRD creation and discovery
-- `/devteam` - Engineering execution
-- `/ops` - Reliability and incident response
-- `/software_engineer` - Context prompt generation
+The repo uses a two-agent architecture for development:
+- **Antigravity (The Brain):** Planning, specs, QA, browser testing — via `.agent/workflows/`
+- **Claude Code (The Hands):** File editing, compilation, local testing
+
+Skills in `.agent/skills/`: `product_owner`, `system_architect`, `software_tester`, `l7_gatekeeper`
+
+Workflows in `.agent/workflows/`: `prism.md` (main loop), `devteam.md`, `product.md`, `ops.md`, `deploy.md`, `develop-sprint.md`
 
 ## Current State
 
-Phase 8 (Production Readiness) is complete. Current focus is Phase 9 (FutureShade - The Intelligence Layer). Migrations are at `000081`. CI/CD runs on Railway with multi-target Dockerfile (`api` + `worker`). See `planning/ROADMAP.md` for detailed status.
+Phases 10–15 of the Beta Launch Roadmap are complete. Migrations are at `000082`. CI/CD runs on Railway with multi-target Dockerfiles (`api` + `worker`). See `planning/archive/v1_post_permit/ROADMAP.md` for detailed status.

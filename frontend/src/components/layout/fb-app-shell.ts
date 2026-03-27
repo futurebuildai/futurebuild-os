@@ -172,7 +172,6 @@ export class FBAppShell extends FBElement {
                 .main-content {
                     grid-column: 1;
                 }
-            }    grid-template-columns: 1fr var(--fb-right-panel-width, 380px);
             }
 
             .top-bar-area {

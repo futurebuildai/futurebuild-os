@@ -1,48 +1,56 @@
 ---
-description: The Atomic Step Loop (Hybrid) for the Prism Protocol with Inter-Thread Protocol and Google Stitch Integration.
+description: The Atomic Step Loop (Hybrid) for the Prism Protocol with Inter-Thread Protocol, Google Stitch Integration, and Dual-Terminal Concurrency.
 ---
 
-# Prism Protocol: The "Stitch-to-Production" Pipeline
+# Prism Protocol: The Dual-Engine Execution Loop
 
-This protocol integrates **Google Stitch** (Generative UI) into our execution loop through a 4-stage process.
+This protocol enforces a strict separation between the **Brain** (Antigravity) and the **Hands** (Claude Code).
 
-## The 4-Stage Execution Loop
+## The 5-Stage Execution Loop
 
 ### Stage 1: UI Generation (Google Stitch)
 - **Role**: Creative Designer.
 - **Action**: Google Stitch uses the **A2UI Trusted Catalog** to generate declarative UI JSON.
-- **Output**: `DynamicUIArtifact` JSON representing the structural and visual intent of the UI.
+- **Output**: `DynamicUIArtifact` JSON representing the structural and visual intent.
 
 ### Stage 2: Parsing & Planning (Antigravity - The Brain)
 - **Role**: System Architect & DevOps Orchestrator.
-- **Action**: Antigravity parses the Stitch JSON, maps it to our **Lit 3.0** components, and generates strict technical specs and execution prompts.
-- **Output**: Updated `specs/` documentation and a dense Terminal Prompt for Claude Code.
+- **Action**: Antigravity parses the Stitch JSON, maps it to **Lit 3.0** components, and determines if the task requires **Dual-Terminal Execution** (Parallel Backend & Frontend work).
+- **Output**: 
+    - **Prompt A (Backend)**: Focuses on Go APIs, SQL migrations, and logic.
+    - **Prompt B (Frontend)**: Focuses on Lit components, CSS variables, and UI state.
 
 ### Stage 3: Execution (Claude Code - The Hands)
-- **Role**: Frontend/Backend Developer.
-- **Action**: The human runs `claude -p "[Prompt]"`. Claude writes the physical Lit/TS/CSS code, compiles the assets, and runs unit tests.
-- **Output**: Implementation of the UI components and business logic.
+- **Role**: Backend/Frontend Developer.
+- **Action**: The human opens two terminal sessions.
+    - **Session 1**: Run `claude -p "[Prompt A]"`.
+    - **Session 2**: Run `claude --fork-session -p "[Prompt B]"` (or separate terminal instance).
+- **Parallel Work**: Both Claude instances execute their respective tasks simultaneously.
 
-### Stage 4: Visual QA (Antigravity - The Brain)
+### Stage 4: Visual QA & Audit (Antigravity - The Brain)
 - **Role**: Software Tester & QA Director.
-- **Action**: Antigravity mandates the use of the `/chome` tool for E2E visual verification.
-- **Verification**: Ensure the implemented UI matches the **Stitch Stage 1** intent (glassmorphism, responsiveness, touch targets).
-- **Remediation Loop**: If `/chome` detects visual bugs or console errors, Antigravity generates a specific fix prompt for Claude Code.
+- **Action**: Antigravity mandates the use of `/chome` for E2E visual verification and `make test` for backend verification.
+- **Verification**: Ensure the implemented UI matches the **Stitch Stage 1** intent and the API meets the **Stage 2** technical spec.
 
-## Workflow Triggers
-- `/product`: Initial feature planning and PRD.
-- `/stitch`: Handoff to Google Stitch for UI generation.
-- `/chome`: Invoke for visual QA and browser testing.
-- `/L7 Gate`: Final security audit before deployment.
+### Stage 5: Revision & Finalization (The Loop)
+- **Outcome (FAIL)**: Antigravity generates a specific "Remediation Prompt" for the relevant terminal session.
+- **Outcome (PASS)**: Antigravity authorizes the merge and updates the `ROADMAP.md`.
 
-## Protocol Visualization
+## Dual-Terminal Protocol Triggers
+- **CONCURRENT_DEV**: Triggered when a spec affects both `internal/api/` and `frontend/src/`.
+- **FORK_SESSION**: Use `claude --fork-session` to maintain context while isolating execution threads.
+
+## Inter-Thread Protocol
 ```mermaid
 graph TD
     A[User Request] --> B[Stitch: Stage 1 - Design]
-    B --> C[Antigravity: Stage 2 - Spec]
-    C --> D[Claude: Stage 3 - Execute]
-    D --> E[Antigravity: Stage 4 - Visual QA]
+    B --> C[Antigravity: Stage 2 - Dual Spec]
+    C --> D1[Human: Run Claude - Backend]
+    C --> D2[Human: Run Claude - Frontend]
+    D1 --> E[Antigravity: Stage 4 - Audit]
+    D2 --> E
     E -- FAIL --> F[Antigravity: Fix Prompt]
-    F --> D
+    F --> D1
+    F --> D2
     E -- PASS --> G[L7 Gate & Finalize]
 ```

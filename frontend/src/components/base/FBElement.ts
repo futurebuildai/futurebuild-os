@@ -63,6 +63,7 @@ export abstract class FBElement extends LitElement {
             -webkit-backdrop-filter: blur(24px);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 16px;
+            box-shadow: var(--md-sys-elevation-1);
         }
 
         .glass-panel {
@@ -74,11 +75,11 @@ export abstract class FBElement extends LitElement {
 
         /* === Hover / Interaction Utilities === */
         .hover-lift {
-            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
         }
         .hover-lift:hover {
-            transform: translateY(-2px);
-            box-shadow: 0px 2px 6px 2px rgba(0, 0, 0, 0.25), 0px 1px 2px 0px rgba(0, 0, 0, 0.4);
+            transform: translateY(-4px);
+            box-shadow: var(--md-sys-elevation-2);
         }
 
         /* === Glow Utilities === */
@@ -130,12 +131,12 @@ export abstract class FBElement extends LitElement {
         .skeleton {
             background: linear-gradient(
                 90deg,
-                var(--fb-surface-2, #1E2029) 25%,
-                var(--fb-surface-1, #161821) 50%,
-                var(--fb-surface-2, #1E2029) 75%
+                var(--md-sys-color-surface-container-high) 25%,
+                var(--md-sys-color-surface-container) 50%,
+                var(--md-sys-color-surface-container-high) 75%
             );
             background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+            animation: shimmer 2s linear infinite;
             border-radius: 4px;
         }
         .skeleton-text { height: 1em; width: 100%; margin-bottom: 0.5em; display: block; }

@@ -64,6 +64,8 @@ export class FBErrorBoundary extends FBElement {
                 border-radius: var(--fb-radius-sm);
                 cursor: pointer;
                 font-size: var(--fb-text-xs);
+                min-height: 44px;
+                min-width: 44px;
             }
             .error-actions button:hover {
                 background: var(--fb-bg-tertiary);

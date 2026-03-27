@@ -9,6 +9,7 @@
  */
 import { html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { FBElement } from '../base/FBElement';
 import { store, type ChatCardContext } from '../../store/store';
 import { feedSSE } from '../../services/feed-sse';
@@ -330,6 +331,7 @@ export class FBHomeFeed extends FBElement {
                 align-items: center;
                 margin-top: 12px;
                 padding: 8px 20px;
+                min-height: 44px;
                 border-radius: 6px;
                 border: 1px solid #F43F5E;
                 background: transparent;
@@ -804,15 +806,13 @@ export class FBHomeFeed extends FBElement {
                                   card-count=${cards.length}
                                   @fb-card-action=${this._handleCardAction}
                               >
-                                  ${cards.map(
-                        (card) => html`
+                                  ${repeat(cards, (card) => card.id, (card) => html`
                                           <fb-feed-card
                                               .card=${card}
                                               class=${this._newCardIds.has(card.id) ? 'new-card' : ''}
                                               role="article"
                                           ></fb-feed-card>
-                                      `
-                    )}
+                                      `)}
                               </fb-feed-section>
                           `;
                 })}

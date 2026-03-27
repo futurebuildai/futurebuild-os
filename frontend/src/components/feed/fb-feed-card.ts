@@ -7,6 +7,7 @@
  */
 import { html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { FBElement } from '../base/FBElement';
 import { scorePriority } from '../../utils/feed-priority';
 import type { FeedCard, FeedCardType } from '../../types/feed';
@@ -187,6 +188,8 @@ export class FBFeedCard extends FBElement {
                 cursor: pointer;
                 border: 1px solid transparent;
                 transition: all 0.15s ease;
+                min-height: 44px;
+                min-width: 44px;
             }
 
             .action-btn[data-style='primary'] {
@@ -427,8 +430,7 @@ export class FBFeedCard extends FBElement {
                 : (this.card.actions?.length ?? 0) > 0
                     ? html`
                               <div class="actions-row">
-                                  ${this.card.actions.map(
-                        (a) => html`
+                                  ${repeat(this.card.actions, (a) => a.id, (a) => html`
                                           <button
                                               class="action-btn"
                                               data-style=${a.style}
@@ -436,8 +438,7 @@ export class FBFeedCard extends FBElement {
                                           >
                                               ${a.label}
                                           </button>
-                                      `
-                    )}
+                                      `)}
                               </div>
                           `
                     : nothing}

@@ -71,3 +71,20 @@ Google Stitch must output UI designs in a standardized JSON format. This allows 
 1. **Output**: Stitch writes the above JSON to `.agent/temp/stitch_output.json`.
 2. **Trigger**: Antigravity is notified to "Parse Stitch Output".
 3. **Action**: Antigravity maps `fb-` components to `frontend/src/components` imports and generates the Lit/TS execution prompt for Claude Code.
+
+## 4. GableLBM Design Constraints
+
+When generating `DynamicUIArtifact` payloads, Google Stitch MUST adhere to the following GableLBM architectural constraints:
+
+1.  **Color Strictness**: Only use `var(--md-sys-color-*)` variables. Never hardcode hex values.
+2.  **Component Archetypes**:
+    - **Cards**: Must use the `.glass-card` class for layout depth.
+    - **Interactions**: Use the `.hover-lift` class for all clickable surface elements.
+    - **Loading States**: Define `skeleton` components for any asynchronous data fetching.
+3.  **Layout Systems**:
+    - Use `var(--fb-spacing-*)` for consistent gaps.
+    - Prefer `flex` and `grid` layouts that respect the `12px` (`var(--md-sys-shape-corner-medium)`) corner radius standards.
+4.  **Brand Identity**:
+    - Primary actions must utilize `var(--md-sys-color-primary)` (Gable Green).
+    - Destructive actions must utilize `var(--md-sys-color-error)` (Safety Red).
+
