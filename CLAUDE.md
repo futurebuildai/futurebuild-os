@@ -58,6 +58,10 @@ npm --prefix frontend run lint:fix
 npm --prefix frontend run format
 npm --prefix frontend run format:check
 
+# Frontend tests (Web Test Runner)
+npm --prefix frontend run test
+npm --prefix frontend run test:watch
+
 # Database migrations (golang-migrate, 6-digit zero-padded sequential)
 # Migration files live in migrations/ at repo root (e.g., 000083_my_change.up.sql)
 make migrate-up
@@ -75,6 +79,12 @@ make deploy-check
 
 # Auth-specific tests
 make test-auth
+
+# Clean build artifacts (bin/, dist/, frontend/dist/)
+make clean
+
+# Validate CI workflow YAML syntax (requires yq)
+make validate-ci
 ```
 
 ### Local Infrastructure
@@ -94,6 +104,7 @@ docker-compose up -d db redis minio
 | Go API | `APP_PORT` (default 8080) | Set to `8081` in local `.env` for Vite proxy |
 | Vite frontend | 3000 | Proxies `/api` to `http://localhost:8081` |
 | Docker Compose DB | 5433 → 5432 | Host port differs from container port |
+| MinIO (S3) | 9000, 9001 | API on 9000, Console on 9001 |
 
 **Important:** The Vite config (`frontend/vite.config.ts`) hardcodes the proxy target as `localhost:8081`. Your local `.env` must set `APP_PORT=8081` for `npm run dev` to work correctly.
 
@@ -128,6 +139,7 @@ The API server supports `--readiness-check` flag for CI/CD health probes (runs p
 - **`middleware/`** — Auth (Clerk JWT via JWKS), role/permission checks, rate limiting, dev auth bypass
 - **`config/`** — Environment-based config with `godotenv`. See `.env.example` for all variables.
 - **`readiness/`** — Per-service health probes (DB, Clerk, Redis, Vertex, S3, notification providers)
+- **`chaos/`** — Fault injection framework (Tree Planting ceremony, Step 69)
 - Also: `adapters/`, `audit/`, `auth/`, `data/`, `platform/`, `prompts/`, `rag/` — supporting packages for external integrations, auditing, data layer, and RAG
 
 ### Conditional Feature Registration
@@ -154,6 +166,8 @@ This means missing an API key won't crash the server — the feature is simply d
 
 **Lit decorators:** `experimentalDecorators: true` and `useDefineForClassFields: false` are required for Lit's `@property` decorator.
 
+**Code style:** Prettier enforces single quotes, trailing commas (es5), 2-space tabs, semicolons, 100-char print width. ESLint uses flat config format (ESLint 9.x) with `eslint-plugin-lit` and `eslint-plugin-wc`. Frontend tests use Web Test Runner with esbuild (`frontend/test/**/*.test.ts`).
+
 ### AI Integration (`pkg/ai/`)
 
 Vendor-agnostic abstraction with `Client` interface supporting `GenerateContent()` and `GenerateEmbedding()`.
@@ -165,7 +179,7 @@ Vendor-agnostic abstraction with `Client` interface supporting `GenerateContent(
 
 Both providers run simultaneously — Vertex for vision/embeddings, Claude for chat/reasoning.
 
-Other `pkg/` packages: `clock/` (time utilities), `httputil/`, `storage/` (S3 abstraction), `sync/`.
+Other `pkg/` packages: `a2a/` (agent-to-agent protocol), `clock/` (time utilities), `httputil/`, `storage/` (S3 abstraction), `sync/`.
 
 ### Rosetta Stone Type System
 
@@ -266,4 +280,4 @@ Guides: `.agent/AGENT_KIT_USER_GUIDE.md` (Brain vs Hands workflow), `.agent/STIT
 
 ## Current State
 
-Phases 10–15 of the Beta Launch Roadmap are complete. Migrations are at `000082`. CI/CD runs on Railway with multi-target Dockerfiles (`api` + `worker`). See `planning/archive/v1_post_permit/ROADMAP.md` for detailed status.
+Phases 10–18 of the Beta Launch Roadmap are complete. Migrations are at `000082`. CI/CD runs on Railway with multi-target Dockerfiles (`api` + `worker`). See `planning/archive/v1_post_permit/ROADMAP.md` for detailed status.

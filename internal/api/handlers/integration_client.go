@@ -10,6 +10,8 @@ import (
 	"os"
 
 	"github.com/colton/futurebuild/pkg/a2a"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // IntegrationClient is a lightweight HTTP client for communicating with FB-Brain.
@@ -95,6 +97,15 @@ func (c *IntegrationClient) postFlow(ctx context.Context, path string, body inte
 	req.Header.Set("X-Signature", sig)
 	req.Header.Set("X-Timestamp", ts)
 	req.Header.Set("X-Nonce", nonce)
+
+	// A2A distributed tracing: prefer W3C traceparent if OTel span active; fallback UUIDv4
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		sc := span.SpanContext()
+		req.Header.Set("X-Trace-ID", fmt.Sprintf("00-%s-%s-01", sc.TraceID(), sc.SpanID()))
+	} else {
+		req.Header.Set("X-Trace-ID", uuid.NewString())
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
