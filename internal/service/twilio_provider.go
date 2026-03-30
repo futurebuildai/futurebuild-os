@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // TwilioProvider implements types.NotificationService using Twilio API.
@@ -28,7 +29,7 @@ func NewTwilioProvider(accountSID, authToken, fromNumber string) *TwilioProvider
 		accountSID: accountSID,
 		authToken:  authToken,
 		fromNumber: fromNumber,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 

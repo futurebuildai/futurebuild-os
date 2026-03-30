@@ -45,6 +45,7 @@ type FleetAsset struct {
 	Status            AssetStatus `json:"status" db:"status"`
 	Location          *string     `json:"location,omitempty" db:"location"`
 	Notes             *string     `json:"notes,omitempty" db:"notes"`
+	VisibleToRoles    []string    `json:"visible_to_roles,omitempty" db:"visible_to_roles"` // Phase 20: per-asset role visibility
 	CreatedAt         time.Time   `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at" db:"updated_at"`
 }

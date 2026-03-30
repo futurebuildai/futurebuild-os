@@ -27,6 +27,7 @@ const (
 	TypeCertificationAlerts     = "task:certification_alerts"   // Phase 18: Daily certification expiration check
 	TypeMaintenanceReminders    = "task:maintenance_reminders"  // Phase 18: Weekly equipment maintenance reminders
 	TypeVoiceTranscription      = "task:voice_transcription"    // Phase 18: Async voice-to-text processing
+	TypeA2AWebhookDispatch      = "task:a2a_webhook_dispatch"   // Phase 20: Retry failed A2A dispatches
 )
 
 // HydrateProjectPayload contains the project ID for scoped hydration.
@@ -233,4 +234,28 @@ func NewVoiceTranscriptionTask(memoID, orgID uuid.UUID, s3Key, mimeType string) 
 		return nil, err
 	}
 	return asynq.NewTask(TypeVoiceTranscription, payload, asynq.Queue("default")), nil
+}
+
+// Phase 20: A2A Webhook Dispatch — retry failed outbound A2A requests
+
+// A2AWebhookDispatchPayload contains data for retrying a failed A2A HTTP request.
+type A2AWebhookDispatchPayload struct {
+	Path    string `json:"path"`
+	Body    []byte `json:"body"`
+	APIKey  string `json:"api_key"`
+	BaseURL string `json:"base_url"`
+	TraceID string `json:"trace_id"`
+}
+
+// NewA2AWebhookDispatchTask creates a task for retrying a failed A2A dispatch.
+func NewA2AWebhookDispatchTask(p A2AWebhookDispatchPayload) (*asynq.Task, error) {
+	payload, err := json.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeA2AWebhookDispatch, payload,
+		asynq.Queue("default"),
+		asynq.MaxRetry(5),
+		asynq.Timeout(30*time.Second),
+	), nil
 }

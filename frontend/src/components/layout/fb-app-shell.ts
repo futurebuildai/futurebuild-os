@@ -57,6 +57,9 @@ import '../settings/fb-settings-org';
 import '../settings/fb-settings-team';
 import '../views/fb-view-budget';
 import '../views/fb-view-directory';
+import '../views/fb-view-corporate';
+import '../views/fb-view-employees';
+import '../views/fb-view-fleet';
 
 /**
  * Route type for V2 URL-based routing.
@@ -79,7 +82,10 @@ type Route =
     | { view: 'schedule' }
     | { view: 'budget' }
     | { view: 'chat' }
-    | { view: 'project-create' };
+    | { view: 'project-create' }
+    | { view: 'corporate' }
+    | { view: 'employees' }
+    | { view: 'fleet' };
 
 function matchRoute(path: string): Route {
     if (path === '/' || path === '') return { view: 'home' };
@@ -94,6 +100,9 @@ function matchRoute(path: string): Route {
     if (path === '/budget') return { view: 'budget' };
     if (path === '/chat') return { view: 'chat' };
     if (path === '/login') return { view: 'login' };
+    if (path === '/corporate') return { view: 'corporate' };
+    if (path === '/employees') return { view: 'employees' };
+    if (path === '/fleet') return { view: 'fleet' };
 
     // /project/:id/chat/:threadId?
     const chatMatch = path.match(/^\/project\/([^/]+)\/chat(?:\/([^/]+))?$/);
@@ -590,6 +599,15 @@ export class FBAppShell extends FBElement {
             case 'project-create':
                 this._navigate('/projects/new');
                 break;
+            case 'corporate':
+                this._navigate('/corporate');
+                break;
+            case 'employees':
+                this._navigate('/employees');
+                break;
+            case 'fleet':
+                this._navigate('/fleet');
+                break;
         }
     };
 
@@ -745,6 +763,12 @@ export class FBAppShell extends FBElement {
 
             case 'contacts':
                 return html`<fb-view-directory></fb-view-directory>`;
+            case 'corporate':
+                return html`<fb-view-corporate></fb-view-corporate>`;
+            case 'employees':
+                return html`<fb-view-employees></fb-view-employees>`;
+            case 'fleet':
+                return html`<fb-view-fleet></fb-view-fleet>`;
 
             case 'login':
                 return nothing;
@@ -770,6 +794,14 @@ export class FBAppShell extends FBElement {
         // Create Project & Settings route protection (RBAC check)
         if ((this._route.view === 'project-create' || this._route.view.startsWith('settings-')) && this._isAuthenticated) {
             if (this._userRole === 'Subcontractor' || this._userRole === 'Viewer') {
+                setTimeout(() => this._navigate('/'), 0);
+                return html`<div class="loading-screen">Redirecting...</div>`;
+            }
+        }
+
+        // ERP views route protection (RBAC check) — Phase 20
+        if ((['corporate', 'employees', 'fleet'] as const).includes(this._route.view as any) && this._isAuthenticated) {
+            if (this._userRole === 'Subcontractor' || this._userRole === 'Viewer' || this._userRole === 'Client') {
                 setTimeout(() => this._navigate('/'), 0);
                 return html`<div class="loading-screen">Redirecting...</div>`;
             }

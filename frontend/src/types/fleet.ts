@@ -23,6 +23,7 @@ export interface FleetAsset {
     status: AssetStatus;
     location?: string;
     notes?: string;
+    visible_to_roles?: string[]; // Phase 20: per-asset role visibility
     created_at: string;
     updated_at: string;
 }

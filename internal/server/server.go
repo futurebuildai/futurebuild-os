@@ -319,7 +319,8 @@ func NewServer(db *pgxpool.Pool, cfg *config.Config, aiClient ai.Client) *Server
 	}
 
 	// V2: Portfolio feed handler (feedService created earlier for agent injection)
-	feedHandler := handlers.NewFeedHandler(feedService)
+	// Phase 20: Pass RedisURL for A2A retry queue support
+	feedHandler := handlers.NewFeedHandler(feedService, cfg.RedisURL)
 	feedHandler.WithAgentActionService(agentActionService)
 
 	// Agent pending actions handler

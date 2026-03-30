@@ -24,22 +24,23 @@ func (s *FleetService) CreateFleetAsset(ctx context.Context, orgID uuid.UUID, as
 	asset.OrgID = orgID
 	query := `
 		INSERT INTO fleet_assets (org_id, asset_number, asset_type, make, model, year, vin, license_plate,
-			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes, visible_to_roles)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING id, created_at, updated_at`
 
 	return s.db.QueryRow(ctx, query,
 		asset.OrgID, asset.AssetNumber, asset.AssetType, asset.Make, asset.Model,
 		asset.Year, asset.VIN, asset.LicensePlate, asset.PurchaseDate,
 		asset.PurchaseCostCents, asset.CurrentValueCents, asset.Status,
-		asset.Location, asset.Notes,
+		asset.Location, asset.Notes, asset.VisibleToRoles,
 	).Scan(&asset.ID, &asset.CreatedAt, &asset.UpdatedAt)
 }
 
 func (s *FleetService) GetFleetAsset(ctx context.Context, assetID, orgID uuid.UUID) (*models.FleetAsset, error) {
 	query := `
 		SELECT id, org_id, asset_number, asset_type, make, model, year, vin, license_plate,
-			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes, created_at, updated_at
+			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes,
+			visible_to_roles, created_at, updated_at
 		FROM fleet_assets
 		WHERE id = $1 AND org_id = $2`
 
@@ -48,7 +49,8 @@ func (s *FleetService) GetFleetAsset(ctx context.Context, assetID, orgID uuid.UU
 		&asset.ID, &asset.OrgID, &asset.AssetNumber, &asset.AssetType,
 		&asset.Make, &asset.Model, &asset.Year, &asset.VIN, &asset.LicensePlate,
 		&asset.PurchaseDate, &asset.PurchaseCostCents, &asset.CurrentValueCents,
-		&asset.Status, &asset.Location, &asset.Notes, &asset.CreatedAt, &asset.UpdatedAt,
+		&asset.Status, &asset.Location, &asset.Notes,
+		&asset.VisibleToRoles, &asset.CreatedAt, &asset.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -57,14 +59,23 @@ func (s *FleetService) GetFleetAsset(ctx context.Context, assetID, orgID uuid.UU
 	return &asset, nil
 }
 
-func (s *FleetService) ListFleetAssets(ctx context.Context, orgID uuid.UUID, status, assetType string) ([]models.FleetAsset, error) {
+func (s *FleetService) ListFleetAssets(ctx context.Context, orgID uuid.UUID, status, assetType, callerRole string) ([]models.FleetAsset, error) {
 	query := `
 		SELECT id, org_id, asset_number, asset_type, make, model, year, vin, license_plate,
-			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes, created_at, updated_at
+			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes,
+			visible_to_roles, created_at, updated_at
 		FROM fleet_assets
 		WHERE org_id = $1`
 	args := []interface{}{orgID}
 	argIdx := 2
+
+	// Phase 20: Role-based visibility — Admins and PMs see everything; others see only
+	// assets where visible_to_roles is NULL/empty OR their role is in the array.
+	if callerRole != "" && callerRole != "Admin" && callerRole != "PM" {
+		query += fmt.Sprintf(" AND (visible_to_roles IS NULL OR visible_to_roles = '{}' OR $%d = ANY(visible_to_roles))", argIdx)
+		args = append(args, callerRole)
+		argIdx++
+	}
 
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
@@ -90,7 +101,8 @@ func (s *FleetService) ListFleetAssets(ctx context.Context, orgID uuid.UUID, sta
 			&a.ID, &a.OrgID, &a.AssetNumber, &a.AssetType,
 			&a.Make, &a.Model, &a.Year, &a.VIN, &a.LicensePlate,
 			&a.PurchaseDate, &a.PurchaseCostCents, &a.CurrentValueCents,
-			&a.Status, &a.Location, &a.Notes, &a.CreatedAt, &a.UpdatedAt,
+			&a.Status, &a.Location, &a.Notes,
+			&a.VisibleToRoles, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -105,22 +117,24 @@ func (s *FleetService) UpdateFleetAsset(ctx context.Context, assetID, orgID uuid
 		UPDATE fleet_assets SET
 			asset_number = $3, asset_type = $4, make = $5, model = $6, year = $7,
 			vin = $8, license_plate = $9, purchase_date = $10, purchase_cost_cents = $11,
-			current_value_cents = $12, status = $13, location = $14, notes = $15
+			current_value_cents = $12, status = $13, location = $14, notes = $15, visible_to_roles = $16
 		WHERE id = $1 AND org_id = $2
 		RETURNING id, org_id, asset_number, asset_type, make, model, year, vin, license_plate,
-			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes, created_at, updated_at`
+			purchase_date, purchase_cost_cents, current_value_cents, status, location, notes,
+			visible_to_roles, created_at, updated_at`
 
 	var updated models.FleetAsset
 	err := s.db.QueryRow(ctx, query,
 		assetID, orgID, asset.AssetNumber, asset.AssetType, asset.Make, asset.Model,
 		asset.Year, asset.VIN, asset.LicensePlate, asset.PurchaseDate,
 		asset.PurchaseCostCents, asset.CurrentValueCents, asset.Status,
-		asset.Location, asset.Notes,
+		asset.Location, asset.Notes, asset.VisibleToRoles,
 	).Scan(
 		&updated.ID, &updated.OrgID, &updated.AssetNumber, &updated.AssetType,
 		&updated.Make, &updated.Model, &updated.Year, &updated.VIN, &updated.LicensePlate,
 		&updated.PurchaseDate, &updated.PurchaseCostCents, &updated.CurrentValueCents,
-		&updated.Status, &updated.Location, &updated.Notes, &updated.CreatedAt, &updated.UpdatedAt,
+		&updated.Status, &updated.Location, &updated.Notes,
+		&updated.VisibleToRoles, &updated.CreatedAt, &updated.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

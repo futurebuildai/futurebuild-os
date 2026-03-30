@@ -296,6 +296,8 @@ func main() {
 	srv.RegisterHandlerFunc(worker.TypeCertificationAlerts, workerHandler.HandleCertificationAlerts)
 	srv.RegisterHandlerFunc(worker.TypeMaintenanceReminders, workerHandler.HandleMaintenanceReminders)
 	srv.RegisterHandlerFunc(worker.TypeVoiceTranscription, workerHandler.HandleVoiceTranscription)
+	// Phase 20: A2A webhook dispatch retry handler
+	srv.RegisterHandlerFunc(worker.TypeA2AWebhookDispatch, worker.HandleA2AWebhookDispatch)
 
 	// 10. Start Services with Error Propagation
 	// Both scheduler and server run in goroutines.

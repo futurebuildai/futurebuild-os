@@ -44,7 +44,7 @@ func (h *FleetHandler) ListFleetAssets(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	assetType := r.URL.Query().Get("asset_type")
 
-	assets, err := h.svc.ListFleetAssets(r.Context(), orgID, status, assetType)
+	assets, err := h.svc.ListFleetAssets(r.Context(), orgID, status, assetType, string(claims.Role))
 	if err != nil {
 		slog.Error("fleet: failed to list assets", "error", err, "org_id", orgID)
 		response.JSONError(w, http.StatusInternalServerError, "failed to list fleet assets")

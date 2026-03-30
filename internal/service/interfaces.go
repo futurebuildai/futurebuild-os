@@ -186,7 +186,7 @@ type EmployeeServicer interface {
 type FleetServicer interface {
 	CreateFleetAsset(ctx context.Context, orgID uuid.UUID, asset *models.FleetAsset) error
 	GetFleetAsset(ctx context.Context, assetID, orgID uuid.UUID) (*models.FleetAsset, error)
-	ListFleetAssets(ctx context.Context, orgID uuid.UUID, status, assetType string) ([]models.FleetAsset, error)
+	ListFleetAssets(ctx context.Context, orgID uuid.UUID, status, assetType, callerRole string) ([]models.FleetAsset, error)
 	UpdateFleetAsset(ctx context.Context, assetID, orgID uuid.UUID, asset *models.FleetAsset) (*models.FleetAsset, error)
 	AllocateEquipment(ctx context.Context, alloc *models.EquipmentAllocation) error
 	CheckEquipmentAvailability(ctx context.Context, assetID uuid.UUID, from, to time.Time) (bool, error)

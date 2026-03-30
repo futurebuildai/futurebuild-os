@@ -346,6 +346,12 @@ export class FBLeftNav extends FBElement {
             this._currentView = 'chat';
         } else if (path.includes('/contacts')) {
             this._currentView = 'contacts';
+        } else if (path.includes('/corporate')) {
+            this._currentView = 'corporate';
+        } else if (path.includes('/employees')) {
+            this._currentView = 'employees';
+        } else if (path.includes('/fleet')) {
+            this._currentView = 'fleet';
         } else {
             this._currentView = 'other';
         }
@@ -371,6 +377,9 @@ export class FBLeftNav extends FBElement {
                 case 'schedule': this.emit('fb-navigate', { view: 'schedule' }); break;
                 case 'budget': this.emit('fb-navigate', { view: 'budget' }); break;
                 case 'chat': this.emit('fb-navigate', { view: 'chat' }); break;
+                case 'corporate': this.emit('fb-navigate', { view: 'corporate' }); break;
+                case 'employees': this.emit('fb-navigate', { view: 'employees' }); break;
+                case 'fleet': this.emit('fb-navigate', { view: 'fleet' }); break;
                 default: console.warn('Global view not implemented:', view);
             }
         }
@@ -471,6 +480,41 @@ export class FBLeftNav extends FBElement {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="1" x2="12" y2="23"/>
                         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </button>
+                <button 
+                    class="nav-item ${this._currentView === 'corporate' ? 'active' : ''}"
+                    @click=${() => this._navigate('corporate')}
+                    aria-label="Corporate Financials"
+                    title="Corporate Financials"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </button>
+                <button 
+                    class="nav-item ${this._currentView === 'employees' ? 'active' : ''}"
+                    @click=${() => this._navigate('employees')}
+                    aria-label="Employees"
+                    title="Employees"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                    </svg>
+                </button>
+                <button 
+                    class="nav-item ${this._currentView === 'fleet' ? 'active' : ''}"
+                    @click=${() => this._navigate('fleet')}
+                    aria-label="Fleet & Equipment"
+                    title="Fleet & Equipment"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="1" y="3" width="15" height="13"/>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                        <circle cx="5.5" cy="18.5" r="2.5"/>
+                        <circle cx="18.5" cy="18.5" r="2.5"/>
                     </svg>
                 </button>
                 ` : nothing}

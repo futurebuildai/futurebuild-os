@@ -2,7 +2,9 @@ import { html, css, TemplateResult, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
 import { api } from '../../services/api';
+import { store } from '../../store/store';
 import type { FleetAsset, MaintenanceLog } from '../../types/fleet';
+import '../shared/fb-modal';
 
 @customElement('fb-view-fleet')
 export class FBViewFleet extends FBViewElement {
@@ -76,6 +78,14 @@ export class FBViewFleet extends FBViewElement {
         background: transparent; color: var(--fb-text-secondary); cursor: pointer; font-size: 13px; }
       .btn-submit { padding: 8px 18px; border-radius: 8px; border: none; background: var(--fb-primary);
         color: #0a0b0f; font-weight: 600; cursor: pointer; font-size: 13px; }
+
+      .skeleton { background: rgba(255, 255, 255, 0.05); border-radius: 4px; position: relative; overflow: hidden; }
+      .skeleton::after {
+        content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+        animation: fb-skeleton-shimmer 1.5s infinite;
+      }
+      @keyframes fb-skeleton-shimmer { 100% { left: 100%; } }
     `,
   ];
 
@@ -129,6 +139,9 @@ export class FBViewFleet extends FBViewElement {
       const plate = data.get('license_plate') as string;
       if (plate) newAsset.license_plate = plate;
       if (costStr) newAsset.purchase_cost_cents = Math.round(parseFloat(costStr) * 100);
+      // Phase 20: Capture visibility roles (admin only)
+      const roles = data.getAll('visible_to_roles') as string[];
+      if (roles.length > 0) newAsset.visible_to_roles = roles;
       await api.fleet.create(newAsset);
       this._showAddForm = false;
       await this._loadAssets();
@@ -183,10 +196,9 @@ export class FBViewFleet extends FBViewElement {
   }
 
   private _renderAddForm(): TemplateResult | typeof nothing {
-    if (!this._showAddForm) return nothing;
     return html`
-      <div class="add-form">
-        <h2>Add New Asset</h2>
+      <fb-modal .open=${this._showAddForm} heading="New Fleet Asset"
+        @fb-modal-close=${() => { this._showAddForm = false; }}>
         <form @submit=${this._onAddSubmit}>
           <div class="form-grid">
             <div class="form-field"><label>Asset Number</label><input name="asset_number" required /></div>
@@ -206,13 +218,23 @@ export class FBViewFleet extends FBViewElement {
                 <option value="retired">Retired</option>
               </select>
             </div>
+            ${store.user$.value?.role === 'Admin' ? html`
+            <div class="form-field">
+              <label>Visible To (leave empty for all)</label>
+              <select name="visible_to_roles" multiple>
+                <option value="Admin">Admin</option>
+                <option value="PM">PM</option>
+                <option value="Builder">Builder</option>
+              </select>
+            </div>
+            ` : nothing}
           </div>
           <div class="form-actions">
             <button type="button" class="btn-cancel" @click=${() => { this._showAddForm = false; }}>Cancel</button>
             <button type="submit" class="btn-submit">Create Asset</button>
           </div>
         </form>
-      </div>
+      </fb-modal>
     `;
   }
 
@@ -228,7 +250,24 @@ export class FBViewFleet extends FBViewElement {
       ${this._renderFilters()}
 
       ${this._viewState === 'loading' ? html`
-        <div class="loading-state"><span>Loading fleet assets...</span></div>
+        <div class="asset-grid">
+          ${[1, 2, 3, 4].map(() => html`
+            <div class="asset-card">
+              <div class="card-header">
+                <div class="skeleton" style="width: 80px; height: 20px;"></div>
+                <div class="skeleton" style="width: 60px; height: 18px; border-radius: 10px;"></div>
+              </div>
+              <div class="card-body">
+                <div class="skeleton" style="width: 140px; height: 16px; margin-bottom: 8px;"></div>
+                <div class="skeleton" style="width: 100px; height: 12px;"></div>
+              </div>
+              <div class="card-footer">
+                <div class="skeleton" style="width: 70px; height: 16px;"></div>
+                <div class="skeleton" style="width: 90px; height: 12px;"></div>
+              </div>
+            </div>
+          `)}
+        </div>
       ` : this._viewState === 'error' ? html`
         <div class="error-state">
           <span>Failed to load fleet data</span>

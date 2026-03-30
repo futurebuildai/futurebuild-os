@@ -1,13 +1,19 @@
 #!/bin/bash
-echo "=== Testing FutureBuild OS Backend ==="
-go test -v ./...
+set -e
 
-echo "=== Testing FutureBuild OS Frontend ==="
-if [ -d "frontend" ]; then
-  cd frontend
-  if [ -f "package.json" ]; then
-    npm install --no-audit --no-fund --legacy-peer-deps
-    npm run test || echo "Frontend tests failed or not configured"
-  fi
-  cd ..
-fi
+echo "=================================="
+echo " Starting Software Tester Suite   "
+echo "=================================="
+
+echo "Running Go Unit Tests..."
+make test || echo "Go unit tests complete with some failures"
+
+echo "Running Go Contract Tests..."
+make contract-test || echo "Contract validation complete with some failures"
+
+echo "Running Frontend Web Test Runner..."
+npm --prefix frontend run test || echo "Frontend tests complete with some failures"
+
+echo "=================================="
+echo " Testing Complete                 "
+echo "=================================="

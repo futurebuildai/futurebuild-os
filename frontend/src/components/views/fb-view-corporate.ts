@@ -251,6 +251,23 @@ export class FBViewCorporate extends FBViewElement {
             .error-state button:hover { background: var(--fb-surface-2, #1E2029); }
 
             .td-error { color: var(--fb-text-tertiary, #5A5B66); font-size: 12px; }
+
+            .skeleton {
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 4px;
+                position: relative;
+                overflow: hidden;
+            }
+            .skeleton::after {
+                content: '';
+                position: absolute;
+                top: 0; left: -100%; width: 100%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+                animation: fb-skeleton-shimmer 1.5s infinite;
+            }
+            @keyframes fb-skeleton-shimmer {
+                100% { left: 100%; }
+            }
         `,
     ];
 
@@ -334,7 +351,22 @@ export class FBViewCorporate extends FBViewElement {
 
     override render(): TemplateResult {
         if (this._viewState === 'loading') {
-            return html`<div class="empty-state">Loading corporate financials...</div>`;
+            return html`
+                <h1>Corporate Financials</h1>
+                <div class="subtitle">Organization-wide budget rollups, receivables, and sync status</div>
+                <div class="section">
+                    <h2 class="section-title skeleton" style="width: 250px; height: 24px; margin-bottom: 20px; border-radius: 4px;"></h2>
+                    <div class="budget-numbers">
+                        <div class="big-number-card skeleton" style="height: 80px;"></div>
+                        <div class="big-number-card skeleton" style="height: 80px;"></div>
+                        <div class="big-number-card skeleton" style="height: 80px;"></div>
+                    </div>
+                </div>
+                <div class="section">
+                    <h2 class="section-title skeleton" style="width: 200px; height: 24px; margin-bottom: 20px;"></h2>
+                    <div class="skeleton" style="width: 100%; height: 32px; border-radius: 6px; margin-bottom: 12px;"></div>
+                </div>
+            `;
         }
         if (this._viewState === 'error') {
             return html`

@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { FBViewElement } from '../base/FBViewElement';
 import { api } from '../../services/api';
 import type { Employee, Certification } from '../../types/employee';
+import '../shared/fb-modal';
 
 type ViewState = 'loading' | 'ready' | 'error';
 type StatusFilter = 'all' | 'active' | 'on_leave' | 'terminated';
@@ -103,6 +104,14 @@ export class FBViewEmployees extends FBViewElement {
         font-size: var(--fb-text-sm, 13px); font-weight: 600; cursor: pointer;
       }
       .btn-submit:hover { opacity: 0.85; }
+      
+      .skeleton { background: rgba(255, 255, 255, 0.05); border-radius: 4px; position: relative; overflow: hidden; }
+      .skeleton::after {
+        content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+        animation: fb-skeleton-shimmer 1.5s infinite;
+      }
+      @keyframes fb-skeleton-shimmer { 100% { left: 100%; } }
     `,
   ];
 
@@ -200,10 +209,9 @@ export class FBViewEmployees extends FBViewElement {
   }
 
   private _renderAddForm(): TemplateResult | typeof nothing {
-    if (!this._showAddForm) return nothing;
     return html`
-      <div class="form-overlay">
-        <h2>New Employee</h2>
+      <fb-modal .open=${this._showAddForm} heading="New Employee"
+        @fb-modal-close=${() => { this._showAddForm = false; }}>
         <form @submit=${this._handleSubmit}>
           <div class="form-row">
             <div class="form-field">
@@ -250,13 +258,29 @@ export class FBViewEmployees extends FBViewElement {
             <button type="submit" class="btn-submit">Create Employee</button>
           </div>
         </form>
-      </div>
+      </fb-modal>
     `;
   }
 
   private _renderEmployeeList(): TemplateResult | typeof nothing {
     if (this._viewState === 'loading') {
-      return html`<div class="loading-state">Loading employees...</div>`;
+      return html`
+        <div class="card-header">
+          <span>Name</span><span>Employee #</span><span>Status</span><span>Pay Rate</span><span>Classification</span>
+        </div>
+        ${[1, 2, 3, 4, 5].map(() => html`
+          <div class="card">
+            <div>
+              <div class="skeleton" style="width: 120px; height: 16px; margin-bottom: 6px;"></div>
+              <div class="skeleton" style="width: 160px; height: 12px;"></div>
+            </div>
+            <div class="skeleton" style="width: 80px; height: 14px;"></div>
+            <div class="skeleton" style="width: 60px; height: 20px; border-radius: 10px;"></div>
+            <div class="skeleton" style="width: 70px; height: 14px;"></div>
+            <div class="skeleton" style="width: 90px; height: 14px;"></div>
+          </div>
+        `)}
+      `;
     }
     if (this._viewState === 'error') {
       return html`

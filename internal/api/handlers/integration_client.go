@@ -6,22 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/colton/futurebuild/internal/worker"
 	"github.com/colton/futurebuild/pkg/a2a"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // IntegrationClient is a lightweight HTTP client for communicating with FB-Brain.
 type IntegrationClient struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
+	baseURL     string
+	apiKey      string
+	httpClient  *http.Client
+	asynqClient *asynq.Client // Phase 20: queue failed requests for retry
 }
 
-func NewIntegrationClient() *IntegrationClient {
+// NewIntegrationClient creates an IntegrationClient. If redisAddr is non-empty,
+// failed requests are queued for async retry via asynq instead of being dropped.
+func NewIntegrationClient(redisAddr string) *IntegrationClient {
 	baseURL := os.Getenv("FB_BRAIN_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8082"
@@ -30,11 +37,15 @@ func NewIntegrationClient() *IntegrationClient {
 	if apiKey == "" {
 		apiKey = "fb-brain-demo-key-2026"
 	}
-	return &IntegrationClient{
+	c := &IntegrationClient{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}
+	if redisAddr != "" {
+		c.asynqClient = asynq.NewClient(worker.ParseRedisOpt(redisAddr))
+	}
+	return c
 }
 
 type FlowResponse struct {
@@ -109,13 +120,41 @@ func (c *IntegrationClient) postFlow(ctx context.Context, path string, body inte
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fb-brain request failed: %w", err)
+		// Phase 20: Queue for async retry via asynq instead of dropping
+		if c.asynqClient != nil {
+			traceID := req.Header.Get("X-Trace-ID")
+			task, qErr := worker.NewA2AWebhookDispatchTask(worker.A2AWebhookDispatchPayload{
+				Path:    path,
+				Body:    bodyBytes,
+				APIKey:  c.apiKey,
+				BaseURL: c.baseURL,
+				TraceID: traceID,
+			})
+			if qErr == nil {
+				_, qErr = c.asynqClient.Enqueue(task)
+			}
+			if qErr != nil {
+				slog.Error("a2a/integration: failed to queue retry", "error", qErr, "path", path)
+			} else {
+				slog.Info("a2a/integration: queued for async retry", "path", path, "trace_id", traceID)
+			}
+		} else {
+			slog.Warn("a2a/integration: no queue available, event dropped", "error", err, "path", path)
+		}
+		return &FlowResponse{
+			Status:  "queued",
+			Message: "A2A connection unavailable, event queued for retry",
+		}, nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("fb-brain error %d: %s", resp.StatusCode, string(respBody))
+		slog.Warn("a2a/integration: fb-brain returned error", "status", resp.StatusCode, "body", string(respBody))
+		return &FlowResponse{
+			Status:  "error",
+			Message: fmt.Sprintf("FB-Brain failed with status %d", resp.StatusCode),
+		}, nil
 	}
 
 	var flowResp FlowResponse

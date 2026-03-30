@@ -22,11 +22,11 @@ type FeedHandler struct {
 	integrationClient  *IntegrationClient
 }
 
-// NewFeedHandler creates a new FeedHandler.
-func NewFeedHandler(fs *service.FeedService) *FeedHandler {
+// NewFeedHandler creates a new FeedHandler. Pass redisAddr for A2A retry queue support.
+func NewFeedHandler(fs *service.FeedService, redisAddr string) *FeedHandler {
 	return &FeedHandler{
 		feedService:       fs,
-		integrationClient: NewIntegrationClient(),
+		integrationClient: NewIntegrationClient(redisAddr),
 	}
 }
 
